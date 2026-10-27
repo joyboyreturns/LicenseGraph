@@ -180,13 +180,30 @@ export function viewOf(session: Session): SessionView {
   };
 }
 
+const ACTIVE: Phase[] = ["created", "extracting", "proposing"];
+
+/** In-memory sessions with a size cap, so a long-running or public server cannot grow without bound. */
 export class SessionStore {
   private sessions = new Map<string, Session>();
+
+  constructor(private readonly maxSessions = 200) {}
+
   add(s: Session) {
+    // Map keeps insertion order, so the first entries are the oldest. Never evict a run in progress.
+    for (const [id, old] of this.sessions) {
+      if (this.sessions.size < this.maxSessions) break;
+      if (!ACTIVE.includes(old.phase)) this.sessions.delete(id);
+    }
     this.sessions.set(s.id, s);
     return s;
   }
+
   get(id: string) {
     return this.sessions.get(id);
+  }
+
+  /** Runs still reading licences or choosing a bundle. */
+  activeCount() {
+    return [...this.sessions.values()].filter((s) => ACTIVE.includes(s.phase)).length;
   }
 }

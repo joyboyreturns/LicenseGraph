@@ -62,6 +62,8 @@ Prize targets: Best Overall, Best Use of Agentic Commerce, Best Use of AG Grid. 
 ## Step 7: Light work (7-8 Nov)
 
 - PIVOT submission days. Only fix bugs here.
+- [x] Done early, as a review pass: the in-memory session store is capped (200, never evicting a run in progress) and at most 3 runs can be active at once (HTTP 429 beyond that), so a public deployment cannot grow without bound or exhaust the gateway.
+- Known limits, accepted for the demo: sessions live in memory and are lost on restart; a session link is a bearer link (anyone holding it can approve and pay), which is fine for Sandbox only.
 
 ## Step 8: AG Grid dashboard (9-10 Nov)
 

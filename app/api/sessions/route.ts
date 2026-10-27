@@ -6,6 +6,8 @@ export const dynamic = "force-dynamic";
 
 const MAX_DOCS = 12;
 const MAX_TEXT = 20_000;
+/** Each run makes several model requests; cap concurrency so one visitor cannot exhaust the gateway. */
+const MAX_ACTIVE_RUNS = 3;
 
 function parse(body: unknown): SessionInput {
   const b = body as Partial<SessionInput> | null;
@@ -36,7 +38,9 @@ function parse(body: unknown): SessionInput {
 export async function POST(req: Request) {
   try {
     const rt = getRuntime();
-    const session = rt.store.add(createSession(parse(await req.json().catch(() => null))));
+    const input = parse(await req.json().catch(() => null));
+    if (rt.store.activeCount() >= MAX_ACTIVE_RUNS) return json({ error: "Too many runs in progress. Try again in a minute." }, 429);
+    const session = rt.store.add(createSession(input));
     // Runs in the background; the page polls the session. Failures are recorded on the session.
     void runPipeline(session, rt.deps).catch((e) => {
       session.phase = "failed";

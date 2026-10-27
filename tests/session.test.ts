@@ -180,4 +180,26 @@ describe("SessionStore", () => {
     expect(store.get(s.id)).toBe(s);
     expect(store.get("nope")).toBeUndefined();
   });
+
+  it("evicts the oldest finished session when full, never one still running", () => {
+    const store = new SessionStore(2);
+    const oldRunning = store.add(createSession(input()));
+    oldRunning.phase = "extracting";
+    const finished = store.add(createSession(input()));
+    finished.phase = "captured";
+
+    const fresh = store.add(createSession(input()));
+    expect(store.get(oldRunning.id)).toBeDefined();
+    expect(store.get(finished.id)).toBeUndefined();
+    expect(store.get(fresh.id)).toBeDefined();
+  });
+
+  it("counts runs still in progress", () => {
+    const store = new SessionStore();
+    const a = store.add(createSession(input()));
+    const b = store.add(createSession(input()));
+    a.phase = "proposing";
+    b.phase = "verified";
+    expect(store.activeCount()).toBe(1);
+  });
 });
