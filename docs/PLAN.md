@@ -51,8 +51,12 @@ Prize targets: Best Overall, Best Use of Agentic Commerce, Best Use of AG Grid. 
 ## Step 6: Approval and checkout (5-6 Nov)
 
 - [x] Approval record type; payment module refuses without `ok` verdict and approval (built in step 2)
-- [ ] Approval screen that produces the `Approval` record
-- [ ] Next.js UI: upload, loop view, approval screen, Sandbox checkout
+- [x] `src/app-logic/session.ts`: one module owns the flow and its order (created, extracting, proposing, verified or failed, approved, order created, captured). Approval needs a verified bundle and a named approver; the order is created only through `startCheckout`; capture only for the session's own order; a failed capture leaves the order waiting
+- [x] Next.js app: project form, licence documents (paste or load a text file), live loop timeline with evidence quotes, bundle table, approval, PayPal Sandbox order, capture, ledger with chain check
+- [x] Demo mode (no keys, no credits) and live mode (free model only); PayPal return URL captures the payment, with a manual "complete payment" fallback
+- [x] Payment idempotency key scoped to the session
+- [x] Verified in a browser (demo) and through the API (live, free model): sample project reads four licences, verifies a bundle of $329.00, approves it and creates a Sandbox order
+- [ ] Buyer approval and capture of a Sandbox order created by the app (needs the buyer to approve in PayPal)
 - Done when: an end-to-end purchase works in Sandbox.
 
 ## Step 7: Light work (7-8 Nov)

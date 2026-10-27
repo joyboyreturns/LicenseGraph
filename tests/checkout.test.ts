@@ -31,6 +31,17 @@ describe("startCheckout", () => {
     );
   });
 
+  it("scopes the idempotency key, so the same bundle can be bought again in a new session", async () => {
+    const keys: string[] = [];
+    const client = { createOrder: vi.fn(async (o: { requestId: string }) => (keys.push(o.requestId), created)) };
+    await startCheckout(client, { ...input(good), idempotencyScope: "s1" });
+    await startCheckout(client, { ...input(good), idempotencyScope: "s1" });
+    await startCheckout(client, { ...input(good), idempotencyScope: "s2" });
+    expect(keys[0]).toBe(keys[1]);
+    expect(keys[2]).not.toBe(keys[0]);
+    expect(keys[0]!.length).toBeLessThanOrEqual(108);
+  });
+
   it("refuses a bundle that fails verification, even if approved", async () => {
     const client = makeClient();
     const bad: Bundle = { offers: [offer({ terms: { commercialUse: false, territories: ["WORLD"], termMonths: 24 } })] };

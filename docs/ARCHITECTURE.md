@@ -50,7 +50,9 @@ The visible propose, verify, reject, revise cycle is the product. The model neve
 | `src/agent/` | `loop.ts`: propose-verify-revise loop with round cap and stall detection. `llm.ts`: model proposer. `greedy.ts`: deterministic stand-in | done |
 | `src/payments/` | `paypal.ts`: Orders v2 client (Sandbox only). `checkout.ts`: `startCheckout` gate (re-verify + approval digest match) | done |
 | `src/ledger/` | Hash-chained append-only event log: proposals, violations, approvals, payments | done |
-| `app/` | Next.js UI: upload, loop view, approval, ledger | steps 5-7 |
+| `src/app-logic/` | `session.ts`: the flow and its step order (extract, propose, verify, approve, pay, capture); the only thing the web layer calls | done |
+| `src/server/` | Runtime wiring (demo or live, PayPal on or off) and HTTP helpers | done |
+| `app/` | Next.js UI and API routes: project and documents, loop timeline, approval, payment, ledger | done |
 | `app/dashboard/` | AG Grid rights graph and ledger, AG Studio agent for views | step 8 |
 
 ## Data model (v1)

@@ -126,6 +126,7 @@ export async function startPayment(session: Session, deps: Deps): Promise<Create
     bundle: session.loop.bundle,
     approval: session.approval,
     today: today(deps),
+    idempotencyScope: session.id,
     returnUrl: deps.returnUrl?.(session.id),
     cancelUrl: deps.cancelUrl?.(session.id),
   });

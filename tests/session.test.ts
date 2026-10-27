@@ -32,7 +32,7 @@ describe("full flow", () => {
 
     const order = await startPayment(s, deps);
     expect(order.id).toBe("ORD1");
-    expect(payments.createOrder).toHaveBeenCalledWith(expect.objectContaining({ amountCents: 20_000 + 8_000 + 4_900, currency: "USD" }));
+    expect(payments.createOrder).toHaveBeenCalledWith(expect.objectContaining({ amountCents: 20_000 + 8_000 + 4_900, currency: "USD", requestId: expect.stringContaining(s.id) }));
 
     await completePayment(s, deps);
     expect(s.phase).toBe("captured");

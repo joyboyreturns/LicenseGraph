@@ -6,3 +6,5 @@ coverage/
 .env.local
 .DS_Store
 .sandbox-order.json
+next-env.d.ts
+*.tsbuildinfo

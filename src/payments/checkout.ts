@@ -41,7 +41,7 @@ export function approve(bundle: Bundle, approvedBy: string, now: Date = new Date
  */
 export async function startCheckout(
   client: Pick<PayPalClient, "createOrder">,
-  input: { project: Project; requiredAssetIds: string[]; bundle: Bundle; approval: Approval | undefined; today?: string; returnUrl?: string; cancelUrl?: string },
+  input: { project: Project; requiredAssetIds: string[]; bundle: Bundle; approval: Approval | undefined; today?: string; returnUrl?: string; cancelUrl?: string; idempotencyScope?: string },
 ): Promise<CreatedOrder> {
   const { project, requiredAssetIds, bundle, approval } = input;
 
@@ -60,8 +60,9 @@ export async function startCheckout(
     currency: bundle.offers[0]!.currency,
     referenceId: project.name,
     description: `LicenseGraph licence bundle for ${project.name}`,
-    // Same approved bundle, same key: a retry can never create a second order.
-    requestId: `lg-${digest.slice(0, 32)}`,
+    // Same approved bundle in the same scope (e.g. one session), same key: a retry can never
+    // create a second order, while a genuine second purchase of the same bundle still can.
+    requestId: `lg-${digest.slice(0, 32)}${input.idempotencyScope ? `-${input.idempotencyScope}` : ""}`,
     returnUrl: input.returnUrl,
     cancelUrl: input.cancelUrl,
   });
