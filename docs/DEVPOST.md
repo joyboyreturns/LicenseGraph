@@ -64,7 +64,7 @@ TypeScript, Next.js, React, PayPal Orders and Payouts (Sandbox), AG Studio, AG G
 - Vercel AI Gateway, routing to the free model `<<model id from your .env>>`, used for licence term extraction, bundle proposals, brief reading and the dashboard assistant, as described above.
 
 **Tools used while building the project:**
-- `<<Decide how to word this. The rules ask you to identify AI tools used; check the official Rules page. This project was built with an AI coding agent working under your direction, and a truthful disclosure should say so. Your repo's CLAUDE.md asks that AI tools are not credited as authors or contributors in git, which is a separate matter from this disclosure. Suggested neutral wording: "AI-assisted development: an AI coding agent was used for implementation and testing under the author's direction; the author reviewed and takes responsibility for the result.">>`
+- AI-assisted development: AI coding tools were used to help write and test the code, under the author's direction. The author reviewed the work and takes responsibility for it.
 
 ## Testing instructions for judges
 Hosted: open the link, press **Run the 60-second demo**, then follow the steps; use the PayPal Sandbox buyer shown on the checkout page if asked (`<<add a Sandbox buyer login you are comfortable sharing, or note that the payment simulator needs none>>`).
