@@ -45,7 +45,7 @@ The visible propose, verify, reject, revise cycle is the product. The model neve
 | Path | Responsibility | Build step |
 |---|---|---|
 | `src/core/types.ts` | Domain types: `Project`, `LicenseOffer`, `Evidence`, `Bundle`, `Verdict` | done |
-| `src/core/rules.ts` | `verifyBundle`: coverage, commercial use, territory, term, currency, evidence, budget | done (v1) |
+| `src/core/rules.ts` | `verifyBundle`: coverage, duplicates, commercial use, territory, term and fixed end date, medium, attribution, sublicensing, exclusivity, offer expiry, currency, evidence, budget | done (v2) |
 | `src/extraction/` | `extract.ts`: licence text to `LicenseOffer` with verified evidence spans. `model.ts`: gateway client, free models only | done (v1) |
 | `src/agent/` | Gateway client, propose and revise prompts, structured output schemas, loop with iteration cap | step 5 |
 | `src/payments/` | `paypal.ts`: Orders v2 client (Sandbox only). `checkout.ts`: `startCheckout` gate (re-verify + approval digest match) | done |
@@ -56,7 +56,8 @@ The visible propose, verify, reject, revise cycle is the product. The model neve
 ## Data model (v1)
 
 - `Project`: commercial flag, territories, term in months, optional budget.
-- `LicenseOffer`: asset, price in integer cents, currency, `LicenseTerms`, and `Evidence[]` (document id, quote, offsets).
+- `LicenseOffer`: asset, price in integer cents, currency, `LicenseTerms` (core terms plus optional media, attribution, sublicensing, exclusivity, fixed end date, offer validity), and `Evidence[]` (document id, field, quote, offsets).
+- Verification policy: a project constraint is checked only if declared, and the offer must then affirmatively meet it; silence fails.
 - `Bundle`: one offer per required asset.
 - `Verdict`: `ok`, total, and `Violation[]` each tagged with a `RuleId`.
 - Ledger event: `{ id, at, kind, payload }` where kind is one of `extracted`, `proposed`, `rejected`, `revised`, `approved`, `order_created`, `captured`.

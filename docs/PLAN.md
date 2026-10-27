@@ -31,9 +31,12 @@ Prize targets: Best Overall, Best Use of Agentic Commerce, Best Use of AG Grid. 
 
 ## Step 4: Rules engine hardening (1-2 Nov)
 
-- [ ] Add rules as needed: exclusivity, medium/format, attribution, sublicensing, expiry date
-- [ ] Property-style tests for territory and term edge cases
-- Done when: rules tests pass and every rule has a failing and passing case.
+- [x] New rules: medium, attribution, sublicensing, exclusivity, fixed end date (under `term`), offer expiry
+- [x] Policy: a constraint is checked only when the project declares it, and the offer must then state that it meets it; an offer that is silent fails
+- [x] Rules are small functions in an `OFFER_RULES` list; expiry takes `today` as an input so verification stays deterministic, and `startCheckout` supplies the real date
+- [x] Failing and passing cases for every rule, plus property tests (fast-check) for territory, term and bundle-order edge cases
+- [ ] Teach extraction to read the new terms (media, attribution, sublicensing, exclusivity, dates) with evidence; needs new fixtures and a few free-model runs
+- Done: 64 unit tests pass; every rule has a failing and passing case.
 
 ## Step 5: Propose-verify-revise loop (3-4 Nov)
 

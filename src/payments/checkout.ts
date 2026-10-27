@@ -41,11 +41,13 @@ export function approve(bundle: Bundle, approvedBy: string, now: Date = new Date
  */
 export async function startCheckout(
   client: Pick<PayPalClient, "createOrder">,
-  input: { project: Project; requiredAssetIds: string[]; bundle: Bundle; approval: Approval | undefined },
+  input: { project: Project; requiredAssetIds: string[]; bundle: Bundle; approval: Approval | undefined; today?: string },
 ): Promise<CreatedOrder> {
   const { project, requiredAssetIds, bundle, approval } = input;
 
-  const verdict = verifyBundle(project, requiredAssetIds, bundle);
+  // Offer expiry is checked against the real date at the moment of purchase.
+  const today = input.today ?? new Date().toISOString().slice(0, 10);
+  const verdict = verifyBundle(project, requiredAssetIds, bundle, { today });
   if (!verdict.ok) throw new PaymentRefused("Bundle failed verification", verdict.violations);
   if (bundle.offers.length === 0) throw new PaymentRefused("Bundle is empty");
 

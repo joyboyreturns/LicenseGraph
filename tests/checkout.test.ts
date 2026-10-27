@@ -54,6 +54,15 @@ describe("startCheckout", () => {
     expect(client.createOrder).not.toHaveBeenCalled();
   });
 
+  it("refuses an offer that expired before the purchase date", async () => {
+    const client = makeClient();
+    const expiring: Bundle = { offers: [offer({ terms: { commercialUse: true, territories: ["WORLD"], termMonths: 24, offerValidUntil: "2026-11-30" } })] };
+
+    await expect(startCheckout(client, { ...input(expiring), today: "2026-12-01" })).rejects.toThrow(/failed verification/);
+    expect(client.createOrder).not.toHaveBeenCalled();
+    await expect(startCheckout(client, { ...input(expiring), today: "2026-11-30" })).resolves.toEqual(created);
+  });
+
   it("refuses an empty bundle", async () => {
     const client = makeClient();
     const empty: Bundle = { offers: [] };

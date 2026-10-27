@@ -19,6 +19,18 @@ export interface LicenseTerms {
   territories: Territory[];
   /** Months of validity from the licence start, or "perpetual". */
   termMonths: number | "perpetual";
+  /** Media the licence covers (e.g. "web", "print", "broadcast"), or "ALL". Absent means not stated. */
+  mediums?: string[] | "ALL";
+  /** True if the licensee must credit the creator. Absent means not stated. */
+  attributionRequired?: boolean;
+  /** True if the licensee may sublicense. Absent means not stated. */
+  sublicensing?: boolean;
+  /** True if the licence is exclusive to the licensee. Absent means not stated. */
+  exclusive?: boolean;
+  /** Licence ends on this fixed date (YYYY-MM-DD), regardless of `termMonths`. */
+  fixedEndDate?: string;
+  /** Last date (YYYY-MM-DD) this offer can be bought. */
+  offerValidUntil?: string;
 }
 
 export interface LicenseOffer {
@@ -37,6 +49,14 @@ export interface Project {
   /** How long the project needs the assets for. */
   termMonths: number;
   budgetCents?: Cents;
+  /** Constraints below are checked only when declared; the offer must then state that it meets them. */
+  mediums?: string[];
+  /** False when the project cannot credit creators. */
+  canCredit?: boolean;
+  needsSublicensing?: boolean;
+  requiresExclusive?: boolean;
+  /** Last day (YYYY-MM-DD) the project needs the assets. */
+  endDate?: string;
 }
 
 export interface Bundle {
@@ -49,6 +69,11 @@ export type RuleId =
   | "commercial-use"
   | "territory"
   | "term"
+  | "medium"
+  | "attribution"
+  | "sublicensing"
+  | "exclusivity"
+  | "expiry"
   | "currency"
   | "evidence"
   | "budget";
