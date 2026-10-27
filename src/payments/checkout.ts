@@ -41,7 +41,7 @@ export function approve(bundle: Bundle, approvedBy: string, now: Date = new Date
  */
 export async function startCheckout(
   client: Pick<PayPalClient, "createOrder">,
-  input: { project: Project; requiredAssetIds: string[]; bundle: Bundle; approval: Approval | undefined; today?: string },
+  input: { project: Project; requiredAssetIds: string[]; bundle: Bundle; approval: Approval | undefined; today?: string; returnUrl?: string; cancelUrl?: string },
 ): Promise<CreatedOrder> {
   const { project, requiredAssetIds, bundle, approval } = input;
 
@@ -62,5 +62,7 @@ export async function startCheckout(
     description: `LicenseGraph licence bundle for ${project.name}`,
     // Same approved bundle, same key: a retry can never create a second order.
     requestId: `lg-${digest.slice(0, 32)}`,
+    returnUrl: input.returnUrl,
+    cancelUrl: input.cancelUrl,
   });
 }

@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 
 export type LedgerKind =
   | "extracted"
+  | "extraction_failed"
   | "proposed"
   | "rejected"
   | "revised"

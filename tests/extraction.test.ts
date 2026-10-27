@@ -3,7 +3,7 @@ import { verifyBundle } from "../src/core/rules";
 import type { Project } from "../src/core/types";
 import { extractOffer, locateQuote } from "../src/extraction/extract";
 import { createGatewayModel, type ModelClient } from "../src/extraction/model";
-import { cannedReply, fixtures, OPTIONAL_TERM_KEYS } from "./fixtures/licenses";
+import { cannedReply, fixtures, OPTIONAL_TERM_KEYS } from "../src/demo/fixtures";
 
 const replying = (...replies: string[]): ModelClient & { complete: ReturnType<typeof vi.fn> } => {
   const complete = vi.fn();

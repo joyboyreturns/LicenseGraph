@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 import { extractOffer } from "../src/extraction/extract";
 import { createGatewayModel, gatewayConfigFromEnv } from "../src/extraction/model";
-import { fixtures } from "./fixtures/licenses";
+import { fixtures } from "../src/demo/fixtures";
 
 describe.skipIf(!process.env.RUN_GATEWAY_LIVE)("extraction against the AI Gateway (live)", () => {
   it.each(fixtures)("extracts $doc.id with verified evidence", async (f) => {

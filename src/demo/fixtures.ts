@@ -1,5 +1,5 @@
-import type { LicenseTerms } from "../../src/core/types";
-import type { SourceDocument } from "../../src/extraction/extract";
+import type { LicenseTerms } from "../core/types";
+import type { SourceDocument } from "../extraction/extract";
 
 export interface Fixture {
   doc: SourceDocument;
