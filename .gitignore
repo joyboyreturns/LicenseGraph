@@ -8,3 +8,4 @@ coverage/
 .sandbox-order.json
 next-env.d.ts
 *.tsbuildinfo
+.data/

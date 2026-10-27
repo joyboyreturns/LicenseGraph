@@ -17,7 +17,7 @@ export interface SessionInput {
   requiredAssetIds: string[];
   documents: SourceDocument[];
   /** Where the run came from, for display. */
-  meta?: { scenarioId?: string; brief?: string };
+  meta?: { scenarioId?: string; brief?: string; /** "demo" replays recorded model output; "live" calls the model. */ runKind?: "demo" | "live" };
 }
 
 export interface Session {

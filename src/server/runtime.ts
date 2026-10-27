@@ -1,10 +1,12 @@
+import { join, resolve } from "node:path";
 import { greedyProposer } from "../agent/greedy";
 import { createLlmProposer } from "../agent/llm";
+import { FileSessionRepository } from "../app-logic/persistence";
 import { SessionStore, type Deps } from "../app-logic/session";
 import { demoModel } from "../demo/mock-model";
-import { createGatewayModel, gatewayConfigFromEnv } from "../extraction/model";
-import { createLlmProxy, limitsFromEnv } from "./llm-proxy";
+import { createGatewayModel, gatewayConfigFromEnv, type ModelClient } from "../extraction/model";
 import { configFromEnv, createPayPalClient } from "../payments/paypal";
+import { createLlmProxy, limitsFromEnv } from "./llm-proxy";
 
 export type Mode = "demo" | "live";
 
@@ -13,10 +15,16 @@ export interface Runtime {
   /** Gateway model id in live mode. Never a secret. */
   model?: string;
   paymentsEnabled: boolean;
-  /** Server-side model access for the dashboard assistant; live mode only. */
+  /** Server-side model access for the dashboard assistant. */
   llmProxy?: ReturnType<typeof createLlmProxy>;
+  /** Reads plain-English briefs; absent without a gateway key (the local reader is used). */
+  intakeModel?: ModelClient;
+  /** Runs for the built-in scenarios: recorded model output and the deterministic baseline proposer. */
+  demoDeps: Deps;
   deps: Deps;
   store: SessionStore;
+  passportSecret?: string;
+  appUrl: string;
 }
 
 const appUrl = () => (process.env.APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
@@ -27,34 +35,44 @@ function build(): Runtime {
 
   const paymentsEnabled = Boolean(process.env.PAYPAL_CLIENT_ID && process.env.PAYPAL_CLIENT_SECRET);
   const payments = paymentsEnabled ? createPayPalClient(configFromEnv()) : undefined;
+  const payeeOverrides = (process.env.LICENSEGRAPH_CREATOR_EMAILS ?? "").split(",").map((e) => e.trim()).filter(Boolean);
 
-  let model = demoModel;
+  let model: ModelClient = demoModel;
   let proposer = greedyProposer;
   let modelId: string | undefined;
   let llmProxy: Runtime["llmProxy"];
-  if (mode === "live") {
+  let intakeModel: ModelClient | undefined;
+  if (hasGateway) {
     // createGatewayModel refuses any model the gateway does not list as free.
     const config = gatewayConfigFromEnv();
-    model = createGatewayModel(config);
-    proposer = createLlmProposer(model);
-    modelId = config.model;
+    intakeModel = createGatewayModel(config);
+    llmProxy = createLlmProxy(config, limitsFromEnv());
+    if (mode === "live") {
+      model = intakeModel;
+      proposer = createLlmProposer(model);
+      modelId = config.model;
+    }
   }
-  // The dashboard assistant needs only the gateway key and a free model, not live extraction.
-  if (hasGateway) llmProxy = createLlmProxy(gatewayConfigFromEnv(), limitsFromEnv());
+
+  const common = {
+    payments,
+    payeeOverrides: payeeOverrides.length ? payeeOverrides : undefined,
+    returnUrl: (id: string) => `${appUrl()}/api/sessions/${id}/return`,
+    cancelUrl: (id: string) => `${appUrl()}/run/${id}`,
+  };
+  const dataDir = resolve(process.env.LICENSEGRAPH_DATA_DIR ?? join(process.cwd(), ".data"));
 
   return {
     mode,
     model: modelId,
     paymentsEnabled,
     llmProxy,
-    store: new SessionStore(),
-    deps: {
-      model,
-      proposer,
-      payments,
-      returnUrl: (id) => `${appUrl()}/api/sessions/${id}/return`,
-      cancelUrl: (id) => `${appUrl()}/?session=${id}`,
-    },
+    intakeModel,
+    passportSecret: process.env.LICENSEGRAPH_PASSPORT_SECRET || undefined,
+    appUrl: appUrl(),
+    store: new SessionStore(500, new FileSessionRepository(join(dataDir, "sessions"))),
+    deps: { model, proposer, ...common },
+    demoDeps: { model: demoModel, proposer: greedyProposer, ...common },
   };
 }
 

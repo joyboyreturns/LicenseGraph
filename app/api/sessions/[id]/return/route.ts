@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const id = (await params).id;
   const session = sessionOr404(id);
-  const back = new URL(`/?session=${encodeURIComponent(id)}`, process.env.APP_URL ?? req.url);
+  const back = new URL(`/run/${encodeURIComponent(id)}`, process.env.APP_URL ?? req.url);
   if (session) {
     // Capture only the order this session created, whatever token the redirect carries.
     await completePayment(session, getRuntime().deps).catch(() => undefined);
