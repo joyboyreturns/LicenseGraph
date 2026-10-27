@@ -47,9 +47,9 @@ The visible propose, verify, reject, revise cycle is the product. The model neve
 | `src/core/types.ts` | Domain types: `Project`, `LicenseOffer`, `Evidence`, `Bundle`, `Verdict` | done |
 | `src/core/rules.ts` | `verifyBundle`: coverage, duplicates, commercial use, territory, term and fixed end date, medium, attribution, sublicensing, exclusivity, offer expiry, currency, evidence, budget | done (v2) |
 | `src/extraction/` | `extract.ts`: licence text to `LicenseOffer` with verified evidence spans. `model.ts`: gateway client, free models only | done (v1) |
-| `src/agent/` | Gateway client, propose and revise prompts, structured output schemas, loop with iteration cap | step 5 |
+| `src/agent/` | `loop.ts`: propose-verify-revise loop with round cap and stall detection. `llm.ts`: model proposer. `greedy.ts`: deterministic stand-in | done |
 | `src/payments/` | `paypal.ts`: Orders v2 client (Sandbox only). `checkout.ts`: `startCheckout` gate (re-verify + approval digest match) | done |
-| `src/ledger/` | Append-only event log: proposals, violations, approvals, payments | step 5 |
+| `src/ledger/` | Hash-chained append-only event log: proposals, violations, approvals, payments | done |
 | `app/` | Next.js UI: upload, loop view, approval, ledger | steps 5-7 |
 | `app/dashboard/` | AG Grid rights graph and ledger, AG Studio agent for views | step 8 |
 
@@ -60,7 +60,7 @@ The visible propose, verify, reject, revise cycle is the product. The model neve
 - Verification policy: a project constraint is checked only if declared, and the offer must then affirmatively meet it; silence fails.
 - `Bundle`: one offer per required asset.
 - `Verdict`: `ok`, total, and `Violation[]` each tagged with a `RuleId`.
-- Ledger event: `{ id, at, kind, payload }` where kind is one of `extracted`, `proposed`, `rejected`, `revised`, `approved`, `order_created`, `captured`.
+- Ledger event: `{ id, at, kind, payload }` where kind is one of `extracted`, `proposed`, `rejected`, `revised`, `verified`, `proposal_error`, `approved`, `order_created`, `captured`. Each event carries the hash of the previous one, so edits, removals and reordering are detectable.
 
 ## Key decisions
 

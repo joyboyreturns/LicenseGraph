@@ -41,10 +41,12 @@ Prize targets: Best Overall, Best Use of Agentic Commerce, Best Use of AG Grid. 
 
 ## Step 5: Propose-verify-revise loop (3-4 Nov)
 
-- [ ] `src/agent/`: gateway client, propose and revise prompts, JSON schema outputs
-- [ ] Loop with iteration cap; violations fed back verbatim
-- [ ] `src/ledger/` event log for every step
-- Done when: a mock run shows reject then revise then accept, with the ledger recording it.
+- [x] `src/agent/loop.ts`: `runProposeVerifyLoop`. The proposer picks offers by id from real candidates only; violations go back verbatim; only a bundle the rules engine accepts is returned as verified; it stops on a repeated bundle ("stalled") and at `maxRounds` ("exhausted"); an unknown id or a throwing proposer is recorded and fed back, not trusted
+- [x] `src/agent/greedy.ts`: deterministic stand-in proposer for tests and offline demos. `src/agent/llm.ts`: model-backed proposer on the same `ModelClient` (free-models-only gateway guard applies)
+- [x] `src/ledger/ledger.ts`: append-only, hash-chained event log (`proposed`, `rejected`, `revised`, `verified`, `proposal_error`, plus `approved`, `order_created`, `captured` for step 6); tampering, removal and reordering are detected; callers only get copies
+- [x] Mock run shows reject, revise, accept with the ledger recording it
+- [ ] One live proposer run on the free model (a single request) to confirm it picks valid offer ids
+- Done: 90 unit tests pass.
 
 ## Step 6: Approval and checkout (5-6 Nov)
 
