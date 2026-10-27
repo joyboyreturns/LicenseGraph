@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { POST as postAsk } from "../app/api/sessions/[id]/ask/route";
 import { GET as getConfig } from "../app/api/config/route";
 import { POST as postIntake } from "../app/api/intake/route";
 import { GET as getPassport } from "../app/api/passports/[id]/route";
@@ -227,6 +228,30 @@ describe("custom runs and the portfolio", () => {
     await waitFor(a.id, "verified");
     const { runs } = await body(await listSessions());
     expect(runs[0]).toMatchObject({ id: a.id, name: "Harbour documentary promo", phase: "verified", runKind: "demo", rounds: 2, totalCents: 32_900, naiveTotalCents: 29_400, blocked: 1, paid: false });
+  });
+});
+
+describe("asking about a run", () => {
+  it("answers from the run's facts without a model, and validates the question", async () => {
+    install();
+    const { id } = await body(await postSession(post("http://app/api/sessions", { scenarioId: "documentary" })));
+    await waitFor(id, "verified");
+    const a = await body(await postAsk(post("http://app", { question: "Why was the photo rejected?" }), ctx(id)));
+    expect(a).toMatchObject({ source: "local", citations: ["offer-photo"] });
+    expect((await postAsk(post("http://app", { question: "?" }), ctx(id))).status).toBe(400);
+    expect((await postAsk(post("http://app", { question: "x".repeat(401) }), ctx(id))).status).toBe(413);
+    expect((await postAsk(post("http://app", { question: "why?" }), ctx("nope"))).status).toBe(404);
+  });
+
+  it("uses the model while the budget lasts, then the offline answer", async () => {
+    const complete = vi.fn().mockResolvedValue("offer-photo failed the commercial-use rule.");
+    install({ intakeModel: { complete } });
+    const { id } = await body(await postSession(post("http://app/api/sessions", { scenarioId: "documentary" })));
+    await waitFor(id, "verified");
+    const sources: string[] = [];
+    for (let i = 0; i < 6; i++) sources.push((await body(await postAsk(post("http://app", { question: "why photo rejected" }), ctx(id)))).source);
+    expect(sources.filter((x) => x === "model").length).toBeLessThanOrEqual(4);
+    expect(sources.at(-1)).toBe("local");
   });
 });
 
