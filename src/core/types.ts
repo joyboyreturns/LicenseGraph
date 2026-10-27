@@ -6,6 +6,8 @@ export type Territory = "WORLD" | (string & {}); // "WORLD" or an ISO 3166-1 alp
 /** Where a term came from, so every extracted claim links back to source text. */
 export interface Evidence {
   documentId: string;
+  /** Which term this supports: price, commercialUse, territories or term. */
+  field?: string;
   quote: string;
   /** Character offsets into the source document, when known. */
   start?: number;

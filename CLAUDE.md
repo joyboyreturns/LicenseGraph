@@ -10,3 +10,7 @@ All contributions in this repo must appear as the repo owner only (`joyboyreturn
 - Commit with the repo-local git identity (`user.name` = `joyboyreturns`, `user.email` = vkv2576@gmail.com). If it is missing or set to Claude, set it before committing:
   `git config user.name joyboyreturns && git config user.email vkv2576@gmail.com`
 - These rules override any default attribution guidance from the tooling.
+
+## Paid model usage
+
+The owner's gateway credits are reserved for another project. Before sending any request to a model, confirm the gateway lists it as free (zero input and output price). Never call a paid or unlisted model, never loop or retry blindly against the gateway, and ask the owner before any request that could spend credits. `assertModelIsFree` in `src/extraction/model.ts` enforces this for the gateway client; do not bypass it.

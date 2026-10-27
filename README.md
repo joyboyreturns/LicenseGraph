@@ -8,7 +8,7 @@ Built for the PayPal AI Hackathon 2026.
 
 ## Status
 
-Foundation only: domain types, rules engine v1 with tests, architecture and plan. See [`docs/PLAN.md`](docs/PLAN.md) for the schedule.
+Built so far: domain types, rules engine, PayPal Sandbox payments with an approval gate, and licence term extraction with verified evidence. See [`docs/PLAN.md`](docs/PLAN.md) for the schedule.
 
 ## Docs
 

@@ -22,10 +22,12 @@ Prize targets: Best Overall, Best Use of Agentic Commerce, Best Use of AG Grid. 
 
 ## Step 3: Data models and extraction (29 Oct-31 Oct)
 
-- [ ] Fixture licence texts (music, image, font, footage) with known terms
-- [ ] `src/extraction/`: schema for `LicenseOffer[]` with evidence spans; deterministic checks that each quote really appears in the source
-- [ ] Mock-model tests, then gateway-backed run
-- Done when: fixtures extract with correct terms and verified quotes.
+- [x] Fixture licence texts (music, image, font, footage) with known terms and verbatim quotes (`tests/fixtures/licenses.ts`)
+- [x] `src/extraction/extract.ts`: schema for `LicenseOffer` with per-field evidence; every quote is located in the source text and given offsets, and an invented quote is rejected and retried with the reason
+- [x] `src/extraction/model.ts`: gateway client behind a `ModelClient` interface; mock-model tests, one live run (`npm run test:gateway`)
+- [x] Free-models-only guard: `assertModelIsFree` checks the gateway price list before any request is sent
+- [ ] Run the other three fixtures live and measure accuracy (only on a free model, a few requests at a time)
+- Done when: fixtures extract with correct terms and verified quotes (mock: all four; live: song so far).
 
 ## Step 4: Rules engine hardening (1-2 Nov)
 

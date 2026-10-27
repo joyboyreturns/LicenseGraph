@@ -26,3 +26,7 @@ LicenseGraph proposes licence bundles with an AI agent, verifies them with a det
 - Add a test with every rule or behaviour change.
 - Keep changes small and follow the step order in `docs/PLAN.md`.
 - If a decision is the owner's (credentials, prize choices, scope cuts), stop and ask.
+
+## Paid model usage
+
+The owner's gateway credits are reserved for another project. Before sending any request to a model, confirm the gateway lists it as free (zero input and output price). Never call a paid or unlisted model, never loop or retry blindly against the gateway, and ask the owner before any request that could spend credits. `assertModelIsFree` in `src/extraction/model.ts` enforces this for the gateway client; do not bypass it.

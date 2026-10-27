@@ -46,7 +46,7 @@ The visible propose, verify, reject, revise cycle is the product. The model neve
 |---|---|---|
 | `src/core/types.ts` | Domain types: `Project`, `LicenseOffer`, `Evidence`, `Bundle`, `Verdict` | done |
 | `src/core/rules.ts` | `verifyBundle`: coverage, commercial use, territory, term, currency, evidence, budget | done (v1) |
-| `src/extraction/` | Turn licence text into `LicenseOffer[]` with evidence spans | step 3 |
+| `src/extraction/` | `extract.ts`: licence text to `LicenseOffer` with verified evidence spans. `model.ts`: gateway client, free models only | done (v1) |
 | `src/agent/` | Gateway client, propose and revise prompts, structured output schemas, loop with iteration cap | step 5 |
 | `src/payments/` | `paypal.ts`: Orders v2 client (Sandbox only). `checkout.ts`: `startCheckout` gate (re-verify + approval digest match) | done |
 | `src/ledger/` | Append-only event log: proposals, violations, approvals, payments | step 5 |
