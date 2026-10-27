@@ -1,48 +1,11 @@
 import { createHash } from "node:crypto";
+import { eventCanonical, GENESIS_HASH, type LedgerEvent, type LedgerKind } from "./chain";
 
-export type LedgerKind =
-  | "extracted"
-  | "extraction_failed"
-  | "proposed"
-  | "rejected"
-  | "revised"
-  | "verified"
-  | "proposal_error"
-  | "approved"
-  | "order_created"
-  | "captured"
-  | "payout_created"
-  | "payout_failed"
-  | "payout_settled";
+export { eventCanonical, GENESIS_HASH, verifyChainAsync, type LedgerEvent, type LedgerKind } from "./chain";
 
-export interface LedgerEvent {
-  seq: number;
-  at: string;
-  kind: LedgerKind;
-  /** Must be JSON-serialisable. */
-  payload: Record<string, unknown>;
-  prevHash: string;
-  hash: string;
-}
-
-const GENESIS = "0".repeat(64);
-
-/** The exact text hashed for an event; shared with the browser-side verifier. */
-export const eventCanonical = (e: Omit<LedgerEvent, "hash">) => JSON.stringify([e.seq, e.at, e.kind, e.payload, e.prevHash]);
-
-export const GENESIS_HASH = GENESIS;
+const GENESIS = GENESIS_HASH;
 
 const hashOf = (e: Omit<LedgerEvent, "hash">) => createHash("sha256").update(eventCanonical(e)).digest("hex");
-
-/** Same check as `verifyChain`, using WebCrypto so it runs in a browser too. */
-export async function verifyChainAsync(events: readonly LedgerEvent[], sha256: (text: string) => Promise<string>): Promise<boolean> {
-  let prev = GENESIS;
-  for (const [i, e] of events.entries()) {
-    if (e.seq !== i + 1 || e.prevHash !== prev || e.hash !== (await sha256(eventCanonical(e)))) return false;
-    prev = e.hash;
-  }
-  return true;
-}
 
 /** Recompute every hash and link; false if any event was changed, removed, reordered or inserted. */
 export function verifyChain(events: readonly LedgerEvent[]): boolean {

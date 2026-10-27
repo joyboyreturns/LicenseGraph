@@ -1,7 +1,7 @@
 import { bundleCanonical, sha256Hex } from "../core/digest";
 import { verifyBundle } from "../core/rules";
 import type { LicenseOffer, Project } from "../core/types";
-import { verifyChainAsync, type LedgerEvent } from "../ledger/ledger";
+import { verifyChainAsync, type LedgerEvent } from "../ledger/chain";
 import type { PayoutSummary } from "../payments/payouts";
 import type { Session } from "../app-logic/session";
 

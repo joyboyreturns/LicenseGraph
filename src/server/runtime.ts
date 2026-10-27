@@ -6,6 +6,7 @@ import { SessionStore, type Deps } from "../app-logic/session";
 import { demoModel } from "../demo/mock-model";
 import { createGatewayModel, gatewayConfigFromEnv, type ModelClient } from "../extraction/model";
 import { configFromEnv, createPayPalClient } from "../payments/paypal";
+import { createPayPalSimulator, type PayPalSimulator } from "../payments/simulator";
 import { createLlmProxy, limitsFromEnv } from "./llm-proxy";
 
 export type Mode = "demo" | "live";
@@ -15,6 +16,9 @@ export interface Runtime {
   /** Gateway model id in live mode. Never a secret. */
   model?: string;
   paymentsEnabled: boolean;
+  /** Which payment backend is live: the real PayPal Sandbox, the offline simulator, or none. */
+  paymentsMode: "paypal-sandbox" | "simulator" | "none";
+  simulator?: PayPalSimulator;
   /** Server-side model access for the dashboard assistant. */
   llmProxy?: ReturnType<typeof createLlmProxy>;
   /** Reads plain-English briefs; absent without a gateway key (the local reader is used). */
@@ -33,8 +37,14 @@ function build(): Runtime {
   const hasGateway = Boolean(process.env.AI_GATEWAY_API_KEY && process.env.LICENSEGRAPH_MODEL);
   const mode: Mode = process.env.LICENSEGRAPH_MODE === "demo" ? "demo" : process.env.LICENSEGRAPH_MODE === "live" || hasGateway ? "live" : "demo";
 
-  const paymentsEnabled = Boolean(process.env.PAYPAL_CLIENT_ID && process.env.PAYPAL_CLIENT_SECRET);
-  const payments = paymentsEnabled ? createPayPalClient(configFromEnv()) : undefined;
+  const hasPayPal = Boolean(process.env.PAYPAL_CLIENT_ID && process.env.PAYPAL_CLIENT_SECRET);
+  // The simulator runs only when asked for (or when forced with LICENSEGRAPH_PAYMENTS=simulator), never in place of real credentials by accident.
+  const forced = process.env.LICENSEGRAPH_PAYMENTS;
+  const useSimulator = forced === "simulator" || (!hasPayPal && forced !== "none" && process.env.LICENSEGRAPH_SIMULATOR === "1");
+  const simulator = useSimulator ? createPayPalSimulator({ appUrl }) : undefined;
+  const payments = simulator ?? (hasPayPal && forced !== "none" ? createPayPalClient(configFromEnv()) : undefined);
+  const paymentsMode: Runtime["paymentsMode"] = simulator ? "simulator" : payments ? "paypal-sandbox" : "none";
+  const paymentsEnabled = paymentsMode !== "none";
   const payeeOverrides = (process.env.LICENSEGRAPH_CREATOR_EMAILS ?? "").split(",").map((e) => e.trim()).filter(Boolean);
 
   let model: ModelClient = demoModel;
@@ -66,6 +76,8 @@ function build(): Runtime {
     mode,
     model: modelId,
     paymentsEnabled,
+    paymentsMode,
+    simulator,
     llmProxy,
     intakeModel,
     passportSecret: process.env.LICENSEGRAPH_PASSPORT_SECRET || undefined,

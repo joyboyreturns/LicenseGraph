@@ -11,6 +11,9 @@ import { POST as postPay } from "../app/api/sessions/[id]/pay/route";
 import { POST as postPayouts } from "../app/api/sessions/[id]/payouts/route";
 import { GET as getSession } from "../app/api/sessions/[id]/route";
 import { GET as listSessions, POST as postSession } from "../app/api/sessions/route";
+import { GET as getReturn } from "../app/api/sessions/[id]/return/route";
+import { GET as getSimOrder, POST as postSimApprove } from "../app/api/simulator/orders/[id]/route";
+import { createPayPalSimulator } from "../src/payments/simulator";
 import { SessionStore } from "../src/app-logic/session";
 import { greedyProposer } from "../src/agent/greedy";
 import { demoModel } from "../src/demo/mock-model";
@@ -29,6 +32,7 @@ function install(over: Partial<Runtime> = {}) {
   const rt: Runtime = {
     mode: "demo",
     paymentsEnabled: true,
+    paymentsMode: "paypal-sandbox",
     appUrl: "http://app",
     passportSecret: "test-secret",
     store: new SessionStore(),
@@ -157,6 +161,39 @@ describe("a scenario run from start to passport", () => {
     const retried = await body(await postPayouts(post("http://app"), ctx(id)));
     expect(retried).toMatchObject({ phase: "settled", payouts: { status: "PENDING" } });
     expect(payments.captureOrder).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("the payment simulator, end to end", () => {
+  it("runs the whole purchase offline: checkout page, buyer approval, return redirect, capture, payouts, passport", async () => {
+    const simulator = createPayPalSimulator({ appUrl: () => "http://app", settleAfterMs: 0 });
+    install({ paymentsMode: "simulator", simulator, deps: { model: demoModel, proposer: greedyProposer, today: () => "2026-11-05", payments: simulator, returnUrl: (id) => `http://app/api/sessions/${id}/return`, cancelUrl: (id) => `http://app/run/${id}` }, demoDeps: { model: demoModel, proposer: greedyProposer, today: () => "2026-11-05", payments: simulator, returnUrl: (id) => `http://app/api/sessions/${id}/return`, cancelUrl: (id) => `http://app/run/${id}` } });
+    const { id } = await body(await postSession(post("http://app/api/sessions", { scenarioId: "podcast" })));
+    await waitFor(id, "verified");
+    await postApprove(post("http://app", { approvedBy: "Kiran" }), ctx(id));
+    const { order } = await body(await postPay(post("http://app"), ctx(id)));
+    expect(order.approveUrl).toBe(`http://app/simulator/checkout?order=${order.id}`);
+
+    // The checkout page reads the order, then the buyer presses Approve and is sent back to the app.
+    expect(await body(await getSimOrder(new Request("http://app"), ctx(order.id)))).toMatchObject({ amountCents: 69_000, approved: false });
+    expect((await postCapture(post("http://app"), ctx(id))).status).toBe(502); // not approved yet
+    const approved = await body(await postSimApprove(post("http://app"), ctx(order.id)));
+    expect(approved.returnUrl).toBe(`http://app/api/sessions/${id}/return`);
+
+    const back = await getReturn(new Request(approved.returnUrl), ctx(id));
+    expect(back.headers.get("location")).toContain(`/run/${id}`);
+    const done = await waitFor(id, "settled");
+    expect(done.capture).toMatchObject({ status: "COMPLETED", amount: { value: "690.00" } });
+    expect(done.capture.captureId).toMatch(/^SIMCAP-/);
+
+    const check = await body(await verifyPassportRoute(new Request("http://app"), ctx(id)));
+    expect(check.ok).toBe(true);
+  });
+
+  it("has no simulator routes when the real PayPal Sandbox is in use", async () => {
+    install();
+    expect((await getSimOrder(new Request("http://app"), ctx("x"))).status).toBe(404);
+    expect((await postSimApprove(post("http://app"), ctx("x"))).status).toBe(404);
   });
 });
 
