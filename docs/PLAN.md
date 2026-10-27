@@ -9,9 +9,9 @@ Prize targets: Best Overall, Best Use of Agentic Commerce, Best Use of AG Grid. 
 - [x] Repo, MIT licence, TypeScript, Vitest, `.env.example`
 - [x] Domain types and rules engine v1 with tests
 - [x] Architecture and plan docs, `AGENTS.md`
-- [ ] PayPal Sandbox account (open question: can it be created from India?)
-- [ ] Sandbox test order and capture from a script
-- Done when: a test payment is captured.
+- [x] PayPal Sandbox accounts (use United States accounts; India-region accounts cannot transact in USD)
+- [x] Sandbox test order and capture from a script (`npm run sandbox:order`)
+- Done: a test payment was captured on 27 Oct.
 
 ## Step 2: Payments client (28 Oct)
 
@@ -61,6 +61,6 @@ Prize targets: Best Overall, Best Use of Agentic Commerce, Best Use of AG Grid. 
 
 ## Open questions
 
-- Can a PayPal Sandbox account be created from India?
+- Resolved: Sandbox accounts can be created from India, but they must use country United States.
 - Exact requirements for Agentic Commerce and AG Grid prizes.
 - Whether Best Overall needs a specific submission format or hosted link.

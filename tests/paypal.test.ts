@@ -50,6 +50,7 @@ describe("createPayPalClient", () => {
     const cap = await client.captureOrder("ORD1", "b");
 
     expect(cap.captureId).toBe("CAP1");
+    expect(cap.amount).toEqual({ currency: "USD", value: "25.00" });
     expect(fetchMock).toHaveBeenCalledTimes(3); // one token fetch only
   });
 

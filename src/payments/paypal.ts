@@ -109,7 +109,7 @@ export function createPayPalClient(config: PayPalConfig) {
       const json = await call(`/v2/checkout/orders/${encodeURIComponent(orderId)}/capture`, requestId);
       const capture = json.purchase_units?.[0]?.payments?.captures?.[0];
       if (!capture) throw new Error(`PayPal capture returned no capture (status ${json.status})`);
-      return { id: json.id, status: json.status, captureId: capture.id, amount: capture.amount };
+      return { id: json.id, status: json.status, captureId: capture.id, amount: { currency: capture.amount.currency_code, value: capture.amount.value } };
     },
   };
 }
