@@ -45,7 +45,7 @@ Prize targets: Best Overall, Best Use of Agentic Commerce, Best Use of AG Grid. 
 - [x] `src/agent/greedy.ts`: deterministic stand-in proposer for tests and offline demos. `src/agent/llm.ts`: model-backed proposer on the same `ModelClient` (free-models-only gateway guard applies)
 - [x] `src/ledger/ledger.ts`: append-only, hash-chained event log (`proposed`, `rejected`, `revised`, `verified`, `proposal_error`, plus `approved`, `order_created`, `captured` for step 6); tampering, removal and reordering are detected; callers only get copies
 - [x] Mock run shows reject, revise, accept with the ledger recording it
-- [ ] One live proposer run on the free model (a single request) to confirm it picks valid offer ids
+- [x] One live proposer run on the free model (a single request, `npm run test:proposer`): it chose valid ids, skipped the cheap non-commercial trap offer, and the rules engine confirmed the bundle
 - Done: 90 unit tests pass.
 
 ## Step 6: Approval and checkout (5-6 Nov)
