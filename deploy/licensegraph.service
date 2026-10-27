@@ -1,0 +1,30 @@
+# systemd unit for LicenseGraph on an Ubuntu server.
+# Install: sudo cp deploy/licensegraph.service /etc/systemd/system/ && sudo systemctl daemon-reload
+#          sudo systemctl enable --now licensegraph
+# Adjust User, WorkingDirectory and the Node path to match your machine (see docs/DEPLOY.md).
+[Unit]
+Description=LicenseGraph (Next.js)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=licensegraph
+Group=licensegraph
+WorkingDirectory=/opt/licensegraph
+EnvironmentFile=/opt/licensegraph/.env
+Environment=NODE_ENV=production
+# Listen on localhost only: Tailscale Funnel connects to it from the same machine.
+ExecStart=/usr/bin/node node_modules/next/dist/bin/next start -H 127.0.0.1 -p 3000
+Restart=on-failure
+RestartSec=5
+
+# Hardening: the app only needs to read its own folder and write its data directory.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/var/lib/licensegraph
+
+[Install]
+WantedBy=multi-user.target
