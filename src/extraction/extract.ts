@@ -6,6 +6,8 @@ export interface SourceDocument {
   id: string;
   assetId: string;
   text: string;
+  /** Who gets paid for this licence. */
+  licensor?: { name: string; email: string };
 }
 
 /** Terms every licence must state; each needs evidence. */

@@ -1,4 +1,4 @@
-import type { Bundle, LicenseOffer, Project, Verdict, Violation } from "./types";
+import type { Bundle, LicenseOffer, Project, RuleId, Verdict, Violation } from "./types";
 
 export interface VerifyOptions {
   /** Today's date (YYYY-MM-DD). Needed only to check offer expiry; passed in so verification stays deterministic. */
@@ -79,6 +79,44 @@ const evidence: Rule = (_project, offer, at) =>
     : [];
 
 const OFFER_RULES: Rule[] = [commercialUse, territory, term, medium, attribution, sublicensing, exclusivity, expiry, evidence];
+
+export type RuleStatus = "pass" | "fail" | "skip";
+
+export interface RuleResult {
+  rule: RuleId;
+  label: string;
+  status: RuleStatus;
+  /** Why it failed; empty for pass and skip. */
+  messages: string[];
+}
+
+/** Every rule the verifier knows, with whether the project's brief makes it relevant. */
+export const RULE_CATALOG: { id: RuleId; label: string; applies: (p: Project, o: LicenseOffer) => boolean }[] = [
+  { id: "commercial-use", label: "Commercial use", applies: (p) => p.commercial },
+  { id: "territory", label: "Territory", applies: () => true },
+  { id: "term", label: "Term", applies: () => true },
+  { id: "medium", label: "Media", applies: (p) => Boolean(p.mediums?.length) },
+  { id: "attribution", label: "Attribution", applies: (p) => p.canCredit === false },
+  { id: "sublicensing", label: "Sublicensing", applies: (p) => Boolean(p.needsSublicensing) },
+  { id: "exclusivity", label: "Exclusivity", applies: (p) => Boolean(p.requiresExclusive) },
+  { id: "expiry", label: "Offer validity", applies: (_p, o) => Boolean(o.terms.offerValidUntil) },
+  { id: "evidence", label: "Evidence", applies: () => true },
+];
+
+/**
+ * Check one offer on its own against every rule, saying pass, fail or skip (the brief does not
+ * declare that constraint). This is what the verification matrix shows: every candidate, not only
+ * the bundle that was proposed.
+ */
+export function evaluateOffer(project: Project, offer: LicenseOffer, options: VerifyOptions = {}): RuleResult[] {
+  const at = { assetId: offer.assetId, offerId: offer.id };
+  const violations = OFFER_RULES.flatMap((rule) => rule(project, offer, at, options));
+  return RULE_CATALOG.map(({ id, label, applies }) => {
+    const messages = violations.filter((v) => v.rule === id).map((v) => v.message);
+    const status: RuleStatus = messages.length ? "fail" : applies(project, offer) ? "pass" : "skip";
+    return { rule: id, label, status, messages };
+  });
+}
 
 /**
  * Deterministic verification of a proposed bundle. No model calls, no I/O:

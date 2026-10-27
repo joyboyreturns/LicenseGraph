@@ -16,6 +16,7 @@ export const fixtures: Fixture[] = [
     doc: {
       id: "song",
       assetId: "song",
+      licensor: { name: "SoundHarbor Music", email: "soundharbor@licensegraph-demo.example" },
       text: `SOUNDHARBOR TRACK LICENCE
 Track: "Morning Tide"
 Licence fee: USD 200.00.
@@ -35,6 +36,7 @@ Term: This licence is valid for 24 months from the date of purchase.`,
     doc: {
       id: "photo",
       assetId: "photo",
+      licensor: { name: "PixelLeaf Images", email: "pixelleaf@licensegraph-demo.example" },
       text: `PIXELLEAF IMAGE LICENCE (EDITORIAL)
 Image: "Harbour at Dawn"
 Price: USD 45.00 per image.
@@ -55,6 +57,7 @@ Term: Perpetual.`,
     doc: {
       id: "font",
       assetId: "font",
+      licensor: { name: "TypeForge Studio", email: "typeforge@licensegraph-demo.example" },
       text: `TYPEFORGE DESKTOP AND WEB FONT LICENCE
 Family: Lumen Sans
 Fee: USD 49.00, one-time.
@@ -74,6 +77,7 @@ Duration: The licence never expires (perpetual).`,
     doc: {
       id: "footage",
       assetId: "footage",
+      licensor: { name: "NorthReel Footage", email: "northreel@licensegraph-demo.example" },
       text: `NORTHREEL STOCK FOOTAGE LICENCE
 Clip: "City Timelapse 4K"
 Price: USD 350.00.
@@ -94,6 +98,7 @@ Licence period: 12 months from purchase.`,
     doc: {
       id: "voiceover",
       assetId: "voiceover",
+      licensor: { name: "Studio Reed", email: "studioreed@licensegraph-demo.example" },
       text: `STUDIOREED VOICEOVER LICENCE
 Recording: "Welcome Aboard" narration
 Price: USD 120.00.
@@ -136,6 +141,7 @@ This offer is valid until 30 November 2026.`,
     doc: {
       id: "archive",
       assetId: "archive",
+      licensor: { name: "HistoryVault Archive", email: "historyvault@licensegraph-demo.example" },
       text: `HISTORYVAULT ARCHIVE IMAGE LICENCE
 Image: "Dockside, 1932"
 Price: USD 80.00.

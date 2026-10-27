@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { bundleCanonical } from "../core/digest";
 import { verifyBundle } from "../core/rules";
 import type { Bundle, Project, Violation } from "../core/types";
 import type { CreatedOrder, createPayPalClient } from "./paypal";
@@ -25,10 +26,7 @@ export class PaymentRefused extends Error {
 
 /** Stable fingerprint of what is being bought; any change to an offer or price changes it. */
 export function bundleDigest(bundle: Bundle): string {
-  const canonical = bundle.offers
-    .map((o) => [o.id, o.assetId, o.priceCents, o.currency] as const)
-    .sort((a, b) => a[0].localeCompare(b[0]));
-  return createHash("sha256").update(JSON.stringify(canonical)).digest("hex");
+  return createHash("sha256").update(bundleCanonical(bundle.offers)).digest("hex");
 }
 
 export function approve(bundle: Bundle, approvedBy: string, now: Date = new Date()): Approval {
