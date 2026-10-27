@@ -53,7 +53,9 @@ The visible propose, verify, reject, revise cycle is the product. The model neve
 | `src/app-logic/` | `session.ts`: the flow and its step order (extract, propose, verify, approve, pay, capture); the only thing the web layer calls | done |
 | `src/server/` | Runtime wiring (demo or live, PayPal on or off) and HTTP helpers | done |
 | `app/` | Next.js UI and API routes: project and documents, loop timeline, approval, payment, ledger | done |
-| `app/dashboard/` | AG Grid rights graph and ledger, AG Studio agent for views | step 8 |
+| `src/dashboard/` | `data.ts`: a run as four linked tables. `widget-tools.ts`: validated chart, table and KPI builders. `llm-adapter.ts`: AG Studio assistant to chat completions. `schema-text.ts` | done |
+| `src/server/llm-proxy.ts` | Server-side model access for the assistant: fixed free model, free check, pacing, limits | done |
+| `app/dashboard/` | AG Studio dashboard (rights graph, ledger) with the AI assistant | done |
 
 ## Data model (v1)
 
@@ -70,6 +72,7 @@ The visible propose, verify, reject, revise cycle is the product. The model neve
 - **Vercel AI Gateway** for all model calls; model chosen by `LICENSEGRAPH_MODEL`, so there is no provider lock-in and tests use a mock.
 - **Integer cents, one currency per bundle** to avoid float and FX bugs.
 - **Evidence is mandatory**: an offer without a source quote fails verification.
+- **Assistant never holds the key**: the browser calls `/api/llm`; the server picks the model, checks it is free, spaces calls to the provider's limit, and caps request size.
 - **Sandbox only**: `PAYPAL_BASE_URL` defaults to the Sandbox host; there is no live path.
 - **Agentic Commerce framing**: the agent initiates the purchase; a human approval record is required before capture.
 

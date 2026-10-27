@@ -67,7 +67,15 @@ Prize targets: Best Overall, Best Use of Agentic Commerce, Best Use of AG Grid. 
 
 ## Step 8: AG Grid dashboard (9-10 Nov)
 
-- [ ] Rights graph and ledger in AG Grid; AG Studio agent that builds views on request
+- [x] AG Studio (`ag-studio`, `ag-studio-react`, commercial; runs locally with a trial watermark until a licence key is set) embedded at `/dashboard?session=ID`
+- [x] Rights graph: four linked tables built from the run (`src/dashboard/data.ts`): assets, licence offers (every term, "Not stated" where the licence is silent), rule violations, and the ledger; relationships link assets to offers and offers to violations
+- [x] Starting dashboard: verified bundle total, offer prices by asset, rules that rejected a proposal, the rights grid and the ledger; View and Edit modes (drag and drop, filters, cross-filtering come from AG Studio)
+- [x] AI assistant that builds views on request: Studio's assistant panel wired to the model through `/api/llm`, a server-side proxy that holds the gateway key, fixes the model, checks it is free before use, paces calls to the provider's rate limit (5 a minute on the free model), and caps size and concurrency
+- [x] Three plain-parameter tools (`create_chart`, `create_table`, `create_kpi`) with closed field lists and validated arguments (`src/dashboard/widget-tools.ts`); a small free model could not configure Studio's own add-widget tool, so it only chose from these
+- [x] Verified in a browser: one plain-English request produced a rendered chart in about 17 seconds (2 model calls)
+- [ ] Request the AG Studio trial licence key (email info@ag-grid.com) before the public deploy, to remove the watermark
+- [ ] Confirm the exact AG Grid prize requirements on the official page
+- Known limits: assistant-built widgets live in the browser session (reloading restores the starting dashboard); Studio data is a snapshot of the run when the page opens.
 - Done when: the dashboard shows the live ledger.
 
 ## Step 9: Ship (11 Nov)

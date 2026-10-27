@@ -8,7 +8,7 @@ Built for the PayPal AI Hackathon 2026.
 
 ## Status
 
-Working end to end: licence term extraction with verified evidence, the propose-verify-revise loop, a hash-chained ledger, human approval, and PayPal Sandbox checkout in a Next.js app. Still to build: the AG Grid dashboard and deployment. See [`docs/PLAN.md`](docs/PLAN.md) for the schedule.
+Working end to end: licence term extraction with verified evidence, the propose-verify-revise loop, a hash-chained ledger, human approval, and PayPal Sandbox checkout in a Next.js app. An AG Studio dashboard (rights graph, ledger) with an AI assistant that builds views on request. Still to build: deployment, README demo steps and the video. See [`docs/PLAN.md`](docs/PLAN.md) for the schedule.
 
 ## Docs
 
@@ -26,6 +26,8 @@ npm run dev              # http://localhost:3000
 - **Demo mode** (no gateway key): reads the built-in sample licences with a stand-in model and shows the full reject, revise, verify loop. No credits are used.
 - **Live mode** (`AI_GATEWAY_API_KEY` and `LICENSEGRAPH_MODEL` set): reads your own licence text through the AI Gateway. The client refuses any model the gateway does not list as free.
 - **Payments** need `PAYPAL_CLIENT_ID` and `PAYPAL_CLIENT_SECRET` from a PayPal Sandbox Business app. Use United States Sandbox accounts; India-region accounts cannot transact in USD.
+
+- **Dashboard**: `/dashboard?session=ID` opens the run in AG Studio. The assistant (live model required) adds charts, tables and KPIs from plain English. AG Studio is commercial; it runs with a trial watermark until `NEXT_PUBLIC_AG_STUDIO_LICENSE_KEY` is set.
 
 The flow: add licences and a project, the agent proposes a bundle, the rules engine verifies it, you approve it, then PayPal Sandbox settles it. A step cannot be skipped: nothing is approved before it is verified, and no order is created before approval.
 

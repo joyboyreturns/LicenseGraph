@@ -4,6 +4,6 @@ import { getRuntime } from "@/src/server/runtime";
 export const dynamic = "force-dynamic";
 
 export function GET() {
-  const { mode, model, paymentsEnabled } = getRuntime();
-  return json({ mode, model, paymentsEnabled });
+  const { mode, model, paymentsEnabled, llmProxy } = getRuntime();
+  return json({ mode, model, paymentsEnabled, assistant: Boolean(llmProxy) });
 }

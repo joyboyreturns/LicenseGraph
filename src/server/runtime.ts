@@ -3,6 +3,7 @@ import { createLlmProposer } from "../agent/llm";
 import { SessionStore, type Deps } from "../app-logic/session";
 import { demoModel } from "../demo/mock-model";
 import { createGatewayModel, gatewayConfigFromEnv } from "../extraction/model";
+import { createLlmProxy, limitsFromEnv } from "./llm-proxy";
 import { configFromEnv, createPayPalClient } from "../payments/paypal";
 
 export type Mode = "demo" | "live";
@@ -12,6 +13,8 @@ export interface Runtime {
   /** Gateway model id in live mode. Never a secret. */
   model?: string;
   paymentsEnabled: boolean;
+  /** Server-side model access for the dashboard assistant; live mode only. */
+  llmProxy?: ReturnType<typeof createLlmProxy>;
   deps: Deps;
   store: SessionStore;
 }
@@ -28,6 +31,7 @@ function build(): Runtime {
   let model = demoModel;
   let proposer = greedyProposer;
   let modelId: string | undefined;
+  let llmProxy: Runtime["llmProxy"];
   if (mode === "live") {
     // createGatewayModel refuses any model the gateway does not list as free.
     const config = gatewayConfigFromEnv();
@@ -35,11 +39,14 @@ function build(): Runtime {
     proposer = createLlmProposer(model);
     modelId = config.model;
   }
+  // The dashboard assistant needs only the gateway key and a free model, not live extraction.
+  if (hasGateway) llmProxy = createLlmProxy(gatewayConfigFromEnv(), limitsFromEnv());
 
   return {
     mode,
     model: modelId,
     paymentsEnabled,
+    llmProxy,
     store: new SessionStore(),
     deps: {
       model,

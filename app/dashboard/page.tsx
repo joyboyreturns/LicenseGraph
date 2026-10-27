@@ -13,6 +13,11 @@ function Dashboard() {
   const id = useSearchParams().get("session");
   const [view, setView] = useState<SessionView | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [assistant, setAssistant] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    fetch("/api/config").then((r) => r.json()).then((c) => setAssistant(Boolean(c.assistant))).catch(() => setAssistant(false));
+  }, []);
 
   useEffect(() => {
     if (!id) return;
@@ -32,7 +37,8 @@ function Dashboard() {
       </div>
       {!id && <p className="muted" style={{ padding: 16 }}>Open a run first, then choose Dashboard.</p>}
       {error && <div className="error" style={{ margin: 16 }}>{error}</div>}
-      {view && <Studio view={view} />}
+      {view && assistant !== null && <Studio view={view} assistant={assistant} />}
+      {view && assistant === false && <p className="muted" style={{ padding: "0 16px" }}>The AI assistant needs live mode (a gateway key and a free model); demo mode shows the dashboard only.</p>}
     </div>
   );
 }
