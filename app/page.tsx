@@ -290,7 +290,10 @@ export default function Home() {
             </details>
           </section>
 
-          <div className="row"><button type="button" onClick={reset}>New project</button></div>
+          <div className="row">
+            <a className="button" href={`/dashboard?session=${view.id}`}>Open dashboard</a>
+            <button type="button" onClick={reset}>New project</button>
+          </div>
         </>
       )}
     </main>

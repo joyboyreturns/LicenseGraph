@@ -26,6 +26,8 @@
     "vitest": "^2.1.0"
   },
   "dependencies": {
+    "ag-studio": "^3.0.0",
+    "ag-studio-react": "^3.0.0",
     "next": "^15.5.28",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
