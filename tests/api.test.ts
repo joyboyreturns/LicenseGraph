@@ -47,7 +47,9 @@ function install(over: Partial<Runtime> = {}) {
 }
 
 const ctx = (id: string) => ({ params: Promise.resolve({ id }) });
-const post = (url: string, body?: unknown) => new Request(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
+const ME = "lg_owner=owner-test-0001";
+const post = (url: string, body?: unknown, cookie = ME) => new Request(url, { method: "POST", headers: { "Content-Type": "application/json", Cookie: cookie }, body: body === undefined ? undefined : JSON.stringify(body) });
+const get = (url = "http://app", cookie = ME) => new Request(url, { headers: { Cookie: cookie } });
 const body = async (res: Response) => (await res.json()) as any;
 
 async function waitFor(id: string, phase: string) {
@@ -232,7 +234,7 @@ describe("custom runs and the portfolio", () => {
     install();
     const a = await body(await postSession(post("http://app/api/sessions", { scenarioId: "documentary" })));
     await waitFor(a.id, "verified");
-    const { runs } = await body(await listSessions());
+    const { runs } = await body(await listSessions(get()));
     expect(runs[0]).toMatchObject({ id: a.id, name: "Harbour documentary promo", phase: "verified", runKind: "demo", rounds: 2, totalCents: 32_900, naiveTotalCents: 29_400, blocked: 1, paid: false });
   });
 });
@@ -261,6 +263,76 @@ describe("asking about a run", () => {
   });
 });
 
+describe("run ownership", () => {
+  const STRANGER = "lg_owner=stranger-0002";
+
+  async function paidRun() {
+    install();
+    const created = await postSession(post("http://app/api/sessions", { scenarioId: "documentary" }));
+    const { id } = await body(created);
+    await waitFor(id, "verified");
+    return { id, created };
+  }
+
+  it("hands a new browser an owner cookie that page scripts cannot read, and keeps an existing one", async () => {
+    install();
+    const first = await postSession(new Request("http://app/api/sessions", { method: "POST", body: JSON.stringify({ scenarioId: "documentary" }) }));
+    expect(first.headers.get("set-cookie")).toMatch(/^lg_owner=[\w-]{36}; Path=\/; Max-Age=31536000; HttpOnly; SameSite=Lax$/);
+    const again = await postSession(post("http://app/api/sessions", { scenarioId: "documentary" }));
+    expect(again.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("marks the cookie Secure when the app is served over https", async () => {
+    install({ appUrl: "https://example.ts.net" });
+    const res = await postSession(new Request("http://app/api/sessions", { method: "POST", body: JSON.stringify({ scenarioId: "documentary" }) }));
+    expect(res.headers.get("set-cookie")).toMatch(/; Secure$/);
+  });
+
+  it("lets only the creating browser approve, pay, capture or retry payouts", async () => {
+    const { id } = await paidRun();
+    for (const [handler, name] of [[postApprove, "approve"], [postPay, "pay"], [postCapture, "capture"], [postPayouts, "payouts"]] as const) {
+      const res = await handler(post("http://app", { approvedBy: "Mallory" }, STRANGER), ctx(id));
+      expect(res.status, name).toBe(403);
+      expect((await body(res)).error).toMatch(/another browser session/);
+    }
+    expect(payments.createOrder).not.toHaveBeenCalled();
+    expect((await postApprove(post("http://app", { approvedBy: "Kiran" }), ctx(id))).status).toBe(200);
+  });
+
+  it("refuses a request with no cookie at all", async () => {
+    const { id } = await paidRun();
+    expect((await postApprove(new Request("http://app", { method: "POST", body: JSON.stringify({ approvedBy: "x" }) }), ctx(id))).status).toBe(403);
+  });
+
+  it("still lets anyone with the link read the run and its passport", async () => {
+    const { id } = await paidRun();
+    await postApprove(post("http://app", { approvedBy: "Kiran" }), ctx(id));
+    await postPay(post("http://app"), ctx(id));
+    await postCapture(post("http://app"), ctx(id));
+    expect((await getSession(get("http://app", STRANGER), ctx(id))).status).toBe(200);
+    expect((await getPassport(get("http://app/api/passports/x", STRANGER), ctx(id))).status).toBe(200);
+    expect((await verifyPassportRoute(get("http://app", STRANGER), ctx(id))).status).toBe(200);
+  });
+
+  it("lists and exports only the caller's own runs", async () => {
+    const { id } = await paidRun();
+    const mine = await body(await listSessions(get()));
+    expect(mine.runs.map((r: { id: string }) => r.id)).toEqual([id]);
+    expect((await body(await listSessions(get("http://app", STRANGER)))).runs).toEqual([]);
+    expect((await body(await getPortfolio(get("http://app", STRANGER)))).views).toEqual([]);
+    expect((await body(await getPortfolio(get()))).views).toHaveLength(1);
+  });
+
+  it("leaves runs from before owners existed open to everyone", async () => {
+    const rt = install();
+    const { id } = await body(await postSession(post("http://app/api/sessions", { scenarioId: "documentary" })));
+    await waitFor(id, "verified");
+    delete rt.store.get(id)!.ownerId;
+    expect((await postApprove(post("http://app", { approvedBy: "Anyone" }, STRANGER), ctx(id))).status).toBe(200);
+    expect((await body(await listSessions(get("http://app", STRANGER)))).runs).toHaveLength(1);
+  });
+});
+
 describe("portfolio", () => {
   it("returns every run without licence text, with payout status brought up to date", async () => {
     install();
@@ -271,7 +343,7 @@ describe("portfolio", () => {
     await postCapture(post("http://app"), ctx(id));
     payments.getPayout.mockResolvedValue({ batchId: "BATCH1", status: "SUCCESS", items: [] });
 
-    const { views } = await body(await getPortfolio());
+    const { views } = await body(await getPortfolio(get()));
     expect(views).toHaveLength(1);
     expect(views[0].documents.every((d: { text: string }) => d.text === "")).toBe(true);
     expect(views[0].payouts.status).toBe("SUCCESS");

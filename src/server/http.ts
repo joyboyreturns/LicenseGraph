@@ -18,3 +18,10 @@ export function fail(e: unknown) {
 export function sessionOr404(id: string) {
   return getRuntime().store.get(id);
 }
+
+import { ownsRun } from "./owner";
+
+/** 403 unless the request comes from the browser that created the run. */
+export function forbidUnlessOwner(session: { ownerId?: string }, req: Request) {
+  return ownsRun(session, req) ? undefined : json({ error: "This run belongs to another browser session. Start your own run to approve or pay." }, 403);
+}

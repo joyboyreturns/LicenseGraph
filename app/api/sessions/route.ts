@@ -1,6 +1,7 @@
 import { createSession, runPipeline, SessionError, viewOf, type SessionInput } from "@/src/app-logic/session";
 import { scenarioById } from "@/src/demo/scenarios";
 import { fail, json } from "@/src/server/http";
+import { ownerCookie, ownerFor, readOwner } from "@/src/server/owner";
 import { getRuntime } from "@/src/server/runtime";
 
 export const dynamic = "force-dynamic";
@@ -64,7 +65,10 @@ export async function POST(req: Request) {
     }
     if (!scenario && rt.store.activeCount() >= MAX_ACTIVE_RUNS) return json({ error: "Too many runs in progress. Try again in a minute." }, 429);
 
-    const session = rt.store.add(createSession(input));
+    const owner = ownerFor(req);
+    const session = createSession(input);
+    session.ownerId = owner.id;
+    rt.store.add(session);
     const deps = scenario ? rt.demoDeps : rt.deps;
     // Runs in the background; the page polls the session. Failures are recorded on the session.
     void runPipeline(session, deps).catch((e) => {
@@ -72,15 +76,18 @@ export async function POST(req: Request) {
       session.failure = e instanceof Error ? e.message : "The run failed.";
       session.onChange?.();
     });
-    return json(viewOf(session), 201);
+    const res = json(viewOf(session), 201);
+    if (owner.isNew) res.headers.append("Set-Cookie", ownerCookie(owner.id, rt.appUrl.startsWith("https:")));
+    return res;
   } catch (e) {
     return fail(e);
   }
 }
 
-/** Every run, newest first: the portfolio. */
-export function GET() {
-  const runs = getRuntime().store.list().map((s) => {
+/** The caller's own runs, newest first: the portfolio. Runs from before owners existed are shown to everyone. */
+export function GET(req: Request) {
+  const me = readOwner(req);
+  const runs = getRuntime().store.list().filter((s) => !s.ownerId || s.ownerId === me).map((s) => {
     const v = viewOf(s);
     return {
       id: s.id,

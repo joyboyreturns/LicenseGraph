@@ -9,6 +9,7 @@ const ACTIVE: Phase[] = ["created", "extracting", "proposing"];
 export interface StoredSession {
   v: 1;
   id: string;
+  ownerId?: string;
   createdAt: string;
   runDate?: string;
   input: SessionInput;
@@ -28,6 +29,7 @@ export function serializeSession(s: Session): StoredSession {
   return {
     v: 1,
     id: s.id,
+    ownerId: s.ownerId,
     createdAt: s.createdAt,
     runDate: s.runDate,
     input: s.input,
@@ -50,6 +52,7 @@ export function deserializeSession(stored: StoredSession): Session {
   const ledger = Ledger.fromEvents(stored.events);
   const session: Session = {
     id: stored.id,
+    ownerId: stored.ownerId,
     createdAt: stored.createdAt,
     runDate: stored.runDate,
     input: stored.input,

@@ -22,6 +22,8 @@ export interface SessionInput {
 
 export interface Session {
   id: string;
+  /** The anonymous browser that created the run; only it may approve, pay or list it. */
+  ownerId?: string;
   createdAt: string;
   /** The date offers were checked against (YYYY-MM-DD), fixed when the run starts. */
   runDate?: string;
