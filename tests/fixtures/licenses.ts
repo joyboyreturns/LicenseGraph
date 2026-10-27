@@ -4,9 +4,12 @@ import type { SourceDocument } from "../../src/extraction/extract";
 export interface Fixture {
   doc: SourceDocument;
   expected: { priceCents: number; currency: string; terms: LicenseTerms };
-  /** Verbatim sentences a correct extraction would quote. */
-  quotes: { price: string; commercialUse: string; territories: string; term: string };
+  /** Verbatim sentences a correct extraction would quote, by evidence field. */
+  quotes: Record<string, string>;
 }
+
+/** Optional terms a correct extraction leaves blank when the text is silent. */
+export const OPTIONAL_TERM_KEYS = ["mediums", "attributionRequired", "sublicensing", "exclusive", "fixedEndDate", "offerValidUntil"] as const;
 
 export const fixtures: Fixture[] = [
   {
@@ -87,16 +90,105 @@ Licence period: 12 months from purchase.`,
       term: "Licence period: 12 months from purchase.",
     },
   },
+  {
+    doc: {
+      id: "voiceover",
+      assetId: "voiceover",
+      text: `STUDIOREED VOICEOVER LICENCE
+Recording: "Welcome Aboard" narration
+Price: USD 120.00.
+Use: Commercial use is permitted.
+Media: Web and broadcast television only.
+Territory: Worldwide.
+Term: 12 months from purchase.
+Credit: The Licensee must credit "Voice by Studio Reed" wherever the recording is used.
+Sublicensing: The Licensee may not sublicense the recording.
+Exclusivity: This licence is exclusive to the Licensee for the term.
+This offer is valid until 30 November 2026.`,
+    },
+    expected: {
+      priceCents: 12_000,
+      currency: "USD",
+      terms: {
+        commercialUse: true,
+        territories: ["WORLD"],
+        termMonths: 12,
+        mediums: ["web", "broadcast"],
+        attributionRequired: true,
+        sublicensing: false,
+        exclusive: true,
+        offerValidUntil: "2026-11-30",
+      },
+    },
+    quotes: {
+      price: "Price: USD 120.00.",
+      commercialUse: "Use: Commercial use is permitted.",
+      territories: "Territory: Worldwide.",
+      term: "Term: 12 months from purchase.",
+      mediums: "Media: Web and broadcast television only.",
+      attribution: 'Credit: The Licensee must credit "Voice by Studio Reed" wherever the recording is used.',
+      sublicensing: "Sublicensing: The Licensee may not sublicense the recording.",
+      exclusivity: "Exclusivity: This licence is exclusive to the Licensee for the term.",
+      offerValidUntil: "This offer is valid until 30 November 2026.",
+    },
+  },
+  {
+    doc: {
+      id: "archive",
+      assetId: "archive",
+      text: `HISTORYVAULT ARCHIVE IMAGE LICENCE
+Image: "Dockside, 1932"
+Price: USD 80.00.
+Use: Commercial and editorial use is permitted in any medium.
+Territory: Worldwide.
+Term: 24 months from purchase, and in any case ending on 31 December 2027.
+No credit line is required.
+The Licensee may sublicense the image to its clients.
+This licence is non-exclusive.`,
+    },
+    expected: {
+      priceCents: 8_000,
+      currency: "USD",
+      terms: {
+        commercialUse: true,
+        territories: ["WORLD"],
+        termMonths: 24,
+        mediums: "ALL",
+        attributionRequired: false,
+        sublicensing: true,
+        exclusive: false,
+        fixedEndDate: "2027-12-31",
+      },
+    },
+    quotes: {
+      price: "Price: USD 80.00.",
+      commercialUse: "Use: Commercial and editorial use is permitted in any medium.",
+      territories: "Territory: Worldwide.",
+      term: "Term: 24 months from purchase, and in any case ending on 31 December 2027.",
+      mediums: "Use: Commercial and editorial use is permitted in any medium.",
+      attribution: "No credit line is required.",
+      sublicensing: "The Licensee may sublicense the image to its clients.",
+      exclusivity: "This licence is non-exclusive.",
+      fixedEndDate: "ending on 31 December 2027.",
+    },
+  },
 ];
 
 /** What a well-behaved model would answer for a fixture. */
 export function cannedReply(f: Fixture): string {
+  const t = f.expected.terms;
   return JSON.stringify({
     priceCents: f.expected.priceCents,
     currency: f.expected.currency,
-    commercialUse: f.expected.terms.commercialUse,
-    territories: f.expected.terms.territories,
-    termMonths: f.expected.terms.termMonths,
-    evidence: (Object.keys(f.quotes) as (keyof Fixture["quotes"])[]).map((field) => ({ field, quote: f.quotes[field] })),
+    commercialUse: t.commercialUse,
+    territories: t.territories,
+    termMonths: t.termMonths,
+    mediums: t.mediums ?? null,
+    attributionRequired: t.attributionRequired ?? null,
+    sublicensing: t.sublicensing ?? null,
+    exclusive: t.exclusive ?? null,
+    fixedEndDate: t.fixedEndDate ?? null,
+    offerValidUntil: t.offerValidUntil ?? null,
+    evidence: Object.entries(f.quotes).map(([field, quote]) => ({ field, quote })),
   });
 }

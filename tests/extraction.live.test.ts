@@ -14,6 +14,7 @@ describe.skipIf(!process.env.RUN_GATEWAY_LIVE)("extraction against the AI Gatewa
 
     expect(result.problems).toEqual([]);
     expect(result.offer?.priceCents).toBe(f.expected.priceCents);
+    // Strict: stated terms must match, and terms the text is silent on must stay blank.
     expect(result.offer?.terms).toEqual(f.expected.terms);
   }, 120_000);
 });

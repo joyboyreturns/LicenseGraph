@@ -3,7 +3,7 @@ import { verifyBundle } from "../src/core/rules";
 import type { Project } from "../src/core/types";
 import { extractOffer, locateQuote } from "../src/extraction/extract";
 import { createGatewayModel, type ModelClient } from "../src/extraction/model";
-import { cannedReply, fixtures } from "./fixtures/licenses";
+import { cannedReply, fixtures, OPTIONAL_TERM_KEYS } from "./fixtures/licenses";
 
 const replying = (...replies: string[]): ModelClient & { complete: ReturnType<typeof vi.fn> } => {
   const complete = vi.fn();
@@ -30,7 +30,7 @@ describe("extractOffer with a well-behaved model", () => {
     const offer = result.offer!;
     expect(offer.priceCents).toBe(f.expected.priceCents);
     expect(offer.terms).toEqual(f.expected.terms);
-    expect(offer.evidence.map((e) => e.field).sort()).toEqual(["commercialUse", "price", "term", "territories"]);
+    expect(offer.evidence.map((e) => e.field).sort()).toEqual(Object.keys(f.quotes).sort());
     for (const e of offer.evidence) expect(f.doc.text.slice(e.start, e.end).replace(/\s+/g, " ")).toBe(e.quote);
   });
 
@@ -38,6 +38,72 @@ describe("extractOffer with a well-behaved model", () => {
     const f = fixtures[0]!;
     const result = await extractOffer(replying("Here you go:\n```json\n" + cannedReply(f) + "\n```"), f.doc);
     expect(result.offer?.priceCents).toBe(20_000);
+  });
+});
+
+describe("optional terms", () => {
+  const voiceover = fixtures.find((f) => f.doc.id === "voiceover")!;
+  const song = fixtures[0]!;
+
+  it("leaves terms the text does not state blank", async () => {
+    const { offer } = await extractOffer(replying(cannedReply(song)), song.doc);
+    expect(offer!.terms).toEqual(song.expected.terms);
+    for (const key of OPTIONAL_TERM_KEYS) expect(offer!.terms[key]).toBeUndefined();
+  });
+
+  it("captures every stated term with located evidence", async () => {
+    const { offer } = await extractOffer(replying(cannedReply(voiceover)), voiceover.doc);
+    expect(offer!.terms).toEqual(voiceover.expected.terms);
+    expect(offer!.evidence.map((e) => e.field)).toEqual(expect.arrayContaining(["mediums", "attribution", "sublicensing", "exclusivity", "offerValidUntil"]));
+  });
+
+  it("rejects a stated optional term that has no evidence, and retries", async () => {
+    const reply = JSON.parse(cannedReply(voiceover));
+    reply.evidence = reply.evidence.filter((e: { field: string }) => e.field !== "sublicensing");
+    const model = replying(JSON.stringify(reply), cannedReply(voiceover));
+    const { offer } = await extractOffer(model, voiceover.doc);
+    expect(offer).toBeDefined();
+    expect(model.complete.mock.calls[1]![0].user).toMatch(/missing evidence for sublicensing/);
+  });
+
+  it("rejects an invented quote for an optional term", async () => {
+    const reply = JSON.parse(cannedReply(voiceover));
+    reply.evidence = reply.evidence.map((e: { field: string }) => (e.field === "sublicensing" ? { field: "sublicensing", quote: "Sublicensing is allowed." } : e));
+    const result = await extractOffer(replying(JSON.stringify(reply)), voiceover.doc, { attempts: 1 });
+    expect(result.offer).toBeUndefined();
+    expect(result.problems[0]).toMatch(/sublicensing/);
+  });
+
+  it("accepts evidence labelled with the JSON key name", async () => {
+    const reply = JSON.parse(cannedReply(voiceover));
+    reply.evidence = reply.evidence.map((e: { field: string; quote: string }) => ({ ...e, field: { term: "termMonths", price: "priceCents", attribution: "attributionRequired", exclusivity: "exclusive" }[e.field] ?? e.field }));
+    const { offer, problems } = await extractOffer(replying(JSON.stringify(reply)), voiceover.doc, { attempts: 1 });
+    expect(problems).toEqual([]);
+    expect(offer!.evidence.map((e) => e.field)).toEqual(expect.arrayContaining(["term", "price", "attribution", "exclusivity"]));
+  });
+
+  it("normalises media: [\"ALL\"] and \"all\" mean any medium, names are lowercased", async () => {
+    const archive = fixtures.find((f) => f.doc.id === "archive")!;
+    for (const mediums of [["ALL"], "all", "ALL"]) {
+      const reply = { ...JSON.parse(cannedReply(archive)), mediums };
+      expect((await extractOffer(replying(JSON.stringify(reply)), archive.doc, { attempts: 1 })).offer!.terms.mediums).toBe("ALL");
+    }
+    const reply = { ...JSON.parse(cannedReply(archive)), mediums: ["Web", " Broadcast "] };
+    expect((await extractOffer(replying(JSON.stringify(reply)), archive.doc, { attempts: 1 })).offer!.terms.mediums).toEqual(["web", "broadcast"]);
+  });
+
+  it("rejects malformed dates", async () => {
+    const reply = JSON.parse(cannedReply(voiceover));
+    reply.offerValidUntil = "30 November 2026";
+    expect((await extractOffer(replying(JSON.stringify(reply)), voiceover.doc, { attempts: 1 })).offer).toBeUndefined();
+  });
+
+  it("feeds the rules engine: a project that needs sublicensing rejects the voiceover, the archive passes", async () => {
+    const project: Project = { name: "Ad", commercial: true, territories: ["US"], termMonths: 12, needsSublicensing: true, mediums: ["web"] };
+    const archive = fixtures.find((f) => f.doc.id === "archive")!;
+    const offers = [(await extractOffer(replying(cannedReply(voiceover)), voiceover.doc)).offer!, (await extractOffer(replying(cannedReply(archive)), archive.doc)).offer!];
+    const v = verifyBundle(project, ["voiceover", "archive"], { offers }, { today: "2026-11-01" });
+    expect(v.violations.map((x) => `${x.rule}:${x.assetId}`)).toEqual(["sublicensing:voiceover"]);
   });
 });
 
@@ -81,7 +147,7 @@ describe("extracted offers feed the rules engine", () => {
   it("a non-commercial photo is rejected for a commercial project, the rest pass", async () => {
     const project: Project = { name: "Promo film", commercial: true, territories: ["US"], termMonths: 12 };
     const offers = [];
-    for (const f of fixtures) offers.push((await extractOffer(replying(cannedReply(f)), f.doc)).offer!);
+    for (const f of fixtures.slice(0, 4)) offers.push((await extractOffer(replying(cannedReply(f)), f.doc)).offer!);
 
     const verdict = verifyBundle(project, ["song", "photo", "font", "footage"], { offers });
     expect(verdict.violations.map((v) => `${v.rule}:${v.assetId}`)).toEqual(["commercial-use:photo"]);

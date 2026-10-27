@@ -51,7 +51,7 @@ export function createGatewayModel(config: GatewayConfig): ModelClient {
           model: config.model,
           temperature: 0,
           // Generous: reasoning models spend tokens thinking before they answer.
-          max_tokens: config.maxTokens ?? 8000,
+          max_tokens: config.maxTokens ?? 16000,
           messages: [
             { role: "system", content: system },
             { role: "user", content: user },
