@@ -168,7 +168,7 @@ describe("a scenario run from start to passport", () => {
 describe("the payment simulator, end to end", () => {
   it("runs the whole purchase offline: checkout page, buyer approval, return redirect, capture, payouts, passport", async () => {
     const simulator = createPayPalSimulator({ appUrl: () => "http://app", settleAfterMs: 0 });
-    install({ paymentsMode: "simulator", simulator, deps: { model: demoModel, proposer: greedyProposer, today: () => "2026-11-05", payments: simulator, returnUrl: (id) => `http://app/api/sessions/${id}/return`, cancelUrl: (id) => `http://app/run/${id}` }, demoDeps: { model: demoModel, proposer: greedyProposer, today: () => "2026-11-05", payments: simulator, returnUrl: (id) => `http://app/api/sessions/${id}/return`, cancelUrl: (id) => `http://app/run/${id}` } });
+    install({ paymentsMode: "simulator", simulator, deps: { model: demoModel, proposer: greedyProposer, paymentsMode: "simulator", today: () => "2026-11-05", payments: simulator, returnUrl: (id) => `http://app/api/sessions/${id}/return`, cancelUrl: (id) => `http://app/run/${id}` }, demoDeps: { model: demoModel, proposer: greedyProposer, paymentsMode: "simulator", today: () => "2026-11-05", payments: simulator, returnUrl: (id) => `http://app/api/sessions/${id}/return`, cancelUrl: (id) => `http://app/run/${id}` } });
     const { id } = await body(await postSession(post("http://app/api/sessions", { scenarioId: "podcast" })));
     await waitFor(id, "verified");
     await postApprove(post("http://app", { approvedBy: "Kiran" }), ctx(id));
@@ -177,7 +177,9 @@ describe("the payment simulator, end to end", () => {
 
     // The checkout page reads the order, then the buyer presses Approve and is sent back to the app.
     expect(await body(await getSimOrder(new Request("http://app"), ctx(order.id)))).toMatchObject({ amountCents: 69_000, approved: false });
-    expect((await postCapture(post("http://app"), ctx(id))).status).toBe(502); // not approved yet
+    const early = await postCapture(post("http://app"), ctx(id)); // not approved yet
+    expect(early.status).toBe(409);
+    expect(await body(early)).toMatchObject({ code: "ORDER_NOT_APPROVED", error: expect.stringContaining("has not approved") });
     const approved = await body(await postSimApprove(post("http://app"), ctx(order.id)));
     expect(approved.returnUrl).toBe(`http://app/api/sessions/${id}/return`);
 
@@ -189,6 +191,9 @@ describe("the payment simulator, end to end", () => {
 
     const check = await body(await verifyPassportRoute(new Request("http://app"), ctx(id)));
     expect(check.ok).toBe(true);
+    const passport = await body(await getPassport(new Request("http://app/api/passports/x"), ctx(id)));
+    expect(passport.paypal.environment).toBe("simulator");
+    expect(check.checks.find((c: { id: string }) => c.id === "payment")).toMatchObject({ label: "Simulated payment matches the bundle total" });
   });
 
   it("has no simulator routes when the real PayPal Sandbox is in use", async () => {

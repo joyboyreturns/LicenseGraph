@@ -18,7 +18,7 @@ export interface Passport {
   documents: { id: string; assetId: string; licensorName?: string; text: string }[];
   bundle: { offers: LicenseOffer[]; totalCents: number; currency: string; digest: string };
   approval: { approvedBy: string; approvedAt: string; bundleDigest: string };
-  paypal: { orderId: string; captureId: string; amount: { currency: string; value: string }; environment: "sandbox" };
+  paypal: { orderId: string; captureId: string; amount: { currency: string; value: string }; environment: "sandbox" | "simulator" };
   payouts?: { batchId: string; status: string; totalCents: number; currency: string; lines: { assetId: string; licensor: string; amountCents: number; status: string }[] };
   comparison: { naiveTotalCents: number; compliancePremiumCents: number; blockedPurchases: { assetId: string; offerId: string; priceCents: number; reasons: string[] }[] };
   ledger: { events: LedgerEvent[]; head: string };
@@ -50,7 +50,7 @@ export function buildPassport(session: Session, comparison: Passport["comparison
     documents: session.input.documents.filter((d) => used.has(d.id)).map((d) => ({ id: d.id, assetId: d.assetId, licensorName: d.licensor?.name, text: d.text })),
     bundle: { offers: bundle.offers, totalCents: session.loop!.verdict!.totalCents, currency: bundle.offers[0]?.currency ?? "USD", digest: session.approval.bundleDigest },
     approval: session.approval,
-    paypal: { orderId: session.capture.id, captureId: session.capture.captureId, amount: session.capture.amount, environment: "sandbox" },
+    paypal: { orderId: session.capture.id, captureId: session.capture.captureId, amount: session.capture.amount, environment: session.paymentsMode === "simulator" ? "simulator" : "sandbox" },
     payouts: payouts && { batchId: payouts.batchId, status: payouts.status, totalCents: payouts.totalCents, currency: payouts.currency, lines: payouts.lines.map((l) => ({ assetId: l.assetId, licensor: l.licensorName, amountCents: l.amountCents, status: l.status })) },
     comparison,
     ledger: { events, head: events.at(-1)!.hash },
@@ -121,9 +121,9 @@ export async function verifyPassport(p: Passport): Promise<{ ok: boolean; checks
   const capturedAmount = captured?.payload.amount as { currency: string; value: string } | undefined;
   add(
     "payment",
-    "PayPal capture matches the bundle total",
+    p.paypal.environment === "simulator" ? "Simulated payment matches the bundle total" : "PayPal capture matches the bundle total",
     sum === p.bundle.totalCents && captured?.payload.captureId === p.paypal.captureId && capturedAmount?.currency === p.bundle.currency && cents(capturedAmount.value) === p.bundle.totalCents && cents(p.paypal.amount.value) === p.bundle.totalCents,
-    `Capture ${p.paypal.captureId} for ${p.paypal.amount.value} ${p.paypal.amount.currency}`,
+    `Capture ${p.paypal.captureId} for ${p.paypal.amount.value} ${p.paypal.amount.currency}${p.paypal.environment === "simulator" ? " (payment simulator, no money moved)" : " (PayPal Sandbox)"}`,
   );
 
   if (p.payouts) {

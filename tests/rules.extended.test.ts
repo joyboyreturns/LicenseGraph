@@ -88,3 +88,10 @@ describe("several new constraints at once", () => {
     expect(rules(project, { mediums: ["web"], sublicensing: false, exclusive: false }).sort()).toEqual(["exclusivity", "medium", "sublicensing"]);
   });
 });
+
+describe("budget message", () => {
+  it("states amounts in dollars, not cents", () => {
+    const v = verifyBundle({ ...base, budgetCents: 30_000 }, ["song"], { offers: [{ ...offerWith(), priceCents: 350_000 }] }).violations;
+    expect(v.find((x) => x.rule === "budget")!.message).toBe("Bundle costs $3,500.00; budget is $300.00.");
+  });
+});

@@ -150,7 +150,8 @@ export function verifyBundle(project: Project, requiredAssetIds: string[], bundl
 
   const totalCents = bundle.offers.reduce((sum, o) => sum + o.priceCents, 0);
   if (project.budgetCents !== undefined && totalCents > project.budgetCents) {
-    violations.push({ rule: "budget", message: `Bundle costs ${totalCents} cents; budget is ${project.budgetCents}.` });
+    const money = (c: number) => (c / 100).toLocaleString("en-US", { style: "currency", currency: bundle.offers[0]?.currency ?? "USD" });
+    violations.push({ rule: "budget", message: `Bundle costs ${money(totalCents)}; budget is ${money(project.budgetCents)}.` });
   }
 
   return { ok: violations.length === 0, totalCents, violations };

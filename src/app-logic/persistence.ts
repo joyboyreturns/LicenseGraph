@@ -20,6 +20,7 @@ export interface StoredSession {
   order?: Session["order"];
   capture?: Session["capture"];
   payouts?: Session["payouts"];
+  paymentsMode?: Session["paymentsMode"];
   events: LedgerEvent[];
 }
 
@@ -38,6 +39,7 @@ export function serializeSession(s: Session): StoredSession {
     order: s.order,
     capture: s.capture,
     payouts: s.payouts,
+    paymentsMode: s.paymentsMode,
     events: s.ledger.events(),
   };
 }
@@ -60,6 +62,7 @@ export function deserializeSession(stored: StoredSession): Session {
     order: stored.order,
     capture: stored.capture,
     payouts: stored.payouts,
+    paymentsMode: stored.paymentsMode,
   };
   if (ACTIVE.includes(session.phase)) {
     session.phase = "failed";

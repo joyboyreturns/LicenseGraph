@@ -36,6 +36,8 @@ export interface Session {
   order?: CreatedOrder;
   capture?: CapturedOrder;
   payouts?: PayoutSummary;
+  /** Which payment backend took this run's order, so the passport can say so truthfully. */
+  paymentsMode?: "paypal-sandbox" | "simulator";
   /** Epoch ms of the last payout status check, to avoid hammering PayPal. Not persisted. */
   payoutsCheckedAt?: number;
   /** Set by the store to persist the session after each change. Not persisted itself. */
@@ -49,6 +51,8 @@ export interface Deps {
   payments?: Pick<PayPalClient, "createOrder" | "captureOrder"> & Partial<Pick<PayPalClient, "createPayout" | "getPayout">>;
   /** Replace licensor emails in order, so a demo can pay real Sandbox accounts. */
   payeeOverrides?: string[];
+  /** Which payment backend `payments` is. */
+  paymentsMode?: "paypal-sandbox" | "simulator";
   today?: () => string;
   returnUrl?: (sessionId: string) => string;
   cancelUrl?: (sessionId: string) => string;
@@ -156,6 +160,7 @@ export async function startPayment(session: Session, deps: Deps): Promise<Create
     cancelUrl: deps.cancelUrl?.(session.id),
   });
   session.order = order;
+  session.paymentsMode = deps.paymentsMode ?? "paypal-sandbox";
   session.phase = "order_created";
   touch(session);
   session.ledger.append("order_created", { orderId: order.id, status: order.status });

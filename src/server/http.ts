@@ -9,7 +9,10 @@ export const json = (body: unknown, status = 200) => NextResponse.json(body, { s
 export function fail(e: unknown) {
   if (e instanceof SessionError) return json({ error: e.message }, 400);
   if (e instanceof PaymentRefused) return json({ error: e.message, violations: e.violations }, 409);
-  return json({ error: e instanceof Error ? e.message : "Unexpected error" }, 502);
+  const message = e instanceof Error ? e.message : "Unexpected error";
+  // PayPal answers 422 ORDER_NOT_APPROVED until the buyer has approved: a normal waiting state, not a gateway failure.
+  if (message.includes("ORDER_NOT_APPROVED")) return json({ error: "The buyer has not approved this order yet. Approve it at checkout, then try again.", code: "ORDER_NOT_APPROVED" }, 409);
+  return json({ error: message }, 502);
 }
 
 export function sessionOr404(id: string) {

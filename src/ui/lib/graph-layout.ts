@@ -52,8 +52,8 @@ export interface GraphLayout {
 }
 
 export const SIZES: Record<Density, { offerH: number; docH: number; assetH: number; rowGap: number; groupGap: number; pad: number }> = {
-  regular: { offerH: 56, docH: 44, assetH: 70, rowGap: 8, groupGap: 20, pad: 6 },
-  compact: { offerH: 60, docH: 52, assetH: 66, rowGap: 8, groupGap: 18, pad: 4 },
+  regular: { offerH: 64, docH: 44, assetH: 70, rowGap: 8, groupGap: 20, pad: 6 },
+  compact: { offerH: 66, docH: 52, assetH: 66, rowGap: 8, groupGap: 18, pad: 4 },
 };
 
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));

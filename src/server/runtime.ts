@@ -66,6 +66,7 @@ function build(): Runtime {
 
   const common = {
     payments,
+    paymentsMode: paymentsMode === "none" ? undefined : paymentsMode,
     payeeOverrides: payeeOverrides.length ? payeeOverrides : undefined,
     returnUrl: (id: string) => `${appUrl()}/api/sessions/${id}/return`,
     cancelUrl: (id: string) => `${appUrl()}/run/${id}`,
