@@ -1,0 +1,600 @@
+.wrap {
+  position: relative;
+}
+.heads {
+  position: relative;
+  height: 26px;
+  margin-bottom: 6px;
+}
+.heads span {
+  position: absolute;
+  top: 0;
+  font-family: var(--font-code);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--line);
+}
+.heads b {
+  font-weight: 600;
+  color: var(--ink-2);
+  margin-left: 4px;
+}
+.graph {
+  position: relative;
+  transition: height var(--dur-slow) var(--ease);
+}
+.skeleton {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--r-lg);
+}
+.edges {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+.groupRule {
+  stroke: var(--line);
+  stroke-dasharray: 2 5;
+}
+
+/* ---------- Edges ---------- */
+.line {
+  fill: none;
+  stroke: var(--line-strong);
+  stroke-width: 1.4;
+  transition: stroke var(--dur-slow) var(--ease), stroke-width var(--dur-slow) var(--ease), opacity var(--dur-slow) var(--ease);
+}
+.e_hidden .line {
+  opacity: 0;
+}
+.edge_read:not(.e_hidden) .line {
+  stroke-dasharray: 100;
+  animation: draw 0.7s var(--ease) both;
+}
+.edge_use.e_candidate .line {
+  opacity: 0.75;
+}
+.edge_use.e_proposed .line {
+  stroke: var(--agent-solid);
+  stroke-width: 2.2;
+  stroke-dasharray: 2.6 1.8;
+  animation: flow 0.8s linear infinite;
+}
+.edge_read.e_proposed .line {
+  stroke: var(--agent-line);
+  stroke-width: 1.6;
+}
+.edge_use.e_rejected .line {
+  stroke: var(--bad-solid);
+  stroke-width: 1.4;
+  stroke-dasharray: 1 1.4;
+  opacity: 0.55;
+}
+.edge_read.e_rejected .line {
+  stroke: var(--bad-line);
+  opacity: 0.7;
+}
+.edge_use.e_chosen .line {
+  stroke: var(--ok-solid);
+  stroke-width: 2.6;
+}
+.edge_read.e_chosen .line {
+  stroke: var(--ok-line);
+  stroke-width: 1.6;
+}
+.e_alternative .line,
+.e_ineligible .line {
+  opacity: 0.3;
+}
+.glow {
+  fill: none;
+  stroke: var(--ok-glow);
+  stroke-width: 9;
+  stroke-linecap: round;
+  animation: glow 2.6s var(--ease-in-out) infinite;
+}
+.strike circle {
+  fill: var(--surface);
+  stroke: var(--bad-solid);
+  stroke-width: 1.4;
+}
+.strike path {
+  stroke: var(--bad-solid);
+  stroke-width: 1.7;
+  stroke-linecap: round;
+}
+.strike {
+  animation: pop 0.45s var(--ease) both;
+}
+
+/* ---------- Nodes ---------- */
+.node {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transition: transform var(--dur-slow) var(--ease), opacity var(--dur-slow) var(--ease), border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+
+.doc {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px 0 9px;
+  border-radius: 11px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  min-width: 0;
+}
+.doc[data-state="queued"] {
+  opacity: 0.5;
+}
+.doc[data-state="reading"] {
+  border-color: var(--agent-solid);
+  background: color-mix(in srgb, var(--agent-soft) 70%, var(--surface));
+  animation: reading 1.3s var(--ease-in-out) infinite;
+}
+.doc[data-state="unreadable"] {
+  border: 1px dashed var(--bad-line);
+  background: var(--bad-soft);
+}
+.docIcon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: var(--surface-3);
+  color: var(--muted);
+  flex: none;
+}
+.docIcon svg {
+  width: 15px;
+  height: 15px;
+}
+.doc[data-state="reading"] .docIcon {
+  color: var(--agent);
+  background: var(--agent-soft);
+}
+.doc[data-state="unreadable"] .docIcon {
+  color: var(--bad);
+  background: transparent;
+}
+.docText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+.docName {
+  font-size: 13px;
+  font-weight: 650;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.docTitle {
+  font-size: 11.5px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.offer {
+  appearance: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 11px 8px 13px;
+  border-radius: 12px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--ink);
+  text-align: left;
+  box-shadow: var(--shadow-1);
+  cursor: pointer;
+  min-width: 0;
+}
+.offer:hover {
+  border-color: var(--faint);
+  box-shadow: var(--shadow-2);
+}
+.offer:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+  border-radius: 12px;
+  z-index: 4;
+}
+.offer:hover,
+.offer:focus-visible {
+  z-index: 4;
+}
+.offer[data-selected] {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+.offer[data-state="hidden"] {
+  opacity: 0.16;
+  border-style: dashed;
+  box-shadow: none;
+  pointer-events: none;
+}
+.offer[data-state="proposed"] {
+  border-color: var(--agent-solid);
+  background: color-mix(in srgb, var(--agent-soft) 65%, var(--surface));
+  box-shadow: 0 0 0 3px var(--agent-soft), 0 12px 28px -14px var(--agent-glow);
+}
+.offer[data-state="rejected"] {
+  border-color: var(--bad-line);
+  background: color-mix(in srgb, var(--bad-soft) 55%, var(--surface));
+}
+.offer[data-state="rejected"] .price,
+.offer[data-state="ineligible"] .price {
+  text-decoration: line-through;
+  text-decoration-thickness: 1.5px;
+  text-decoration-color: var(--bad-solid);
+}
+.offer[data-state="chosen"] {
+  border-color: var(--ok-solid);
+  background: color-mix(in srgb, var(--ok-soft) 55%, var(--surface));
+  box-shadow: 0 0 0 3px var(--ok-soft), 0 14px 32px -14px var(--ok-glow);
+}
+.offer[data-state="alternative"] {
+  opacity: 0.66;
+}
+.offer[data-state="ineligible"] {
+  opacity: 0.58;
+}
+.offerTop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.price {
+  font-size: 15.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  flex: none;
+}
+.offerTitle {
+  font-size: 12.5px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1;
+}
+.badge {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 650;
+  flex: none;
+  border: 1px solid transparent;
+}
+.badge svg {
+  width: 12px;
+  height: 12px;
+}
+.badge[data-kind="proposed"] {
+  color: var(--agent);
+  background: var(--agent-soft);
+  border-color: var(--agent-line);
+}
+.badge[data-kind="rejected"],
+.badge[data-kind="ineligible"] {
+  color: var(--bad);
+  background: var(--bad-soft);
+  border-color: var(--bad-line);
+}
+.badge[data-kind="chosen"] {
+  color: var(--ok);
+  background: var(--ok-soft);
+  border-color: var(--ok-line);
+  animation: pop 0.5s var(--ease) both;
+}
+.badge[data-kind="alternative"] {
+  color: var(--muted);
+  background: var(--surface-3);
+}
+.badgeDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: dot 1s var(--ease-in-out) infinite;
+}
+.round {
+  font-family: var(--font-code);
+  font-weight: 500;
+  opacity: 0.8;
+}
+.tags {
+  display: flex;
+  gap: 4px;
+  overflow: hidden;
+  min-width: 0;
+}
+.tag {
+  font-size: 11px;
+  line-height: 18px;
+  padding: 0 6px;
+  border-radius: 5px;
+  background: var(--surface-3);
+  color: var(--ink-2);
+  white-space: nowrap;
+  flex: none;
+}
+.tag[data-warn] {
+  color: var(--bad);
+  background: var(--bad-soft);
+}
+
+.tip {
+  position: absolute;
+  left: -1px;
+  z-index: 10;
+  display: none;
+  flex-direction: column;
+  gap: 5px;
+  width: max(100%, 280px);
+  max-width: min(360px, 80vw);
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--bad-line);
+  box-shadow: var(--shadow-3);
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--ink);
+  pointer-events: none;
+  white-space: normal;
+}
+.tipBelow {
+  top: calc(100% + 8px);
+}
+.tipAbove {
+  bottom: calc(100% + 8px);
+}
+.tipHead {
+  font-family: var(--font-code);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--bad);
+}
+.tipRow b {
+  font-weight: 650;
+  margin-right: 4px;
+}
+.offer:hover .tip,
+.offer:focus-visible .tip {
+  display: flex;
+}
+
+.asset {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 0 12px;
+  border-radius: 16px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  box-shadow: var(--shadow-1);
+  min-width: 0;
+}
+.assetIcon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--surface-3);
+  color: var(--ink-2);
+  flex: none;
+  transition: background var(--dur), color var(--dur);
+}
+.assetIcon svg {
+  width: 17px;
+  height: 17px;
+}
+.assetText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+.assetName {
+  font-weight: 650;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.assetStatus {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.assetWarn {
+  width: 16px;
+  height: 16px;
+  color: var(--faint);
+  margin-left: auto;
+}
+.asset[data-state="proposed"] {
+  border-color: var(--agent-solid);
+}
+.asset[data-state="proposed"] .assetIcon {
+  background: var(--agent-soft);
+  color: var(--agent);
+}
+.asset[data-state="rejected"] {
+  border-color: var(--bad-line);
+}
+.asset[data-state="rejected"] .assetStatus {
+  color: var(--bad);
+}
+.asset[data-state="covered"] {
+  border-color: var(--ok-solid);
+  box-shadow: 0 0 0 3px var(--ok-soft), 0 14px 34px -14px var(--ok-glow);
+}
+.asset[data-state="covered"] .assetIcon {
+  background: var(--ok-solid);
+  color: #04140c;
+  animation: pop 0.5s var(--ease) both;
+}
+.asset[data-state="covered"] .assetStatus {
+  color: var(--ok);
+  font-weight: 600;
+}
+
+/* ---------- Compact (phones) ---------- */
+.compact .doc {
+  padding: 0 7px;
+  gap: 6px;
+  border-radius: 9px;
+}
+.compact .docIcon {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+}
+.compact .docIcon svg {
+  width: 12px;
+  height: 12px;
+}
+.compact .docName {
+  font-size: 11.5px;
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-height: 1.2;
+}
+.compact .offer {
+  padding: 6px 8px;
+  gap: 4px;
+  border-radius: 10px;
+}
+.compact .price {
+  font-size: 13.5px;
+}
+.compact .badge {
+  padding: 0 4px;
+  height: 18px;
+}
+.compact .tag {
+  font-size: 10px;
+  padding: 0 4px;
+  line-height: 16px;
+}
+.compact .asset {
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px;
+  text-align: center;
+  border-radius: 12px;
+}
+.compact .assetIcon {
+  width: 26px;
+  height: 26px;
+}
+.compact .assetIcon svg {
+  width: 14px;
+  height: 14px;
+}
+.compact .assetText {
+  align-items: center;
+  max-width: 100%;
+}
+.compact .assetName {
+  font-size: 12px;
+}
+.compact .assetStatus {
+  font-size: 10.5px;
+}
+
+/* ---------- Motion ---------- */
+@keyframes draw {
+  from {
+    stroke-dashoffset: 100;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes flow {
+  to {
+    stroke-dashoffset: -8.8;
+  }
+}
+@keyframes glow {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@keyframes pop {
+  0% {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  70% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes reading {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 var(--agent-glow);
+  }
+  50% {
+    box-shadow: 0 0 0 5px transparent;
+  }
+}
+@keyframes dot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .edge_use.e_proposed .line {
+    animation: none;
+  }
+  .glow {
+    animation: none;
+    opacity: 0.8;
+  }
+}

@@ -1,0 +1,27 @@
+import type { Project } from "@/src/core/types";
+
+export interface ScenarioInfo {
+  id: string;
+  title: string;
+  tagline: string;
+  brief: string;
+  project: Project;
+  requiredAssetIds: string[];
+  showcases: string[];
+  documents: { id: string; assetId: string; text: string; licensorName?: string }[];
+}
+
+export interface RunSummary {
+  id: string;
+  createdAt: string;
+  name: string;
+  phase: string;
+  runKind?: string;
+  scenarioId?: string;
+  rounds?: number;
+  totalCents?: number;
+  currency?: string;
+  naiveTotalCents?: number;
+  blocked: number;
+  paid: boolean;
+}

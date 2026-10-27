@@ -1,0 +1,145 @@
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  height: var(--header-h);
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter: saturate(1.4) blur(14px);
+  -webkit-backdrop-filter: saturate(1.4) blur(14px);
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+}
+.inner {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.brand {
+  text-decoration: none;
+  color: var(--ink);
+  margin-right: 18px;
+  border-radius: 8px;
+  flex: none;
+}
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 11px;
+  border-radius: 8px;
+  color: var(--ink-2);
+  font-size: 14px;
+  font-weight: 550;
+  text-decoration: none;
+  transition: background var(--dur-fast), color var(--dur-fast);
+}
+.link svg {
+  width: 15px;
+  height: 15px;
+  opacity: 0.75;
+}
+.link:hover {
+  background: var(--surface-3);
+  color: var(--ink);
+}
+.link[aria-current="page"] {
+  color: var(--ink);
+  background: var(--surface-3);
+}
+.pills {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-right: 6px;
+}
+.pillsStacked {
+  flex-wrap: wrap;
+  margin: 12px 0 0;
+}
+.pillsPlaceholder {
+  display: inline-block;
+  width: 240px;
+  height: 20px;
+}
+.desktopOnly {
+  display: contents;
+}
+.menuBtn {
+  display: none;
+}
+.skip {
+  position: absolute;
+  left: 12px;
+  top: -60px;
+  z-index: 60;
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: var(--primary);
+  color: var(--primary-ink);
+  font-weight: 600;
+  text-decoration: none;
+}
+.skip:focus {
+  top: 10px;
+}
+.mobileMenu {
+  position: absolute;
+  inset: var(--header-h) 0 auto 0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  box-shadow: var(--shadow-3);
+  padding: 10px var(--gutter) 16px;
+  animation: drop var(--dur) var(--ease) both;
+}
+.mobileLink {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+  text-decoration: none;
+  font-weight: 550;
+}
+.mobileLink svg {
+  width: 18px;
+  height: 18px;
+  color: var(--muted);
+}
+@keyframes drop {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (max-width: 1080px) {
+  .pillsPlaceholder {
+    width: 0;
+  }
+  .desktopOnly {
+    display: none;
+  }
+  .menuBtn {
+    display: inline-flex;
+  }
+}
+@media (min-width: 761px) {
+  .mobileMenu nav {
+    display: none;
+  }
+}
+@media (max-width: 760px) {
+  .nav {
+    display: none;
+  }
+}

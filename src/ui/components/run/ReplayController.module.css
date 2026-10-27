@@ -1,0 +1,145 @@
+.bar {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--line);
+  background: var(--surface-2);
+  border-radius: 0 0 var(--r-lg) var(--r-lg);
+}
+.buttons {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.play {
+  min-width: 84px;
+}
+.scrub {
+  position: relative;
+  min-width: 0;
+  padding-top: 4px;
+}
+.track {
+  position: relative;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  border: 1px solid var(--line);
+}
+.fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--agent-solid), var(--engine-solid));
+  transition: width var(--dur) var(--ease);
+}
+.marker {
+  position: absolute;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border-radius: 50%;
+  border: 2px solid var(--surface);
+  background: var(--bad-solid);
+}
+.marker[data-kind="verified"],
+.marker[data-kind="captured"] {
+  background: var(--ok-solid);
+}
+.marker[data-kind="approved"] {
+  background: var(--ink);
+}
+.range {
+  position: absolute;
+  inset: -6px 0 auto 0;
+  width: 100%;
+  height: 22px;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.range:focus-visible + .meta,
+.scrub:focus-within .track {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+.meta {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--muted);
+  min-width: 0;
+  border-radius: 4px;
+}
+.meta > span:first-child {
+  flex: none;
+  font-family: var(--font-code);
+  font-size: 11px;
+}
+.now {
+  color: var(--ink-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--agent);
+  font-weight: 600;
+}
+.right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.speeds {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: 8px;
+  background: var(--surface-3);
+  border: 1px solid var(--line);
+}
+.speed {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+  font-family: var(--font-code);
+  height: 26px;
+  min-width: 32px;
+  border-radius: 6px;
+}
+.speed[aria-checked="true"] {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-1);
+}
+.speed:hover {
+  color: var(--ink);
+}
+@media (max-width: 760px) {
+  .bar {
+    grid-template-columns: auto 1fr;
+    gap: 10px 12px;
+  }
+  .scrub {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+  .right {
+    justify-content: flex-end;
+  }
+  .playLabel {
+    display: none;
+  }
+  .play {
+    min-width: 40px;
+  }
+}

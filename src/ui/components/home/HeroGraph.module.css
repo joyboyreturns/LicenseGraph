@@ -1,0 +1,300 @@
+.figure {
+  margin: 0;
+  position: relative;
+}
+.frame {
+  position: relative;
+  border-radius: 20px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  box-shadow: var(--shadow-3);
+  overflow: hidden;
+}
+.frameHead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-2);
+  font-size: 12px;
+}
+.dots {
+  display: inline-flex;
+  gap: 5px;
+}
+.dots i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--line-strong);
+}
+.frameTitle {
+  color: var(--muted);
+  font-family: var(--font-code);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.round {
+  margin-left: auto;
+  font-family: var(--font-code);
+  font-size: 11px;
+  color: var(--ink-2);
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  white-space: nowrap;
+}
+.svg {
+  width: 100%;
+  height: auto;
+  padding: 14px 14px 4px;
+  overflow: visible;
+}
+.caption {
+  display: flex;
+  align-items: center;
+  min-height: 50px;
+  padding: 12px 18px 14px;
+  border-top: 1px solid var(--line);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.caption span {
+  animation: lg-fade-up 0.4s var(--ease) both;
+}
+.caption::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 10px;
+  flex: none;
+  background: var(--agent-solid);
+}
+.caption[data-tone="bad"]::before {
+  background: var(--bad-solid);
+}
+.caption[data-tone="ok"]::before {
+  background: var(--ok-solid);
+  box-shadow: 0 0 0 4px var(--ok-soft);
+}
+
+/* svg parts */
+.doc rect:first-child {
+  fill: var(--surface-2);
+  stroke: var(--line);
+}
+.doc[data-reading] rect:first-child {
+  animation: read 1.2s var(--ease-in-out) infinite;
+}
+.docIcon {
+  fill: var(--surface-3);
+}
+.docLines {
+  stroke: var(--faint);
+  stroke-width: 1.2;
+  stroke-linecap: round;
+}
+.docText {
+  font-size: 11.5px;
+  font-weight: 600;
+  fill: var(--ink);
+  font-family: var(--font-ui);
+}
+.readEdge {
+  stroke: var(--line-strong);
+  stroke-width: 1.3;
+  transition: opacity var(--dur-slow) var(--ease), stroke var(--dur-slow);
+}
+.readEdge[data-state="hidden"] {
+  opacity: 0;
+}
+.readEdge[data-state="chosen"] {
+  stroke: var(--ok-line);
+}
+.readEdge[data-state="rejected"] {
+  stroke: var(--bad-line);
+}
+.useLine {
+  fill: none;
+  stroke: var(--line-strong);
+  stroke-width: 1.3;
+  transition: stroke var(--dur-slow) var(--ease), stroke-width var(--dur-slow), opacity var(--dur-slow);
+}
+.useEdge[data-state="hidden"] .useLine {
+  opacity: 0;
+}
+.useEdge[data-state="idle"] .useLine {
+  opacity: 0.6;
+}
+.useEdge[data-state="proposed"] .useLine {
+  stroke: var(--agent-solid);
+  stroke-width: 2.2;
+  stroke-dasharray: 6 5;
+  animation: flow 0.9s linear infinite;
+}
+.useEdge[data-state="rejected"] .useLine {
+  stroke: var(--bad-solid);
+  stroke-dasharray: 2 4;
+  opacity: 0.6;
+}
+.useEdge[data-state="chosen"] .useLine {
+  stroke: var(--ok-solid);
+  stroke-width: 2.6;
+}
+.glow {
+  fill: none;
+  stroke: var(--ok-glow);
+  stroke-width: 9;
+  animation: glow 2.2s var(--ease-in-out) infinite;
+}
+.strike circle {
+  fill: var(--surface);
+  stroke: var(--bad-solid);
+  stroke-width: 1.4;
+}
+.strike path {
+  stroke: var(--bad-solid);
+  stroke-width: 1.7;
+  stroke-linecap: round;
+}
+.strike,
+.stampInner {
+  animation: pop 0.5s var(--ease) both;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.offer rect {
+  fill: var(--surface);
+  stroke: var(--line-strong);
+  transition: fill var(--dur) var(--ease), stroke var(--dur) var(--ease), opacity var(--dur-slow);
+}
+.offer text {
+  transition: opacity var(--dur-slow);
+}
+.offer[data-state="hidden"] rect,
+.offer[data-state="hidden"] text {
+  opacity: 0.18;
+}
+.offer[data-state="proposed"] rect {
+  stroke: var(--agent-solid);
+  stroke-width: 1.6;
+  fill: color-mix(in srgb, var(--agent-soft) 70%, var(--surface));
+}
+.offer[data-state="rejected"] rect {
+  stroke: var(--bad-line);
+  fill: color-mix(in srgb, var(--bad-soft) 70%, var(--surface));
+}
+.offer[data-state="chosen"] rect {
+  stroke: var(--ok-solid);
+  stroke-width: 1.6;
+  fill: color-mix(in srgb, var(--ok-soft) 70%, var(--surface));
+}
+.price {
+  font-size: 14px;
+  font-weight: 750;
+  fill: var(--ink);
+  font-family: var(--font-ui);
+}
+.tag {
+  font-size: 10.5px;
+  fill: var(--muted);
+  font-family: var(--font-ui);
+}
+.offer[data-state="rejected"] .tag {
+  fill: var(--bad);
+  font-weight: 600;
+}
+.strikePrice {
+  stroke: var(--bad-solid);
+  stroke-width: 1.6;
+}
+.asset rect {
+  fill: var(--surface);
+  stroke: var(--line-strong);
+  transition: stroke var(--dur) var(--ease);
+}
+.assetDot {
+  fill: var(--surface-3);
+  transition: fill var(--dur) var(--ease);
+}
+.asset[data-state="proposed"] rect {
+  stroke: var(--agent-solid);
+}
+.asset[data-state="rejected"] rect {
+  stroke: var(--bad-line);
+}
+.asset[data-state="covered"] rect {
+  stroke: var(--ok-solid);
+  stroke-width: 1.6;
+}
+.asset[data-state="covered"] .assetDot {
+  fill: var(--ok-solid);
+}
+.check {
+  fill: none;
+  stroke: #04140c;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.assetText {
+  font-size: 13px;
+  font-weight: 650;
+  fill: var(--ink);
+  font-family: var(--font-ui);
+}
+.stamp rect {
+  fill: var(--surface);
+  stroke: var(--ok-solid);
+  stroke-width: 2;
+  filter: drop-shadow(0 8px 18px var(--ok-glow));
+}
+.stamp text {
+  font-size: 12.5px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  fill: var(--ok);
+  font-family: var(--font-ui);
+}
+@keyframes flow {
+  to {
+    stroke-dashoffset: -22;
+  }
+}
+@keyframes glow {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@keyframes pop {
+  0% {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+  70% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes read {
+  0%,
+  100% {
+    stroke: var(--line);
+  }
+  50% {
+    stroke: var(--agent-solid);
+  }
+}

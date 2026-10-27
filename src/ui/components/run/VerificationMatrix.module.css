@@ -1,0 +1,273 @@
+.wrap {
+  position: relative;
+}
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
+  padding: 12px 18px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  border-bottom: 1px solid var(--line);
+}
+.legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.legendNote {
+  margin-left: auto;
+  color: var(--muted);
+}
+.chosenSwatch {
+  width: 18px;
+  height: 12px;
+  border-radius: 3px;
+  background: var(--ok-soft);
+  box-shadow: inset 3px 0 0 var(--ok-solid);
+}
+.scroll {
+  overflow: auto;
+  max-height: min(72vh, 760px);
+  scrollbar-width: thin;
+}
+.scroll:focus-visible {
+  outline-offset: -2px;
+}
+.table {
+  width: 100%;
+  min-width: 920px;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13.5px;
+}
+.table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--surface-2);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--line);
+  text-align: center;
+  white-space: nowrap;
+}
+.table thead th.colLicence {
+  text-align: left;
+  z-index: 4;
+  padding-left: 18px;
+}
+.ruleCol[data-unused] {
+  color: var(--faint);
+}
+.right {
+  text-align: right !important;
+}
+.sticky {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--surface);
+}
+.groupRow th {
+  position: sticky;
+  left: 0;
+}
+.groupHead {
+  text-align: left;
+  padding: 14px 18px 6px;
+  background: var(--surface);
+  font-weight: 650;
+  font-size: 13px;
+  border-bottom: 1px solid var(--line);
+}
+.groupInner {
+  position: sticky;
+  left: 18px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.groupCount {
+  font-weight: 500;
+  color: var(--muted);
+  font-size: 12px;
+}
+.row td,
+.row th {
+  border-bottom: 1px solid var(--line);
+  transition: background var(--dur) var(--ease), opacity var(--dur) var(--ease);
+}
+.row td {
+  padding: 8px;
+}
+.licence {
+  padding: 0;
+  text-align: left;
+  font-weight: 400;
+  min-width: 230px;
+  max-width: 280px;
+  box-shadow: inset -1px 0 0 var(--line);
+}
+.licenceBtn {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 9px 12px 9px 18px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  line-height: 1.3;
+}
+.licenceBtn:hover .licensor {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.licensor {
+  font-weight: 650;
+  font-size: 13.5px;
+}
+.title {
+  font-size: 12px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 250px;
+}
+.price {
+  font-weight: 650;
+  white-space: nowrap;
+}
+.cell {
+  text-align: center;
+}
+.icon {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  vertical-align: middle;
+}
+.icon svg {
+  width: 14px;
+  height: 14px;
+}
+.pass {
+  color: var(--ok);
+  background: var(--ok-soft);
+}
+.fail {
+  color: var(--bad);
+  background: var(--bad-soft);
+  box-shadow: inset 0 0 0 1px var(--bad-line);
+}
+.skip {
+  color: var(--faint);
+  background: transparent;
+}
+.failBtn {
+  border: 0;
+  cursor: help;
+  padding: 0;
+}
+.failBtn:hover,
+.failBtn[aria-expanded="true"] {
+  background: var(--bad-solid);
+  color: #fff;
+}
+.pending {
+  color: var(--faint);
+}
+.pendingText {
+  font-size: 12px;
+  color: var(--muted);
+}
+.verdictCell {
+  white-space: nowrap;
+  padding-right: 18px !important;
+}
+
+.row[data-state="hidden"] td,
+.row[data-state="hidden"] th {
+  opacity: 0.45;
+}
+.row[data-state="proposed"] td,
+.row[data-state="proposed"] th {
+  background: color-mix(in srgb, var(--agent-soft) 70%, var(--surface));
+}
+.row[data-state="proposed"] .licence {
+  box-shadow: inset 3px 0 0 var(--agent-solid), inset -1px 0 0 var(--line);
+}
+.row[data-state="rejected"] .licence {
+  box-shadow: inset 3px 0 0 var(--bad-solid), inset -1px 0 0 var(--line);
+}
+.row[data-chosen] td,
+.row[data-chosen] th {
+  background: color-mix(in srgb, var(--ok-soft) 70%, var(--surface));
+}
+.row[data-chosen][data-state="chosen"] .licence {
+  box-shadow: inset 3px 0 0 var(--ok-solid), inset -1px 0 0 var(--line);
+}
+.row[data-chosen]:not([data-state="chosen"]) td,
+.row[data-chosen]:not([data-state="chosen"]) th {
+  background: var(--surface);
+}
+.row[data-selected] .licence {
+  box-shadow: inset 3px 0 0 var(--focus), inset -1px 0 0 var(--line);
+}
+.row:hover td,
+.row:hover th {
+  background: var(--surface-2);
+}
+
+.tip {
+  position: fixed;
+  z-index: 80;
+  transform: translate(-50%, -100%);
+  max-width: min(320px, calc(100vw - 24px));
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--bad-line);
+  box-shadow: var(--shadow-3);
+  font-size: 12.5px;
+  line-height: 1.4;
+  pointer-events: none;
+  animation: tipIn var(--dur) var(--ease) both;
+}
+@keyframes tipIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.tipBelow {
+  transform: translate(-50%, 0);
+}
+.tip strong {
+  font-size: 12px;
+  color: var(--bad);
+}
+@media (max-width: 760px) {
+  .legendNote {
+    margin-left: 0;
+  }
+  .licence {
+    min-width: 170px;
+  }
+  .title {
+    max-width: 150px;
+  }
+}
