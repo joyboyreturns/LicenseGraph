@@ -1,10 +1,12 @@
 // Usage: npm run sandbox:order            create a Sandbox order and print the approval link
 //        npm run sandbox:order -- capture  capture the last order after the buyer approved it
+//        npm run sandbox:order -- create INR  create the order in another currency (default USD)
 import { randomUUID } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { configFromEnv, createPayPalClient } from "../src/payments/paypal";
 
 const STATE = ".sandbox-order.json";
+const currency = process.argv[2] === "create" ? (process.argv[3] ?? "USD").toUpperCase() : "USD";
 const client = createPayPalClient(configFromEnv());
 
 if (process.argv[2] === "capture") {
@@ -14,7 +16,7 @@ if (process.argv[2] === "capture") {
 } else {
   const order = await client.createOrder({
     amountCents: 1000,
-    currency: "USD",
+    currency,
     referenceId: "licensegraph-test",
     description: "LicenseGraph Sandbox test purchase",
     requestId: randomUUID(),
