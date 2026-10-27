@@ -1,13 +1,13 @@
 // Calls the real AI Gateway. Skipped unless RUN_GATEWAY_LIVE=1 (use `npm run test:gateway`).
-// Sends exactly one request, and only after assertModelIsFree confirms the model costs nothing.
+// Sends one request per fixture (no retries), and only after assertModelIsFree confirms the model costs nothing.
+// Narrow the run with `-- -t photo` to send fewer requests.
 import { describe, expect, it } from "vitest";
 import { extractOffer } from "../src/extraction/extract";
 import { createGatewayModel, gatewayConfigFromEnv } from "../src/extraction/model";
 import { fixtures } from "./fixtures/licenses";
 
 describe.skipIf(!process.env.RUN_GATEWAY_LIVE)("extraction against the AI Gateway (live)", () => {
-  it("extracts the song licence terms with verified evidence", async () => {
-    const f = fixtures[0]!;
+  it.each(fixtures)("extracts $doc.id with verified evidence", async (f) => {
     const model = createGatewayModel(gatewayConfigFromEnv());
 
     const result = await extractOffer(model, f.doc, { attempts: 1 });

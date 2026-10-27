@@ -26,8 +26,8 @@ Prize targets: Best Overall, Best Use of Agentic Commerce, Best Use of AG Grid. 
 - [x] `src/extraction/extract.ts`: schema for `LicenseOffer` with per-field evidence; every quote is located in the source text and given offsets, and an invented quote is rejected and retried with the reason
 - [x] `src/extraction/model.ts`: gateway client behind a `ModelClient` interface; mock-model tests, one live run (`npm run test:gateway`)
 - [x] Free-models-only guard: `assertModelIsFree` checks the gateway price list before any request is sent
-- [ ] Run the other three fixtures live and measure accuracy (only on a free model, a few requests at a time)
-- Done when: fixtures extract with correct terms and verified quotes (mock: all four; live: song so far).
+- [x] Live run of all four fixtures on a free model: 4 of 4 correct on the first attempt, with every quote verified in the source (one request each, no retries)
+- Done: fixtures extract with correct terms and verified quotes, both with the mock and live.
 
 ## Step 4: Rules engine hardening (1-2 Nov)
 
