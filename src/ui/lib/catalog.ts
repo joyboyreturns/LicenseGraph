@@ -20,7 +20,7 @@ export interface OfferInfo {
   /** Licence title without the licensor's name, e.g. "Indie starter licence". */
   title: string;
   price: string;
-  /** "Pixel Hymns, song, $150" */
+  /** "Pixel Hymns · song · $150" */
   name: string;
 }
 
@@ -39,7 +39,7 @@ export function buildCatalog(documents: readonly DocInfo[], offers: readonly Lic
     const doc = documentId ? docs.get(documentId) : undefined;
     const licensor = doc?.licensorName ?? doc?.title ?? documentId ?? o.id;
     const price = formatMoney(o.priceCents, o.currency, { trim: true });
-    map.set(o.id, { id: o.id, assetId: o.assetId, documentId, licensor, title: doc?.title ?? o.id, price, name: `${licensor}, ${assetNoun(o.assetId)}, ${price}` });
+    map.set(o.id, { id: o.id, assetId: o.assetId, documentId, licensor, title: doc?.title ?? o.id, price, name: `${licensor} · ${assetNoun(o.assetId)} · ${price}` });
   }
   return {
     offers: map,

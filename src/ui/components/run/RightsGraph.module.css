@@ -194,8 +194,9 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 6px;
-  padding: 8px 11px 8px 13px;
+  gap: 4px;
+  padding: 6px 10px 6px 12px;
+  line-height: 1.2;
   border-radius: 12px;
   border: 1px solid var(--line-strong);
   background: var(--surface);
@@ -260,6 +261,7 @@
   align-items: center;
   gap: 8px;
   min-width: 0;
+  height: 21px;
 }
 .price {
   font-size: 15.5px;
@@ -331,6 +333,8 @@
   gap: 4px;
   overflow: hidden;
   min-width: 0;
+  height: 18px;
+  flex: none;
 }
 .tag {
   font-size: 11px;

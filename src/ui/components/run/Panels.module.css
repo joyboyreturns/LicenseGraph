@@ -141,7 +141,7 @@
   flex: 1 1 240px;
   max-width: 380px;
 }
-.approveForm .input {
+.approveForm :global(.input) {
   height: 48px;
   font-size: 15px;
 }
@@ -379,10 +379,69 @@
   .celebrate > a {
     grid-column: 1 / -1;
   }
-  .approveForm .btn {
+  .approveForm :global(.btn) {
     width: 100%;
   }
   .field {
     max-width: none;
+  }
+}
+@media (max-width: 640px) {
+  .bundle,
+  .payouts {
+    min-width: 0;
+  }
+  .bundle thead,
+  .payouts thead {
+    display: none;
+  }
+  .bundle tbody tr,
+  .payouts tbody tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 2px 12px;
+    padding: 12px;
+    border-bottom: 1px solid var(--line);
+  }
+  .bundle tbody td,
+  .payouts tbody td {
+    display: block;
+    padding: 0 !important;
+    border: 0 !important;
+  }
+  .bundle tbody td:nth-child(1) {
+    grid-column: 1;
+  }
+  .bundle tbody td:nth-child(4) {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .bundle tbody td:nth-child(2),
+  .bundle tbody td:nth-child(3) {
+    grid-column: 1 / -1;
+  }
+  .bundle tfoot tr {
+    display: flex;
+    justify-content: space-between;
+    padding: 0 12px;
+  }
+  .bundle tfoot td {
+    border: 0;
+  }
+  .payouts tbody td:nth-child(4) {
+    grid-column: 2;
+    grid-row: 1;
+    text-align: right;
+  }
+  .payouts tbody td:nth-child(5) {
+    grid-column: 2;
+    grid-row: 2 / span 2;
+    text-align: right;
+  }
+  .payouts tbody td:nth-child(2),
+  .payouts tbody td:nth-child(3) {
+    grid-column: 1;
+    font-size: 12.5px;
+    color: var(--muted);
   }
 }

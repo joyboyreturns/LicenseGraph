@@ -26,7 +26,7 @@ export function ComplianceSummary({ analysis, catalog, currency, verified }: { a
           <span className={`${styles.amount} num`}>{m(analysis.naiveTotalCents)}</span>
           <span className={styles.note}>{blocked.length ? <>Includes {pluralise(blocked.length, "licence")} this project could not use.</> : <>The cheapest offer for every asset was also compliant.</>}</span>
         </div>
-        <div className={styles.side} data-kind="verified">
+        <div className={styles.side} data-kind={verified ? "verified" : "none"}>
           <span className={styles.label}>
             <ShieldCheck aria-hidden /> {verified ? "Verified bundle" : "No verified bundle"}
           </span>

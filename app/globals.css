@@ -638,6 +638,7 @@ hr {
   text-align: right;
 }
 .table-scroll {
+  position: relative;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }
@@ -743,9 +744,35 @@ hr {
 }
 
 /* ---------- Print ---------- */
+@page {
+  size: A4;
+  margin: 10mm;
+}
 @media print {
-  :root {
+  :root,
+  :root:not([data-theme="light"]),
+  :root[data-theme="dark"] {
     color-scheme: light;
+    --bg: #ffffff;
+    --surface: #ffffff;
+    --surface-2: #fafafa;
+    --surface-3: #f2f2f2;
+    --ink: #000000;
+    --ink-2: #222222;
+    --muted: #555555;
+    --line: #dddddd;
+    --line-strong: #bbbbbb;
+    --primary: #111318;
+    --primary-ink: #ffffff;
+    --ok: #0a7446;
+    --ok-solid: #12a866;
+    --shadow-1: none;
+    --shadow-2: none;
+    --shadow-3: none;
+  }
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
   body {
     background: #fff !important;

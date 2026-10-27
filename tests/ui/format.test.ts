@@ -106,7 +106,8 @@ describe("labels", () => {
     expect(shortHash("abcdef0123456789", 6)).toBe("abcdef…");
     expect(shortHash("abc", 6)).toBe("abc");
     expect(shortHash(undefined)).toBe("—");
-    expect(formatElapsed(420)).toBe("0.4 s");
+    expect(formatElapsed(420)).toBe("420 ms");
+    expect(formatElapsed(4200)).toBe("4.2 s");
     expect(formatElapsed(42_000)).toBe("42 s");
     expect(formatElapsed(185_000)).toBe("3 min 05 s");
     expect(formatElapsed(-1)).toBe("—");

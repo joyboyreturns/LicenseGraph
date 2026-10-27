@@ -61,12 +61,12 @@ export function SiteHeader() {
         Skip to content
       </a>
       <div className={`container-wide ${styles.inner}`}>
-        <Link href="/" className={styles.brand} aria-label="LicenseGraph home">
+        <Link prefetch={false} href="/" className={styles.brand} aria-label="LicenseGraph home">
           <Wordmark size={26} />
         </Link>
         <nav aria-label="Main" className={styles.nav}>
           {NAV.map(({ href, label, icon: Icon }) => (
-            <Link key={href} href={href} className={styles.link} aria-current={pathname.startsWith(href) ? "page" : undefined}>
+            <Link key={href} prefetch={false} href={href} className={styles.link} aria-current={pathname.startsWith(href) ? "page" : undefined}>
               <Icon aria-hidden />
               {label}
             </Link>
@@ -85,7 +85,7 @@ export function SiteHeader() {
         <div id="mobile-menu" className={styles.mobileMenu}>
           <nav aria-label="Main (mobile)">
             {NAV.map(({ href, label, icon: Icon }) => (
-              <Link key={href} href={href} className={styles.mobileLink} aria-current={pathname.startsWith(href) ? "page" : undefined}>
+              <Link key={href} prefetch={false} href={href} className={styles.mobileLink} aria-current={pathname.startsWith(href) ? "page" : undefined}>
                 <Icon aria-hidden />
                 {label}
               </Link>

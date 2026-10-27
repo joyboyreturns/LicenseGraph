@@ -63,10 +63,9 @@
   left: -8px;
   top: 4px;
   bottom: 4px;
-  width: 3px;
-  border-radius: 3px;
-  background: var(--ink);
-  opacity: 0.8;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--faint);
 }
 .roundHead {
   display: flex;
@@ -235,7 +234,7 @@
   border-color: var(--bad-line);
   background: color-mix(in srgb, var(--bad-soft) 60%, var(--surface));
 }
-.offerChip[data-tone="bad"] .offerChipMeta .num {
+.offerChip[data-tone="bad"] .offerChipMeta :global(.num) {
   text-decoration: line-through;
   text-decoration-color: var(--bad-solid);
 }
@@ -311,7 +310,7 @@
   color: var(--ink-2);
   line-height: 1.4;
 }
-.violations ul li .chip {
+.violations ul li :global(.chip) {
   margin-top: -1px;
 }
 .linkish {

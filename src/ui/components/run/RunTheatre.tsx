@@ -13,6 +13,7 @@ import { useConfig, useToast } from "../Providers";
 import { storageGet, storageSet, useNow, useReducedMotion } from "../bits";
 import { AgentTimeline } from "./AgentTimeline";
 import { ApprovalPanel } from "./ApprovalPanel";
+import { AskPanel } from "./AskPanel";
 import { ComplianceSummary } from "./ComplianceSummary";
 import { EvidenceViewer } from "./EvidenceViewer";
 import { FailurePanel } from "./FailurePanel";
@@ -129,7 +130,8 @@ function Theatre({ view, accept, refresh }: { view: SessionView; accept: (v: Ses
 
   const now = useNow(live);
   const lastAt = view.events.at(-1)?.at;
-  const elapsedMs = (live ? now : lastAt ? Date.parse(lastAt) : Date.parse(view.createdAt)) - Date.parse(view.createdAt);
+  const created = Date.parse(view.createdAt);
+  const elapsedMs = !state.atEnd ? (state.current ? Date.parse(state.current.at) - created : 0) : (live ? now : lastAt ? Date.parse(lastAt) : created) - created;
 
   const [busy, setBusy] = useState<string | null>(null);
   const run = useCallback(
@@ -183,7 +185,7 @@ function Theatre({ view, accept, refresh }: { view: SessionView; accept: (v: Ses
     );
   } else if (view.phase === "captured" || view.phase === "settled") {
     cta = (
-      <Link href={`/passport/${view.id}`} className="btn btn-ok btn-lg">
+      <Link prefetch={false} href={`/passport/${view.id}`} className="btn btn-ok btn-lg">
         <FileBadge aria-hidden /> View Licence Passport
       </Link>
     );
@@ -204,13 +206,13 @@ function Theatre({ view, accept, refresh }: { view: SessionView; accept: (v: Ses
       <RunHeader
         name={view.project.name}
         runKind={view.meta?.runKind}
-        phase={view.phase}
+        phase={state.phase}
         elapsedMs={elapsedMs}
         live={live}
         scenarioTitle={view.meta?.scenarioId ? (SCENARIO_TITLES[view.meta.scenarioId] ?? view.meta.scenarioId) : undefined}
         actions={
           <>
-            <Link href={`/dashboard?session=${view.id}`} className="btn btn-lg btn-ghost">
+            <Link prefetch={false} href={`/dashboard?session=${view.id}`} className="btn btn-lg btn-ghost">
               <LayoutGrid aria-hidden /> Dashboard
             </Link>
             {cta}
@@ -309,6 +311,7 @@ function Theatre({ view, accept, refresh }: { view: SessionView; accept: (v: Ses
             </div>
           )}
         </section>
+        <div className={styles.sideCol}>
         {view.analysis && (
           <section className={`card ${styles.summaryCard}`} aria-labelledby="summary-title">
             <div className="card-head">
@@ -320,6 +323,18 @@ function Theatre({ view, accept, refresh }: { view: SessionView; accept: (v: Ses
             <ComplianceSummary analysis={view.analysis} catalog={catalog} currency={currency} verified={Boolean(view.bundle)} />
           </section>
         )}
+        {!live && (
+          <section className="card" aria-labelledby="ask-title">
+            <div className="card-head">
+              <h2 id="ask-title" className="card-title">
+                Ask about this run
+              </h2>
+              <span className="small muted">Answers come only from this run&rsquo;s recorded facts</span>
+            </div>
+            <AskPanel runId={view.id} catalog={catalog} onSelectOffer={setSelected} suggestions={["Why were licences rejected?", "What did staying compliant cost?", "Who gets paid?"]} />
+          </section>
+        )}
+        </div>
       </div>
 
       {view.analysis && (
@@ -374,10 +389,10 @@ export function RunNotFound({ id }: { id: string }) {
       <h1 className={styles.emptyTitle}>This run does not exist on this server</h1>
       <p className={styles.emptyText}>The link may be mistyped, or the run was created on another server. Runs are stored by the server that created them.</p>
       <div className="row">
-        <Link href="/" className="btn btn-primary">
+        <Link prefetch={false} href="/" className="btn btn-primary">
           Start a new run
         </Link>
-        <Link href="/dashboard" className="btn">
+        <Link prefetch={false} href="/dashboard" className="btn">
           <LayoutGrid aria-hidden /> Open the portfolio
         </Link>
       </div>

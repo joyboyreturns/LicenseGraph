@@ -6,7 +6,7 @@ import type { LedgerEvent } from "@/src/ledger/chain";
 import type { Catalog } from "@/src/ui/lib/catalog";
 import { humaniseIds } from "@/src/ui/lib/catalog";
 import { eventTitle } from "@/src/ui/lib/event-text";
-import { assetNoun, dateTimeText, formatMoney, isSimulatedId, pluralise } from "@/src/ui/lib/format";
+import { assetLabel, assetNoun, dateTimeText, formatMoney, isSimulatedId, pluralise } from "@/src/ui/lib/format";
 import type { RunState } from "@/src/ui/lib/replay";
 import { buildStory, violationsByOffer, type Round } from "@/src/ui/lib/rounds";
 import { isBundleRule, ruleName, violationText } from "@/src/ui/lib/rule-text";
@@ -240,7 +240,10 @@ function Rejection({ violations, catalog, currency, onSelectOffer }: { violation
               {list.map((v, i) => (
                 <li key={i}>
                   <span className={`chip chip-sm chip-mono ${isBundleRule(v.rule) ? "tone-engine" : "tone-bad"}`}>{ruleName(v.rule)}</span>
-                  <span>{violationText(v, currency)}</span>
+                  <span>
+                    {!offerId && v.assetId ? <b>{assetLabel(v.assetId)}: </b> : null}
+                    {violationText(v, currency)}
+                  </span>
                 </li>
               ))}
             </ul>

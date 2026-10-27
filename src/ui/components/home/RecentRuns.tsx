@@ -27,7 +27,7 @@ export function RecentRuns() {
             Recent runs
           </h2>
         </div>
-        <Link href="/dashboard" className="btn btn-ghost">
+        <Link prefetch={false} href="/dashboard" className="btn btn-ghost">
           All runs in the portfolio <ArrowRight aria-hidden />
         </Link>
       </div>
@@ -36,7 +36,7 @@ export function RecentRuns() {
           const p = phaseInfo(r.phase);
           return (
             <li key={r.id}>
-              <Link href={`/run/${r.id}`} className={styles.run}>
+              <Link prefetch={false} href={`/run/${r.id}`} className={styles.run}>
                 <span className={styles.runMain}>
                   <span className={styles.runName}>{r.name}</span>
                   <span className={styles.runMeta}>

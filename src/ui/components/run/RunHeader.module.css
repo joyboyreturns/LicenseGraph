@@ -4,7 +4,7 @@
   justify-content: space-between;
   gap: 20px 32px;
   flex-wrap: wrap;
-  padding: 28px 0 18px;
+  padding: 22px 0 14px;
 }
 .titleBlock {
   min-width: 0;
@@ -39,10 +39,12 @@
   height: 14px;
 }
 .kindNote {
-  margin-top: 8px;
+  flex: 1 1 320px;
   font-size: 12.5px;
+  line-height: 1.4;
   color: var(--muted);
-  max-width: 70ch;
+  max-width: 62ch;
+  padding-left: 4px;
 }
 .actions {
   display: flex;
@@ -53,19 +55,20 @@
 
 .railWrap {
   position: sticky;
-  top: var(--header-h);
+  top: calc(var(--header-h) + 8px);
   z-index: 20;
-  margin: 0 calc(var(--gutter) * -1);
-  padding: 0 var(--gutter);
-  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  padding: 0 6px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface-2) 88%, transparent);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  border-bottom: 1px solid var(--line);
+  box-shadow: var(--shadow-1);
 }
 .rail {
   list-style: none;
   margin: 0;
-  padding: 10px 0;
+  padding: 6px 0;
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 6px;
@@ -204,5 +207,10 @@
   .step[data-status="current"] {
     background: transparent;
     box-shadow: none;
+  }
+}
+@media (max-width: 760px) {
+  .railWrap {
+    position: static;
   }
 }

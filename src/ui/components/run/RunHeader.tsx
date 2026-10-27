@@ -28,8 +28,8 @@ export function RunHeader({ name, runKind, phase, elapsedMs, live, actions, scen
             <span className="num">{formatElapsed(elapsedMs)}</span>
             <span className="visually-hidden">elapsed</span>
           </span>
+          <span className={styles.kindNote}>{kind.long}</span>
         </div>
-        <p className={styles.kindNote}>{kind.long}</p>
       </div>
       {actions && <div className={styles.actions}>{actions}</div>}
     </div>

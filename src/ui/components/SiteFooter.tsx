@@ -39,9 +39,9 @@ export function SiteFooter() {
         </div>
         <nav className={styles.links} aria-label="Footer">
           <h2 className="eyebrow">Explore</h2>
-          <Link href="/">Home</Link>
-          <Link href="/dashboard">Portfolio</Link>
-          <Link href="/verify">Verify a passport</Link>
+          <Link prefetch={false} href="/">Home</Link>
+          <Link prefetch={false} href="/dashboard">Portfolio</Link>
+          <Link prefetch={false} href="/verify">Verify a passport</Link>
           <a href={REPO_URL} rel="noreferrer">
             Source code (MIT)
           </a>

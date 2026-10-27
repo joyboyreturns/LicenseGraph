@@ -97,7 +97,7 @@ export function HeroGraph() {
           <span className={styles.frameTitle}>Documentary promo · replayed scenario</span>
           <span className={styles.round}>{stage <= 1 ? "Reading" : stage <= 3 ? "Round 1" : "Round 2"}</span>
         </div>
-        <svg viewBox="0 0 556 340" className={styles.svg} role="img" aria-label="Animated rights graph: four licences, four offers and three assets. The agent proposes the cheapest bundle, the rules engine rejects a $45 editorial-only photo, the agent picks the $80 archive image instead, and the $329 bundle is verified.">
+        <svg viewBox="0 0 556 372" className={styles.svg} role="img" aria-label="Animated rights graph: four licences, four offers and three assets. The agent proposes the cheapest bundle, the rules engine rejects a $45 editorial-only photo, the agent picks the $80 archive image instead, and the $329 bundle is verified.">
           <defs>
             <filter id="hg-glow" x="-20%" y="-60%" width="140%" height="220%">
               <feGaussianBlur stdDeviation="3" />
@@ -160,7 +160,7 @@ export function HeroGraph() {
             </g>
           ))}
           {stage === FINAL && (
-            <g className={styles.stamp} transform="translate(330 170)">
+            <g className={styles.stamp} transform="translate(390 350)">
               <g className={styles.stampInner}>
                 <rect x={-62} y={-19} width={124} height={38} rx={9} />
                 <text x={0} y={5.5} textAnchor="middle">

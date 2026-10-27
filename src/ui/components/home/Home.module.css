@@ -112,7 +112,7 @@
   max-width: 760px;
   margin-bottom: 28px;
 }
-.sectionHead .eyebrow {
+.sectionHead :global(.eyebrow) {
   margin-bottom: 10px;
 }
 .sectionLead {
@@ -352,7 +352,7 @@
   flex-wrap: wrap;
   margin-bottom: 20px;
 }
-.recentHead .eyebrow {
+.recentHead :global(.eyebrow) {
   margin-bottom: 8px;
 }
 .runs {
@@ -440,7 +440,32 @@
   .runs {
     grid-template-columns: minmax(0, 1fr);
   }
-  .ctas .btn {
+  .ctas :global(.btn) {
     width: 100%;
+  }
+}
+@media (max-width: 700px) {
+  .kicker {
+    border-radius: 14px;
+  }
+  .stage {
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr);
+    column-gap: 14px;
+    row-gap: 4px;
+    padding: 16px;
+  }
+  .stageTop {
+    grid-row: 1 / span 3;
+    align-self: start;
+  }
+  .stageNum {
+    display: none;
+  }
+  .stageTitle {
+    margin-top: 0;
+  }
+  .stage > :not(.stageTop) {
+    grid-column: 2;
   }
 }

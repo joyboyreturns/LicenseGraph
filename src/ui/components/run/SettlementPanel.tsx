@@ -100,7 +100,7 @@ export function SettlementPanel({ view, config, busy, actions }: { view: Session
               {payouts!.lines.length} {payouts!.lines.length === 1 ? "licensor" : "licensors"} received {formatMoney(payouts!.totalCents, payouts!.currency)} in total{simulated ? " (simulated)" : " in the Sandbox"}. The Licence Passport is ready to share.
             </p>
           </div>
-          <Link href={`/passport/${view.id}`} className="btn btn-ok btn-lg">
+          <Link prefetch={false} href={`/passport/${view.id}`} className="btn btn-ok btn-lg">
             <FileBadge aria-hidden /> View Licence Passport
           </Link>
         </div>
@@ -229,7 +229,7 @@ export function SettlementPanel({ view, config, busy, actions }: { view: Session
                 A shareable, printable record that anyone can re-verify in their own browser.
               </p>
               {!allPaid && (
-                <Link href={`/passport/${view.id}`} className="btn">
+                <Link prefetch={false} href={`/passport/${view.id}`} className="btn">
                   <FileBadge aria-hidden /> View passport
                 </Link>
               )}

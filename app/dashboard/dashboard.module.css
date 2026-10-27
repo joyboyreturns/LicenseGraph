@@ -1,0 +1,158 @@
+.head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+.title {
+  margin-top: 10px;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(38px, 4.6vw, 60px);
+  line-height: 1.04;
+  letter-spacing: -0.02em;
+}
+.lead {
+  margin-top: 10px;
+  color: var(--ink-2);
+  max-width: 62ch;
+}
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0 0 16px;
+}
+.kpis div {
+  padding: 16px 18px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+.kpis dt {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.kpis dd {
+  margin: 4px 0 0;
+  font-family: var(--font-display);
+  font-size: 34px;
+  line-height: 1.05;
+}
+.tableCard {
+  overflow: hidden;
+}
+.table {
+  min-width: 900px;
+}
+.table td {
+  vertical-align: middle;
+}
+.name {
+  font-weight: 650;
+  text-decoration: none;
+}
+.name:hover {
+  text-decoration: underline;
+}
+.sub {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.sub svg {
+  width: 13px;
+  height: 13px;
+}
+.actions {
+  white-space: nowrap;
+  text-align: right;
+}
+.actions a + a {
+  margin-left: 4px;
+}
+.emptyCard {
+  padding: 32px;
+}
+.emptyTitle {
+  font-family: var(--font-display);
+  font-size: 30px;
+}
+
+/* Studio view: the context bar sits in the empty right half of the studio's own toolbar row. */
+.studioPage {
+  position: relative;
+  overflow-x: clip;
+}
+.context {
+  position: absolute;
+  top: 8px;
+  right: 16px;
+  z-index: 5;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: calc(100% - 260px);
+}
+.contextName {
+  font-weight: 650;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.contextNote {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.studio > div:first-child > button {
+  height: 34px;
+  padding: 0 14px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 13px;
+}
+.studio > div:first-child > button:global(.primary) {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-ink);
+}
+.loading {
+  height: calc(100vh - 120px);
+  padding: 16px;
+}
+.assistantNote {
+  font-size: 13px;
+  color: var(--muted);
+  padding-top: 8px;
+}
+@media (max-width: 900px) {
+  .kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 640px) {
+  .context {
+    position: static;
+    max-width: none;
+    padding: 8px 12px;
+    height: auto;
+    flex-wrap: wrap;
+    border-bottom: 1px solid var(--line);
+  }
+  .contextNote {
+    display: none;
+  }
+}

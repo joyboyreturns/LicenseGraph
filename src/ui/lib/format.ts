@@ -114,6 +114,7 @@ export function relativeTime(iso: string, now: number = Date.now()): string {
 /** Milliseconds as "0.4 s", "12 s", "3 min 05 s", "2 h 10 min". */
 export function formatElapsed(ms: number): string {
   if (!Number.isFinite(ms) || ms < 0) return "—";
+  if (ms < 1000) return `${Math.round(ms)} ms`;
   if (ms < 10_000) return `${(ms / 1000).toFixed(1)} s`;
   const s = Math.floor(ms / 1000);
   if (s < 60) return `${s} s`;

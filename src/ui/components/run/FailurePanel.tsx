@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import type { SessionView } from "@/src/app-logic/session";
 import { api } from "@/src/ui/lib/api";
 import type { Catalog } from "@/src/ui/lib/catalog";
+import { assetLabel } from "@/src/ui/lib/format";
 import { buildStory } from "@/src/ui/lib/rounds";
 import { ruleName, violationText } from "@/src/ui/lib/rule-text";
 import { Spinner } from "../bits";
@@ -53,7 +54,7 @@ export function FailurePanel({ view, catalog }: { view: SessionView; catalog: Ca
             {lastRejection.violations.map((v, i) => (
               <li key={i}>
                 <b>{ruleName(v.rule)}</b>
-                {v.offerId ? ` · ${catalog.offerName(v.offerId)}` : ""}: {violationText(v, currency)}
+                {v.offerId ? ` · ${catalog.offerName(v.offerId)}` : v.assetId ? ` · ${assetLabel(v.assetId)}` : ""}: {violationText(v, currency)}
               </li>
             ))}
           </ul>
@@ -69,7 +70,7 @@ export function FailurePanel({ view, catalog }: { view: SessionView; catalog: Ca
               {starting === s.id ? <Spinner label="Starting" /> : <ArrowRight aria-hidden />} {s.title}
             </button>
           ))}
-          <Link href="/#describe" className="btn btn-ghost">
+          <Link prefetch={false} href="/#describe" className="btn btn-ghost">
             Describe a new project
           </Link>
         </div>

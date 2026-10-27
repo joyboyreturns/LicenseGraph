@@ -74,10 +74,10 @@ describe("catalog", () => {
   it("names offers the way people read them", async () => {
     const view = await scenarioView("documentary");
     const c = buildCatalog(view.documents, view.candidates);
-    expect(c.offerName("offer-song")).toBe("SoundHarbor Music, song, $200");
+    expect(c.offerName("offer-song")).toBe("SoundHarbor Music · song · $200");
     expect(c.offer("offer-photo")).toMatchObject({ licensor: "PixelLeaf Images", price: "$45" });
     expect(c.offerName("unknown")).toBe("unknown");
-    expect(humaniseIds("Avoiding offer-photo", c)).toBe("Avoiding PixelLeaf Images, image, $45");
+    expect(humaniseIds("Avoiding offer-photo", c)).toBe("Avoiding PixelLeaf Images · image · $45");
   });
   it("replaces longer ids first", () => {
     const c = buildCatalog(
@@ -90,11 +90,11 @@ describe("catalog", () => {
         { id: "offer-a-pro", assetId: "song", priceCents: 200, currency: "USD", terms: { commercialUse: true, territories: ["WORLD"], termMonths: 1 }, evidence: [{ documentId: "b", quote: "B" }] },
       ],
     );
-    expect(humaniseIds("offer-a-pro, offer-a", c)).toBe("Beta, song, $2, Alpha, song, $1");
+    expect(humaniseIds("offer-a-pro, offer-a", c)).toBe("Beta · song · $2, Alpha · song · $1");
   });
   it("falls back when a document has no licensor", () => {
     const c = buildCatalog([{ id: "d", assetId: "font", text: "FONT LICENCE" }], [{ id: "o", assetId: "font", priceCents: 4900, currency: "USD", terms: { commercialUse: true, territories: ["WORLD"], termMonths: "perpetual" }, evidence: [] }]);
-    expect(c.offerName("o")).toBe("o, font, $49");
+    expect(c.offerName("o")).toBe("o · font · $49");
   });
 });
 

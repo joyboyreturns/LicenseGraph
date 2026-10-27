@@ -105,6 +105,7 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
+  align-items: start;
 }
 .found,
 .assumed {
@@ -200,7 +201,7 @@
   gap: 16px;
   flex-wrap: wrap;
 }
-.terrRow .input {
+.terrRow :global(.input) {
   flex: 1 1 260px;
   max-width: 420px;
 }
@@ -246,7 +247,7 @@
   gap: 6px;
   align-items: center;
 }
-.addAsset .input {
+.addAsset :global(.input) {
   width: 150px;
   min-height: 34px;
   height: 34px;
@@ -265,7 +266,7 @@
   border: 1px dashed var(--line-strong);
   background: var(--surface-2);
 }
-.useScenario .select {
+.useScenario :global(.select) {
   max-width: 420px;
 }
 .assetBlock {
