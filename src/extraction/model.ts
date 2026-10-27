@@ -9,12 +9,23 @@ export interface GatewayConfig {
   baseUrl?: string;
   maxTokens?: number;
   fetch?: typeof fetch;
+  /** Minimum gap between the starts of two requests, to stay inside the provider's rate limit. */
+  minIntervalMs?: number;
+  /** Injectable for tests. */
+  now?: () => number;
+  sleep?: (ms: number) => Promise<void>;
+}
+
+/** Free models are typically limited to about 5 requests a minute (LICENSEGRAPH_MODEL_RPM overrides). */
+export function minIntervalFromEnv(env: Record<string, string | undefined> = process.env): number {
+  const rpm = Number(env.LICENSEGRAPH_MODEL_RPM);
+  return Math.ceil(60_000 / (rpm > 0 ? rpm : 5)) + 500;
 }
 
 export function gatewayConfigFromEnv(env: Record<string, string | undefined> = process.env): GatewayConfig {
   const { AI_GATEWAY_API_KEY: apiKey, LICENSEGRAPH_MODEL: model } = env;
   if (!apiKey || !model) throw new Error("AI_GATEWAY_API_KEY and LICENSEGRAPH_MODEL must be set");
-  return { apiKey, model };
+  return { apiKey, model, minIntervalMs: minIntervalFromEnv(env) };
 }
 
 /**
@@ -39,11 +50,18 @@ export async function assertModelIsFree(config: GatewayConfig): Promise<void> {
 /** Vercel AI Gateway, OpenAI-compatible chat completions. Free models only. */
 export function createGatewayModel(config: GatewayConfig): ModelClient {
   const doFetch = config.fetch ?? fetch;
+  const now = config.now ?? Date.now;
+  const sleep = config.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
   let checked: Promise<void> | undefined;
+  let nextSlot = 0;
   return {
     async complete({ system, user }) {
       checked ??= assertModelIsFree(config);
       await checked;
+      // Take the next free slot so several calls in a row never outrun the provider's rate limit.
+      const slot = Math.max(now(), nextSlot);
+      nextSlot = slot + (config.minIntervalMs ?? 0);
+      if (slot > now()) await sleep(slot - now());
       const res = await doFetch(`${config.baseUrl ?? "https://ai-gateway.vercel.sh"}/v1/chat/completions`, {
         method: "POST",
         headers: { Authorization: `Bearer ${config.apiKey}`, "Content-Type": "application/json" },

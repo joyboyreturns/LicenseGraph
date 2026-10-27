@@ -1,5 +1,7 @@
 # LicenseGraph step-by-step plan
 
+> **Status:** steps 1 to 8 are built. After them the product was extended and redesigned for the hackathon: creator payouts, per-offer rule matrix and price-only comparison, the Licence Passport with in-browser verification, persistence, run ownership, an offline payment simulator, plain-English briefs and run Q&A, three scenarios, a full front-end redesign, a cross-run AG Studio portfolio, and end-to-end browser tests. Deployment is deferred by the owner; `docs/DEPLOY.md` is ready for when it is wanted. What remains is in the last section.
+
 Target: submit to the PayPal AI Hackathon on **11 Nov 2026** (official close 12 Nov, 12:00 PM PT; confirmed from PayPal's developer blog). Budget about 45-50 hours, 2-3 hours a day alongside PIVOT until 8 Nov.
 
 Prize targets: Best Overall, Best Use of Agentic Commerce, Best Use of AG Grid. Optional: APIMatic, Render hosting. Read each prize's exact requirements before counting on it.
@@ -83,8 +85,25 @@ Prize targets: Best Overall, Best Use of Agentic Commerce, Best Use of AG Grid. 
 - [ ] README with demo steps, repo public, Render deploy, demo video, submit
 - 12 Nov: buffer only.
 
+## After step 8: product and polish
+
+- [x] Creator payouts (PayPal Payouts) after capture; failure never undoes the capture; retry
+- [x] Every offer checked against every rule (verification matrix); price-only comparison
+- [x] Licence Passport, browser verification, optional server signature, `/verify`, QR code
+- [x] Offline payment simulator, labelled everywhere; `npm run demo` for a zero-setup run
+- [x] Persistence of runs; run ownership (anonymous cookie); portfolio across runs in AG Studio
+- [x] Plain-English brief reader and grounded run Q&A with offline fallbacks
+- [x] Three scenarios (documentary, game trailer, podcast network) replayed from recorded model output
+- [x] Front-end redesign: home, run theatre (rights graph, replay, matrix, evidence viewer), settlement, passport, verify, simulator checkout
+- [x] End-to-end browser tests (11) and API-level tests; model calls paced to the free model's rate limit
+- [x] README with local-run steps, `.env.example`, demo script and submission text drafts
+- [ ] Deployment (deferred by the owner): home Ubuntu server with Tailscale Funnel, see `docs/DEPLOY.md`
+- [ ] Request the AG Studio trial licence key (info@ag-grid.com) to remove the dashboard watermark
+- [ ] Create US Sandbox personal accounts for the demo creators (`LICENSEGRAPH_CREATOR_EMAILS`) so payouts show SUCCESS on camera
+- [ ] One run on the real PayPal Sandbox with the new payout flow (needs the buyer's approval in a browser)
+- [ ] Record the demo video (see `docs/DEMO_SCRIPT.md`), publish it on YouTube, fill in the Devpost form
+- [ ] Make a final check of the official Rules page (eligibility, team size, IP terms, AI disclosure wording)
+
 ## Open questions
 
-- Resolved: Sandbox accounts can be created from India, but they must use country United States.
-- Exact requirements for Agentic Commerce and AG Grid prizes.
-- Whether Best Overall needs a specific submission format or hosted link.
+- Official rules details that the Devpost overview does not settle: eligibility for India, team size, IP terms, whether one project can win several categories.

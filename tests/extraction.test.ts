@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { verifyBundle } from "../src/core/rules";
 import type { Project } from "../src/core/types";
 import { extractOffer, locateQuote } from "../src/extraction/extract";
-import { createGatewayModel, type ModelClient } from "../src/extraction/model";
+import { createGatewayModel, minIntervalFromEnv, type ModelClient } from "../src/extraction/model";
 import { cannedReply, fixtures, OPTIONAL_TERM_KEYS } from "../src/demo/fixtures";
 
 const replying = (...replies: string[]): ModelClient & { complete: ReturnType<typeof vi.fn> } => {
@@ -202,5 +202,42 @@ describe("createGatewayModel", () => {
 
     const denied = createGatewayModel({ apiKey: "k", model: "m/x", fetch: router(free, () => new Response(JSON.stringify({ error: { message: "needs plan" } }), { status: 403 })) as unknown as typeof fetch });
     await expect(denied.complete({ system: "s", user: "u" })).rejects.toThrow(/403 needs plan/);
+  });
+});
+
+describe("gateway pacing", () => {
+  const free = { input: "0", output: "0" };
+  const route = (calls: number[], t: () => number) =>
+    vi.fn(async (url: string) => {
+      if (url.endsWith("/v1/models")) return new Response(JSON.stringify({ data: [{ id: "m/x", pricing: free }] }));
+      calls.push(t());
+      return new Response(JSON.stringify({ choices: [{ message: { content: "ok" } }] }));
+    });
+
+  it("spaces requests by the minimum interval so a burst stays inside the rate limit", async () => {
+    let t = 1_000;
+    const calls: number[] = [];
+    const sleeps: number[] = [];
+    const model = createGatewayModel({ apiKey: "k", model: "m/x", minIntervalMs: 12_500, now: () => t, sleep: async (ms) => { sleeps.push(ms); t += ms; }, fetch: route(calls, () => t) as unknown as typeof fetch });
+
+    for (let i = 0; i < 3; i++) await model.complete({ system: "s", user: "u" });
+    expect(sleeps).toEqual([12_500, 12_500]); // the first call goes straight out
+    expect(calls).toEqual([1_000, 13_500, 26_000]);
+  });
+
+  it("does not wait when calls are naturally further apart", async () => {
+    let t = 0;
+    const sleeps: number[] = [];
+    const model = createGatewayModel({ apiKey: "k", model: "m/x", minIntervalMs: 12_500, now: () => t, sleep: async (ms) => void sleeps.push(ms), fetch: route([], () => t) as unknown as typeof fetch });
+    await model.complete({ system: "s", user: "u" });
+    t = 60_000;
+    await model.complete({ system: "s", user: "u" });
+    expect(sleeps).toEqual([]);
+  });
+
+  it("derives the interval from requests per minute", () => {
+    expect(minIntervalFromEnv({})).toBe(12_500);
+    expect(minIntervalFromEnv({ LICENSEGRAPH_MODEL_RPM: "20" })).toBe(3_500);
+    expect(minIntervalFromEnv({ LICENSEGRAPH_MODEL_RPM: "0" })).toBe(12_500);
   });
 });
