@@ -21,7 +21,9 @@ const Studio = dynamic(() => import("./studio"), {
 });
 
 function Dashboard() {
-  const id = useSearchParams().get("session");
+  const params = useSearchParams();
+  const id = params.get("session");
+  const portfolioMode = Boolean(params.get("portfolio"));
   const [view, setView] = useState<SessionView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [assistant, setAssistant] = useState<boolean | null>(null);
@@ -42,6 +44,7 @@ function Dashboard() {
       .catch((e) => setError(e.message));
   }, [id]);
 
+  if (portfolioMode) return <PortfolioStudio assistant={assistant} />;
   if (!id) return <Portfolio />;
 
   return (
@@ -80,6 +83,51 @@ function Dashboard() {
   );
 }
 
+function PortfolioStudio({ assistant }: { assistant: boolean | null }) {
+  const [views, setViews] = useState<SessionView[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    document.title = "Portfolio dashboard · LicenseGraph";
+    fetch("/api/portfolio")
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("Could not load the runs."))))
+      .then((d: { views: SessionView[] }) => setViews(d.views))
+      .catch((e: Error) => setError(e.message));
+  }, []);
+
+  return (
+    <div className={styles.studioPage}>
+      <div className={styles.context}>
+        <Link prefetch={false} href="/dashboard" className="btn btn-sm btn-ghost">
+          <ArrowLeft aria-hidden /> All runs
+        </Link>
+        <span className={styles.contextName}>Portfolio dashboard</span>
+        {views && <span className="chip chip-sm">{pluralise(views.length, "run")}</span>}
+        {assistant === false && <span className={styles.contextNote}>Assistant needs a gateway key</span>}
+      </div>
+      {error && (
+        <div className="container" style={{ paddingTop: 32 }}>
+          <p className="callout tone-bad" role="alert">
+            {error}
+          </p>
+        </div>
+      )}
+      {views && views.length === 0 && (
+        <div className="container" style={{ paddingTop: 32 }}>
+          <p className="callout">There are no runs yet. Run a scenario first, then come back to see them across projects.</p>
+          <Link prefetch={false} href="/" className="btn btn-primary" style={{ marginTop: 16 }}>
+            Run a scenario <ArrowRight aria-hidden />
+          </Link>
+        </div>
+      )}
+      {views && views.length > 0 && assistant !== null && (
+        <div className={styles.studio}>
+          <Studio portfolio={views} assistant={assistant} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Portfolio() {
   const [runs, setRuns] = useState<RunSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -107,9 +155,16 @@ function Portfolio() {
           <h1 className={styles.title}>Every run on this server</h1>
           <p className={styles.lead}>Open a run to replay it, or open its AG Studio dashboard to explore offers, violations and the ledger as linked tables.</p>
         </div>
-        <Link prefetch={false} href="/" className="btn btn-primary">
-          Start a new run <ArrowRight aria-hidden />
-        </Link>
+        <div className={styles.headActions}>
+          {runs && runs.length > 0 && (
+            <Link prefetch={false} href="/dashboard?portfolio=1" className="btn">
+              <LayoutGrid aria-hidden /> Open portfolio dashboard
+            </Link>
+          )}
+          <Link prefetch={false} href="/" className="btn btn-primary">
+            Start a new run <ArrowRight aria-hidden />
+          </Link>
+        </div>
       </div>
 
       {error && (

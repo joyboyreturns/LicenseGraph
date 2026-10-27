@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { POST as postAsk } from "../app/api/sessions/[id]/ask/route";
 import { GET as getConfig } from "../app/api/config/route";
+import { GET as getPortfolio } from "../app/api/portfolio/route";
 import { POST as postIntake } from "../app/api/intake/route";
 import { GET as getPassport } from "../app/api/passports/[id]/route";
 import { GET as getQr } from "../app/api/passports/[id]/qr/route";
@@ -257,6 +258,24 @@ describe("asking about a run", () => {
     for (let i = 0; i < 6; i++) sources.push((await body(await postAsk(post("http://app", { question: "why photo rejected" }), ctx(id)))).source);
     expect(sources.filter((x) => x === "model").length).toBeLessThanOrEqual(4);
     expect(sources.at(-1)).toBe("local");
+  });
+});
+
+describe("portfolio", () => {
+  it("returns every run without licence text, with payout status brought up to date", async () => {
+    install();
+    const { id } = await body(await postSession(post("http://app/api/sessions", { scenarioId: "documentary" })));
+    await waitFor(id, "verified");
+    await postApprove(post("http://app", { approvedBy: "Kiran" }), ctx(id));
+    await postPay(post("http://app"), ctx(id));
+    await postCapture(post("http://app"), ctx(id));
+    payments.getPayout.mockResolvedValue({ batchId: "BATCH1", status: "SUCCESS", items: [] });
+
+    const { views } = await body(await getPortfolio());
+    expect(views).toHaveLength(1);
+    expect(views[0].documents.every((d: { text: string }) => d.text === "")).toBe(true);
+    expect(views[0].payouts.status).toBe("SUCCESS");
+    expect(views[0].project.name).toBe("Harbour documentary promo");
   });
 });
 

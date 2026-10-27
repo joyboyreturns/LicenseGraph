@@ -5,6 +5,7 @@ import { AgStudio, AgStudioProvider } from "ag-studio-react";
 import { useMemo, useState } from "react";
 import type { SessionView } from "@/src/app-logic/session";
 import { buildStudioData } from "@/src/dashboard/data";
+import { buildPortfolioData, PORTFOLIO_INITIAL_STATE } from "@/src/dashboard/portfolio";
 import { chatCompletionsAdapter } from "@/src/dashboard/llm-adapter";
 import { describeSchema } from "@/src/dashboard/schema-text";
 import { AGGREGATIONS, buildChart, buildKpi, buildTable, catalogFrom, CHART_TYPES, placeWidget, type Aggregation, type Built, type ChartKind } from "@/src/dashboard/widget-tools";
@@ -70,16 +71,35 @@ const PROMPT_STARTERS = [
   { label: "What was rejected?", prompt: "Add a table of every rule violation with the offer and message." },
 ];
 
+const PORTFOLIO_INSTRUCTIONS = [
+  "You build dashboard views for a licence-rights tool called LicenseGraph.",
+  "The data covers every licensing run: runs (what each verified bundle cost versus a price-only purchase), licence offers with their terms, rule violations, creator payouts and ledger events. All prices are US dollars.",
+  "The data schema is below. Fields are written table.field, for example runs.verifiedTotal.",
+  "To build something, call create_chart, create_table or create_kpi straight away. Prefer a chart for comparisons and a table only when asked for one.",
+  "Only say you added something if the tool reported success. If a tool returns an error, fix the arguments and call it again.",
+  "Keep replies to one or two sentences.",
+].join("\n");
+
+const PORTFOLIO_PROMPT_STARTERS = [
+  { label: "Premium by run", prompt: "Add a chart of the compliance premium for each run." },
+  { label: "Who got paid?", prompt: "Show a chart of the amount paid to each creator." },
+  { label: "Terms we keep missing", prompt: "Add a chart counting offers by their attribution status." },
+];
+
 const USD = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 
-export default function Studio({ view, assistant }: { view: SessionView; assistant: boolean }) {
+type StudioProps = { assistant: boolean } & ({ view: SessionView; portfolio?: undefined } | { portfolio: SessionView[]; view?: undefined });
+
+export default function Studio(props: StudioProps) {
+  const { assistant } = props;
+  const isPortfolio = props.portfolio !== undefined;
   const [mode, setMode] = useState<"view" | "edit">("view");
   const data = useMemo(() => {
-    const def = buildStudioData(view);
+    const def = props.portfolio ? buildPortfolioData(props.portfolio) : buildStudioData(props.view);
     // Money fields are in dollars; show them with a currency symbol.
     for (const source of def.sources) for (const f of source.fields) if (f.format === "currencyFormat") Object.assign(f, { formatOptions: { format: USD } });
     return def;
-  }, [view]);
+  }, [props.portfolio, props.view]);
   // The assistant talks to our server route, which holds the gateway key and fixes the (free) model.
   const ai = useMemo<AgAiHarnessSetup | undefined>(() => {
     if (!assistant) return undefined;
@@ -123,16 +143,16 @@ export default function Studio({ view, assistant }: { view: SessionView; assista
           directLlmRunner({
             id: "analyst",
             adapter,
-            instructions: () => `${INSTRUCTIONS}\n\n${describeSchema(api.getAiContext().schema() as never)}`,
+            instructions: () => `${isPortfolio ? PORTFOLIO_INSTRUCTIONS : INSTRUCTIONS}\n\n${describeSchema(api.getAiContext().schema() as never)}`,
             tools: () => [createChart, createTable, createKpi],
           }),
         ],
         primary: "analyst",
         models: [{ id: "server", label: "Free model (server-side)" }],
-        promptStarters: PROMPT_STARTERS,
+        promptStarters: isPortfolio ? PORTFOLIO_PROMPT_STARTERS : PROMPT_STARTERS,
       }));
     };
-  }, [assistant, data]);
+  }, [assistant, data, isPortfolio]);
 
   return (
     <AgStudioProvider modules={assistant ? [AgStudioAiModule] : []} licenseKey={process.env.NEXT_PUBLIC_AG_STUDIO_LICENSE_KEY}>
@@ -140,7 +160,7 @@ export default function Studio({ view, assistant }: { view: SessionView; assista
         <button type="button" className={mode === "view" ? "primary" : ""} onClick={() => setMode("view")}>View</button>
         <button type="button" className={mode === "edit" ? "primary" : ""} onClick={() => setMode("edit")}>Edit dashboard</button>
       </div>
-      <AgStudio data={data as never} initialState={initialState} mode={mode} ai={ai} style={{ height: "calc(100vh - 108px)" }} />
+      <AgStudio data={data as never} initialState={(isPortfolio ? PORTFOLIO_INITIAL_STATE : initialState) as AgReportState} mode={mode} ai={ai} style={{ height: "calc(100vh - 108px)" }} />
     </AgStudioProvider>
   );
 }
