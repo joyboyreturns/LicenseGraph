@@ -57,4 +57,11 @@ describe("PayPal simulator", () => {
     expect((await sim.getPayout("B1")).status).toBe("SUCCESS");
     await expect(sim.getPayout("nope")).rejects.toThrow(/404/);
   });
+
+  it("can be told to fail the first payout, then behaves normally", async () => {
+    const sim = createPayPalSimulator({ appUrl: () => "http://app", failFirstPayout: true });
+    const items = [{ itemId: "i1", receiver: "a@x.test", amountCents: 100, currency: "USD", note: "n" }];
+    await expect(sim.createPayout({ batchId: "B1", subject: "s", items })).rejects.toThrow(/INSUFFICIENT_FUNDS/);
+    expect(await sim.createPayout({ batchId: "B2", subject: "s", items })).toEqual({ batchId: "B2", status: "PENDING" });
+  });
 });

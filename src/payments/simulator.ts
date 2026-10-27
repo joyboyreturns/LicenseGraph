@@ -24,12 +24,13 @@ interface SimPayout {
  * retries with the same request id return the same order, and payouts settle shortly after being
  * created. It moves no money and is always labelled as a simulator in the app.
  */
-export function createPayPalSimulator(options: { appUrl: () => string; now?: () => number; settleAfterMs?: number }) {
+export function createPayPalSimulator(options: { appUrl: () => string; now?: () => number; settleAfterMs?: number; /** Make the first payout batch fail, so the failure and retry path can be shown and tested. */ failFirstPayout?: boolean }) {
   const now = options.now ?? Date.now;
   const settleAfterMs = options.settleAfterMs ?? 3_000;
   const orders = new Map<string, SimOrder>();
   const byRequest = new Map<string, string>();
   const payouts = new Map<string, SimPayout>();
+  let failNext = options.failFirstPayout ?? false;
 
   return {
     async createOrder(input: { amountCents: number; currency: string; requestId: string; returnUrl?: string; cancelUrl?: string }): Promise<CreatedOrder> {
@@ -53,6 +54,10 @@ export function createPayPalSimulator(options: { appUrl: () => string; now?: () 
     },
 
     async createPayout(input: { batchId: string; subject: string; items: PayoutItemInput[] }): Promise<{ batchId: string; status: string }> {
+      if (failNext) {
+        failNext = false;
+        throw new Error("PayPal /v1/payments/payouts failed: 403 INSUFFICIENT_FUNDS (simulated failure)");
+      }
       if (!payouts.has(input.batchId)) payouts.set(input.batchId, { batchId: input.batchId, createdAt: now(), items: input.items });
       return { batchId: input.batchId, status: "PENDING" };
     },

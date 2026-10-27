@@ -41,7 +41,7 @@ function build(): Runtime {
   // The simulator runs only when asked for (or when forced with LICENSEGRAPH_PAYMENTS=simulator), never in place of real credentials by accident.
   const forced = process.env.LICENSEGRAPH_PAYMENTS;
   const useSimulator = forced === "simulator" || (!hasPayPal && forced !== "none" && process.env.LICENSEGRAPH_SIMULATOR === "1");
-  const simulator = useSimulator ? createPayPalSimulator({ appUrl }) : undefined;
+  const simulator = useSimulator ? createPayPalSimulator({ appUrl, failFirstPayout: process.env.LICENSEGRAPH_SIMULATOR_FAIL_FIRST_PAYOUT === "1" }) : undefined;
   const payments = simulator ?? (hasPayPal && forced !== "none" ? createPayPalClient(configFromEnv()) : undefined);
   const paymentsMode: Runtime["paymentsMode"] = simulator ? "simulator" : payments ? "paypal-sandbox" : "none";
   const paymentsEnabled = paymentsMode !== "none";
