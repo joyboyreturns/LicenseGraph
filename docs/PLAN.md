@@ -15,9 +15,10 @@ Prize targets: Best Overall, Best Use of Agentic Commerce, Best Use of AG Grid. 
 
 ## Step 2: Payments client (28 Oct)
 
-- [ ] `src/payments/paypal.ts`: OAuth token, create order, capture, `PayPal-Request-Id` idempotency
-- [ ] Mocked-HTTP unit tests; flagged live Sandbox test
-- Done when: `npm test` covers the client and the live test captures an order.
+- [x] `src/payments/paypal.ts`: OAuth token, create order, capture, `PayPal-Request-Id` idempotency, Sandbox-only host guard
+- [x] Mocked-HTTP unit tests; flagged live Sandbox test (`npm run test:live`)
+- [x] `src/payments/checkout.ts`: `startCheckout` re-verifies the bundle and requires an approval for that exact bundle (digest match) before creating an order
+- Done: `npm test` covers the client and the gate (20 tests); the live test creates orders against the Sandbox and checks idempotent retries. Capture needs a human buyer, so it stays in `npm run sandbox:order`, which captured a real Sandbox payment on 27 Oct.
 
 ## Step 3: Data models and extraction (29 Oct-31 Oct)
 
@@ -41,7 +42,8 @@ Prize targets: Best Overall, Best Use of Agentic Commerce, Best Use of AG Grid. 
 
 ## Step 6: Approval and checkout (5-6 Nov)
 
-- [ ] Approval record type; payment module refuses without `ok` verdict and approval
+- [x] Approval record type; payment module refuses without `ok` verdict and approval (built in step 2)
+- [ ] Approval screen that produces the `Approval` record
 - [ ] Next.js UI: upload, loop view, approval screen, Sandbox checkout
 - Done when: an end-to-end purchase works in Sandbox.
 

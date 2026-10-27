@@ -48,7 +48,7 @@ The visible propose, verify, reject, revise cycle is the product. The model neve
 | `src/core/rules.ts` | `verifyBundle`: coverage, commercial use, territory, term, currency, evidence, budget | done (v1) |
 | `src/extraction/` | Turn licence text into `LicenseOffer[]` with evidence spans | step 3 |
 | `src/agent/` | Gateway client, propose and revise prompts, structured output schemas, loop with iteration cap | step 5 |
-| `src/payments/` | PayPal Orders v2 client (Sandbox): create, capture, idempotency keys | step 2 |
+| `src/payments/` | `paypal.ts`: Orders v2 client (Sandbox only). `checkout.ts`: `startCheckout` gate (re-verify + approval digest match) | done |
 | `src/ledger/` | Append-only event log: proposals, violations, approvals, payments | step 5 |
 | `app/` | Next.js UI: upload, loop view, approval, ledger | steps 5-7 |
 | `app/dashboard/` | AG Grid rights graph and ledger, AG Studio agent for views | step 8 |
