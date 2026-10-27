@@ -56,8 +56,8 @@ Prize targets: Best Overall, Best Use of Agentic Commerce, Best Use of AG Grid. 
 - [x] Demo mode (no keys, no credits) and live mode (free model only); PayPal return URL captures the payment, with a manual "complete payment" fallback
 - [x] Payment idempotency key scoped to the session
 - [x] Verified in a browser (demo) and through the API (live, free model): sample project reads four licences, verifies a bundle of $329.00, approves it and creates a Sandbox order
-- [ ] Buyer approval and capture of a Sandbox order created by the app (needs the buyer to approve in PayPal)
-- Done when: an end-to-end purchase works in Sandbox.
+- [x] Buyer approved and the app captured a Sandbox order: $329.00 for the sample bundle on 27 Oct, with the ledger chain verified (read, proposed, rejected, revised, verified, approved, order created, captured)
+- Done: an end-to-end purchase works in Sandbox.
 
 ## Step 7: Light work (7-8 Nov)
 
