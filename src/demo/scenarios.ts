@@ -1,6 +1,6 @@
 import type { Project } from "../core/types";
 import type { SourceDocument } from "../extraction/extract";
-import { fixtures, podcastFixtures, trailerFixtures } from "./fixtures";
+import { exclusiveReplyFixtures, fixtures, podcastFixtures, trailerFixtures } from "./fixtures";
 import { sampleDocuments, sampleProject, sampleRequiredAssets } from "./sample";
 
 export interface Scenario {
@@ -16,6 +16,8 @@ export interface Scenario {
   showcases: string[];
   /** True when no licence on offer can meet the brief, so the honest result is "no bundle" and what to ask for. */
   noBundle?: boolean;
+  /** For a no-bundle scenario: the revised licences the licensors could send back, so the whole loop can be shown offline. */
+  replies?: SourceDocument[];
 }
 
 const docs = (list: typeof fixtures) => list.map((f) => ({ ...f.doc }));
@@ -61,6 +63,7 @@ export const scenarios: Scenario[] = [
     documents: docs(podcastFixtures),
     showcases: ["exclusivity"],
     noBundle: true,
+    replies: docs(exclusiveReplyFixtures),
   },
 ];
 

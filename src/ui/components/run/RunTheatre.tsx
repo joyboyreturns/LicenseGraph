@@ -210,6 +210,7 @@ function Theatre({ view, accept, refresh }: { view: SessionView; accept: (v: Ses
         phase={state.phase}
         elapsedMs={elapsedMs}
         live={live}
+        revisedFrom={view.meta?.revisedFrom}
         scenarioTitle={view.meta?.scenarioId ? (SCENARIO_TITLES[view.meta.scenarioId] ?? view.meta.scenarioId) : undefined}
         actions={
           <>

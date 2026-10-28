@@ -47,3 +47,27 @@ test("Exclusive theme tune: no licence can be bought, and the run says what to a
   expect(decodeURIComponent(href)).toContain("Make the licence exclusive.");
   expect(errors).toEqual([]);
 });
+
+test("Exclusive theme tune: simulating the licensors saying yes starts a new run that verifies and can be paid, and the first run stays as it was", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("/");
+  await page.locator("article", { hasText: "Exclusive theme tune" }).getByRole("button", { name: /Run this scenario/ }).click();
+  await page.waitForURL(/\/run\//);
+  const firstUrl = page.url();
+  await page.getByRole("button", { name: "Skip to result" }).first().click();
+  await expect(page.getByRole("heading", { name: "No compliant bundle" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Simulate the licensors agreeing" }).click();
+  await expect(page).not.toHaveURL(firstUrl);
+  await page.getByRole("button", { name: "Skip to result" }).first().click();
+  await expect(page.getByRole("link", { name: "Revision of an earlier run" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Review and approve" })).toBeVisible();
+  await expect(page.getByText("$1,160.00").first()).toBeVisible();
+
+  // The first run is still there, still without a bundle.
+  await page.getByRole("link", { name: "Revision of an earlier run" }).click();
+  await page.waitForURL(firstUrl);
+  await expect(page.getByRole("heading", { name: "No compliant bundle" })).toBeVisible();
+  expect(errors).toEqual([]);
+});

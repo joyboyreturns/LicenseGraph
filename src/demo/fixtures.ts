@@ -245,7 +245,14 @@ export const podcastFixtures: Fixture[] = [
   licence({ id: "pod-voice-long", assetId: "voiceover", licensor: "Marlow Voice", title: "Marlow Voice intro licence, three years", priceUsd: 210, use: "Commercial use is permitted.", territory: "United States and Canada.", term: "36 months from purchase.", media: "Audio and websites.", credit: "No credit is required.", sublicensing: "The Licensee may sublicense the recording to partners.", terms: { commercialUse: true, territories: ["US", "CA"], termMonths: 36, mediums: ["audio", "web"], attributionRequired: false, sublicensing: true } }),
 ];
 
-fixtures.push(...trailerFixtures, ...podcastFixtures);
+/** What the podcast licensors could send back when asked for exclusivity: the same offers, made exclusive, at higher prices. */
+export const exclusiveReplyFixtures: Fixture[] = [
+  licence({ id: "pod-song-exclusive", assetId: "song", licensor: "Tapeloop", title: "Tapeloop exclusive network licence", priceUsd: 520, use: "Commercial use is permitted.", territory: "United States and Canada.", term: "36 months from purchase.", media: "Audio and websites.", credit: "No credit is required.", sublicensing: "The Licensee may sublicense the track to syndication partners.", exclusivity: "Exclusive to the Licensee for the whole term.", terms: { commercialUse: true, territories: ["US", "CA"], termMonths: 36, mediums: ["audio", "web"], attributionRequired: false, sublicensing: true, exclusive: true } }),
+  licence({ id: "pod-art-exclusive", assetId: "image", licensor: "Greyscale Lane", title: "Greyscale Lane exclusive cover art licence", priceUsd: 260, use: "Commercial use is permitted.", territory: "United States and Canada.", term: "Perpetual.", media: "Any medium.", credit: "No credit is required.", sublicensing: "The Licensee may sublicense the image to partners.", exclusivity: "Exclusive to the Licensee.", terms: { commercialUse: true, territories: ["US", "CA"], termMonths: "perpetual", mediums: "ALL", attributionRequired: false, sublicensing: true, exclusive: true } }),
+  licence({ id: "pod-voice-exclusive", assetId: "voiceover", licensor: "Marlow Voice", title: "Marlow Voice exclusive intro licence", priceUsd: 380, use: "Commercial use is permitted.", territory: "United States and Canada.", term: "36 months from purchase.", media: "Audio and websites.", credit: "No credit is required.", sublicensing: "The Licensee may sublicense the recording to partners.", exclusivity: "Exclusive to the Licensee for the whole term.", terms: { commercialUse: true, territories: ["US", "CA"], termMonths: 36, mediums: ["audio", "web"], attributionRequired: false, sublicensing: true, exclusive: true } }),
+];
+
+fixtures.push(...trailerFixtures, ...podcastFixtures, ...exclusiveReplyFixtures);
 
 /** What a well-behaved model would answer for a fixture. */
 export function cannedReply(f: Fixture): string {

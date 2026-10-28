@@ -116,3 +116,27 @@
   font-size: 13px;
   color: var(--ink-2);
 }
+.simulate {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--agent-soft, var(--surface-2));
+}
+.reply {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+}
+.reply > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.reply[open] > summary {
+  margin-bottom: 8px;
+}

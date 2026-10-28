@@ -1,12 +1,13 @@
 "use client";
 
-import { BadgeCheck, Check, CircleDot, Clock, History, Radio, X } from "lucide-react";
+import { BadgeCheck, Check, CircleDot, Clock, GitBranch, History, Radio, X } from "lucide-react";
+import Link from "next/link";
 import type { ReactNode } from "react";
 import { formatElapsed, phaseInfo, runKindLabel } from "@/src/ui/lib/format";
 import { STEPS, type RunState, type StepStatus } from "@/src/ui/lib/replay";
 import styles from "./RunHeader.module.css";
 
-export function RunHeader({ name, runKind, phase, elapsedMs, live, actions, scenarioTitle }: { name: string; runKind?: string; phase: string; elapsedMs: number; live: boolean; actions?: ReactNode; scenarioTitle?: string }) {
+export function RunHeader({ name, runKind, phase, elapsedMs, live, actions, scenarioTitle, revisedFrom }: { name: string; runKind?: string; phase: string; elapsedMs: number; live: boolean; actions?: ReactNode; scenarioTitle?: string; revisedFrom?: string }) {
   const kind = runKindLabel(runKind);
   const p = phaseInfo(phase);
   return (
@@ -28,6 +29,11 @@ export function RunHeader({ name, runKind, phase, elapsedMs, live, actions, scen
             <span className="num">{formatElapsed(elapsedMs)}</span>
             <span className="visually-hidden">elapsed</span>
           </span>
+          {revisedFrom && (
+            <Link prefetch={false} className="chip tone-agent" href={`/run/${revisedFrom}`} title="This run checks a licensor's revised licence. The run it answers is unchanged.">
+              <GitBranch aria-hidden /> Revision of an earlier run
+            </Link>
+          )}
           <span className={styles.kindNote}>{kind.long}</span>
         </div>
       </div>

@@ -9,6 +9,7 @@ import { GET as verifyPassportRoute } from "../app/api/passports/[id]/verify/rou
 import { GET as getScenarios } from "../app/api/scenarios/route";
 import { POST as postApprove } from "../app/api/sessions/[id]/approve/route";
 import { POST as postCapture } from "../app/api/sessions/[id]/capture/route";
+import { POST as postRevise } from "../app/api/sessions/[id]/revise/route";
 import { POST as postPay } from "../app/api/sessions/[id]/pay/route";
 import { POST as postPayouts } from "../app/api/sessions/[id]/payouts/route";
 import { GET as getSession } from "../app/api/sessions/[id]/route";
@@ -398,5 +399,58 @@ describe("plain-English intake", () => {
     expect((await postIntake(post("http://app/api/intake", { text: "hi" }))).status).toBe(400);
     expect((await postIntake(post("http://app/api/intake", { text: "x".repeat(2001) }))).status).toBe(413);
     expect((await postIntake(post("http://app/api/intake", {}))).status).toBe(400);
+  });
+});
+
+
+describe("answering a gap request", () => {
+  const start = async (scenarioId: string) => {
+    const created = await body(await postSession(post("http://app/api/sessions", { scenarioId })));
+    return created.id as string;
+  };
+
+  it("simulated replies start a new run that verifies, link back to the first, and leave the first as it was", async () => {
+    install();
+    const id = await start("exclusive-theme");
+    const first = await waitFor(id, "failed");
+    expect(first.bundle).toBeUndefined();
+
+    const res = await postRevise(post("http://app", { simulate: true }), ctx(id));
+    expect(res.status).toBe(201);
+    const created = await body(res);
+    expect(created.id).not.toBe(id);
+    const next = await waitFor(created.id, "verified");
+    expect(next.meta.revisedFrom).toBe(id);
+    expect(next.bundle.totalCents).toBe(52_000 + 26_000 + 38_000);
+    expect(next.bundle.offers.map((o: { id: string }) => o.id).sort()).toEqual(["offer-pod-art-exclusive", "offer-pod-song-exclusive", "offer-pod-voice-exclusive"]);
+
+    expect((await body(await getSession(new Request("http://app"), ctx(id)))).phase).toBe("failed");
+  });
+
+  it("only the owner of the run may answer it", async () => {
+    install();
+    const id = await start("exclusive-theme");
+    await waitFor(id, "failed");
+    const res = await postRevise(post("http://app", { simulate: true }, "lg_owner=someone-else-9999"), ctx(id));
+    expect(res.status).toBe(403);
+  });
+
+  it("refuses pasted licences when the server has no model, and a run that is not finished or has a payment", async () => {
+    install();
+    const id = await start("exclusive-theme");
+    await waitFor(id, "failed");
+    const pasted = await postRevise(post("http://app", { assetId: "song", text: "Price: USD 500.00." }), ctx(id));
+    expect(pasted.status).toBe(400);
+    expect((await body(pasted)).error).toMatch(/needs a model/);
+    expect((await postRevise(post("http://app", { nonsense: true }), ctx(id))).status).toBe(400);
+    expect((await postRevise(post("http://app", { simulate: true }), ctx("nope"))).status).toBe(404);
+
+    const paid = await start("podcast");
+    await waitFor(paid, "verified");
+    await postApprove(post("http://app", { approvedBy: "Kiran" }), ctx(paid));
+    await postPay(post("http://app"), ctx(paid));
+    const late = await postRevise(post("http://app", { simulate: true }), ctx(paid));
+    expect(late.status).toBe(400);
+    expect((await body(late)).error).toMatch(/payment in progress/);
   });
 });

@@ -46,7 +46,7 @@ export const SessionView = z
     failure: z.string().optional(),
     awaitingPerson: z.boolean().optional().describe("An agent started this run and no person has taken control yet, so it cannot be approved or paid."),
     project: Project,
-    meta: z.object({ scenarioId: z.string().optional(), brief: z.string().optional(), runKind: z.enum(["demo", "live"]).optional(), startedBy: z.literal("agent").optional() }).optional(),
+    meta: z.object({ scenarioId: z.string().optional(), brief: z.string().optional(), runKind: z.enum(["demo", "live"]).optional(), startedBy: z.literal("agent").optional(), revisedFrom: z.string().optional().describe("The run whose gap requests this one answers, with a licensor's revised licence added.") }).optional(),
     documents: z.array(z.object({ id: z.string(), assetId: z.string(), text: z.string(), licensorName: z.string().optional() })),
     candidates: z.array(Offer).describe("Every offer read from the licences."),
     loopStatus: z.enum(["verified", "exhausted", "stalled"]).optional(),

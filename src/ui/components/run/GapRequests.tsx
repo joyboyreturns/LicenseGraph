@@ -1,13 +1,17 @@
 "use client";
 
-import { Mail } from "lucide-react";
-import { useMemo } from "react";
+import { Mail, Send } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
 import type { SessionView } from "@/src/app-logic/session";
+import { scenarioById } from "@/src/demo/scenarios";
 import { draftLicensorMessage } from "@/src/core/insights";
 import { negotiationOutlook } from "@/src/core/negotiation";
 import type { Catalog } from "@/src/ui/lib/catalog";
+import { api, errorMessage } from "@/src/ui/lib/api";
 import { assetLabel, formatMoney, mailtoHref } from "@/src/ui/lib/format";
-import { AssetIcon, CopyButton } from "../bits";
+import { AssetIcon, CopyButton, Spinner } from "../bits";
+import { useConfig } from "../Providers";
 import styles from "./Insights.module.css";
 
 /**
@@ -15,7 +19,27 @@ import styles from "./Insights.module.css";
  * exact terms to ask the licensor to change, and a message that says so, ready to copy.
  */
 export function GapRequests({ view, catalog }: { view: SessionView; catalog: Catalog }) {
+  const router = useRouter();
+  const { config } = useConfig();
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [pasted, setPasted] = useState<Record<string, string>>({});
+  const canSimulate = Boolean(scenarioById(view.meta?.scenarioId ?? "")?.replies?.length) && !view.meta?.revisedFrom;
+  const canPaste = config?.mode === "live";
   const gaps = view.analysis?.gaps ?? [];
+
+  // The answer is checked as a new run; this one stays as it was, on record.
+  const revise = async (key: string, json: object) => {
+    setBusy(key);
+    setError(null);
+    try {
+      const next = await api<SessionView>(`/api/sessions/${view.id}/revise`, { method: "POST", json });
+      router.push(`/run/${next.id}`);
+    } catch (e) {
+      setError(errorMessage(e, "The revised licence could not be checked."));
+      setBusy(null);
+    }
+  };
   const currency = view.candidates[0]?.currency ?? "USD";
   const outlook = useMemo(
     () => (gaps.length ? negotiationOutlook(view.project, view.analysis?.assets.map((a) => a.assetId) ?? [], view.candidates, currency, { today: view.runDate }) : undefined),
@@ -54,6 +78,21 @@ export function GapRequests({ view, catalog }: { view: SessionView; catalog: Cat
           )}
         </div>
       )}
+      {canSimulate && (
+        <div className={styles.simulate}>
+          <p className="small ink-2" style={{ margin: 0 }}>
+            Demo: see what happens if the licensors do say yes. They send back exclusive versions of these licences at higher prices, and everything is checked again as a new run.
+          </p>
+          <button type="button" className="btn btn-sm" disabled={busy !== null} onClick={() => revise("simulate", { simulate: true })}>
+            {busy === "simulate" ? <Spinner label="Checking" /> : <Send aria-hidden />} Simulate the licensors agreeing
+          </button>
+        </div>
+      )}
+      {error && (
+        <p className="callout tone-bad" role="alert">
+          {error}
+        </p>
+      )}
       <div className={styles.gaps}>
         {gaps.map((gap) => {
           const message = draftLicensorMessage(view.project, gap, catalog.offer(gap.offerId)?.licensor);
@@ -80,6 +119,20 @@ export function GapRequests({ view, catalog }: { view: SessionView; catalog: Cat
                   <Mail aria-hidden /> Open in email
                 </a>
               </div>
+              {canPaste && (
+                <details className={styles.reply}>
+                  <summary>They replied: check their revised licence</summary>
+                  <label className="small muted" htmlFor={`reply-${gap.assetId}`}>
+                    Paste the revised licence text. It is read and checked again as a new run; nothing is bought.
+                  </label>
+                  <textarea id={`reply-${gap.assetId}`} className="textarea" rows={5} maxLength={20000} value={pasted[gap.assetId] ?? ""} onChange={(e) => setPasted((p) => ({ ...p, [gap.assetId]: e.target.value }))} />
+                  <div>
+                    <button type="button" className="btn btn-sm" disabled={busy !== null || !(pasted[gap.assetId] ?? "").trim()} onClick={() => revise(gap.assetId, { assetId: gap.assetId, text: pasted[gap.assetId], licensor: { name: catalog.offer(gap.offerId)?.licensor ?? "Licensor" } })}>
+                      {busy === gap.assetId ? <Spinner label="Checking" /> : <Send aria-hidden />} Check revised terms
+                    </button>
+                  </div>
+                </details>
+              )}
             </div>
           );
         })}

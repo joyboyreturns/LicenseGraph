@@ -16,10 +16,16 @@ const IntakeInput = z.object({ text: z.string().min(5).max(2000) }).meta({ id: "
 const AskInput = z.object({ question: z.string().min(3).max(400) }).meta({ id: "AskInput" });
 const ApproveInput = z.object({ approvedBy: z.string().describe("Who is approving this exact bundle.") }).meta({ id: "ApproveInput" });
 const ClaimInput = z.object({ token: z.string().describe("The one-time token from the claim link an agent was given.") }).meta({ id: "ClaimInput" });
+const ReviseInput = z
+  .union([
+    z.object({ simulate: z.literal(true) }).describe("Demo scenarios only: add the replies the built-in licensors would send."),
+    z.object({ assetId: z.string(), text: z.string().describe("The licensor's revised licence, as text."), licensor: z.object({ name: z.string(), email: z.string().optional() }).optional() }),
+  ])
+  .meta({ id: "ReviseInput", description: "A licensor's answer to a gap request." });
 const RunId = z.object({ id: z.string() });
 
 const registry = z.registry<{ id?: string }>();
-for (const s of [S.Project, S.Offer, S.LedgerEvent, S.SessionView, S.RunCreated, S.RunSummary, S.Passport, S.PassportVerification, S.ApiError, S.BriefReading, S.Answer, S.Health, S.Config, S.Scenario, RunInput, ScenarioStart, IntakeInput, AskInput, ApproveInput, ClaimInput]) {
+for (const s of [S.Project, S.Offer, S.LedgerEvent, S.SessionView, S.RunCreated, S.RunSummary, S.Passport, S.PassportVerification, S.ApiError, S.BriefReading, S.Answer, S.Health, S.Config, S.Scenario, RunInput, ScenarioStart, IntakeInput, AskInput, ApproveInput, ClaimInput, ReviseInput]) {
   registry.add(s, z.globalRegistry.get(s) ?? {});
 }
 
@@ -91,6 +97,9 @@ export function buildOpenApi(serverUrl = "http://localhost:3000"): Json {
       },
       "/api/sessions/{id}/approve": {
         post: { operationId: "approveRun", tags: ["Runs"], summary: "Approve the verified bundle", description: "Records who approved which exact bundle (by digest). Nothing is charged yet.", security: owner, parameters: [idParam], requestBody: body("ApproveInput"), responses: { ...ok("The run, approved.", ref("Run")), ...err(["400", "The run is not ready to approve."], ["403", "This run belongs to another browser."], ["404", "No such run."]) } },
+      },
+      "/api/sessions/{id}/revise": {
+        post: { operationId: "reviseRun", tags: ["Runs"], summary: "Answer a gap request with a licensor's revised licence", description: "Adds the revised licence to what the run read and checks everything again as a new run (`meta.revisedFrom` names this one). The earlier run is unchanged. Nothing is bought: only a bundle that passes the rules can be approved and paid.", security: owner, parameters: [idParam], requestBody: body("ReviseInput"), responses: { ...ok("The new run, started.", ref("Run"), "201"), ...err(["400", "The run is not finished, already has a payment, or the revision is invalid."], ["403", "This run belongs to another browser."], ["404", "No such run."], ["429", "Too many runs in progress."]) } },
       },
       "/api/sessions/{id}/pay": {
         post: { operationId: "startPayment", tags: ["Runs"], summary: "Create the PayPal order", description: "Re-checks the approved bundle with the rules engine, then creates a PayPal order. The response carries `order.approveUrl` for the buyer.", security: owner, parameters: [idParam], responses: { ...ok("The run with its order.", ref("Run")), ...err(["403", "This run belongs to another browser."], ["404", "No such run."], ["409", "The rules engine refused the payment."], ["502", "PayPal refused or was unreachable."]) } },

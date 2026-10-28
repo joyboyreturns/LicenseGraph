@@ -314,6 +314,94 @@
         }
       }
     },
+    "/api/sessions/{id}/revise": {
+      "post": {
+        "operationId": "reviseRun",
+        "tags": [
+          "Runs"
+        ],
+        "summary": "Answer a gap request with a licensor's revised licence",
+        "description": "Adds the revised licence to what the run read and checks everything again as a new run (`meta.revisedFrom` names this one). The earlier run is unchanged. Nothing is bought: only a bundle that passes the rules can be approved and paid.",
+        "security": [
+          {
+            "ownerCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The run id."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviseInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new run, started.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Run"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The run is not finished, already has a payment, or the revision is invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "This run belongs to another browser.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such run.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many runs in progress.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/sessions/{id}/pay": {
       "post": {
         "operationId": "startPayment",
@@ -1592,6 +1680,10 @@
               "startedBy": {
                 "type": "string",
                 "const": "agent"
+              },
+              "revisedFrom": {
+                "description": "The run whose gap requests this one answers, with a licensor's revised licence added.",
+                "type": "string"
               }
             },
             "additionalProperties": false
@@ -1993,6 +2085,10 @@
               "startedBy": {
                 "type": "string",
                 "const": "agent"
+              },
+              "revisedFrom": {
+                "description": "The run whose gap requests this one answers, with a licensor's revised licence added.",
+                "type": "string"
               }
             },
             "additionalProperties": false
@@ -3076,6 +3172,57 @@
         "required": [
           "token"
         ]
+      },
+      "ReviseInput": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "simulate": {
+                "type": "boolean",
+                "const": true
+              }
+            },
+            "required": [
+              "simulate"
+            ],
+            "additionalProperties": false,
+            "description": "Demo scenarios only: add the replies the built-in licensors would send."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "assetId": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string",
+                "description": "The licensor's revised licence, as text."
+              },
+              "licensor": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "email": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "assetId",
+              "text"
+            ],
+            "additionalProperties": false
+          }
+        ],
+        "description": "A licensor's answer to a gap request."
       }
     }
   }

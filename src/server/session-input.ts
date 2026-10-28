@@ -7,6 +7,15 @@ const MAX_DOCS = 12;
 const MAX_TEXT = 20_000;
 const EMAIL = /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/;
 const textId = z.string().trim().min(1).max(55);
+/** The body of POST /api/sessions/{id}/revise: one licensor's revised licence, or (demo scenarios) their simulated replies. */
+export const reviseInputSchema = z.union([
+  z.object({ simulate: z.literal(true) }),
+  z.object({
+    assetId: textId,
+    text: z.string().min(1).max(MAX_TEXT),
+    licensor: z.object({ name: z.string().trim().min(1).max(80), email: z.string().max(127).regex(EMAIL).optional() }).optional(),
+  }),
+]);
 export const sessionInputSchema = z.object({
   project: z.object({
     name: z.string().trim().min(1).max(120),
