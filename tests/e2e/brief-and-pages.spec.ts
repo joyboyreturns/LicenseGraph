@@ -182,3 +182,9 @@ test("the tour lists seven steps in order, and its buttons start the scenario th
   const id = new URL(page.url()).pathname.split("/").pop()!;
   expect((await (await page.request.get(`/api/sessions/${id}`)).json()).meta.scenarioId).toBe("exclusive-theme");
 });
+
+test("the app can be installed: a web manifest names it and points at an icon that exists", async ({ request }) => {
+  const manifest = await (await request.get("/manifest.webmanifest")).json();
+  expect(manifest).toMatchObject({ name: "LicenseGraph", start_url: "/", display: "standalone" });
+  expect((await request.get(manifest.icons[0].src)).status()).toBe(200);
+});
