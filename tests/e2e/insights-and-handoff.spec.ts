@@ -48,6 +48,13 @@ test("an agent can start a purchase, but only a person who takes control can app
   await page.getByRole("button", { name: "Skip to result" }).first().click();
   await expect(page.getByRole("button", { name: "Review and approve" })).toBeVisible();
 
+  // Where the money goes, with each creator's address masked, before anyone approves.
+  const preview = page.getByTestId("payout-preview");
+  await expect(preview).toContainText("SoundHarbor Music");
+  await expect(preview).toContainText("$200.00 to");
+  await expect(preview).toContainText("•");
+  await expect(preview).not.toContainText("soundharbor@licensegraph-demo.example");
+
   // Clauses the engine does not check are quoted for the person to read, from the licences that were bought.
   const fine = page.getByTestId("fine-print");
   await expect(fine).toContainText("Also in these licences, not checked by the rules engine");

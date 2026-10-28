@@ -25,6 +25,7 @@ export interface StoredSession {
   paymentsMode?: Session["paymentsMode"];
   claim?: Session["claim"];
   payoutBlockedAssets?: Session["payoutBlockedAssets"];
+  payoutPreview?: Session["payoutPreview"];
   events: LedgerEvent[];
 }
 
@@ -48,6 +49,7 @@ export function serializeSession(s: Session): StoredSession {
     paymentsMode: s.paymentsMode,
     claim: s.claim,
     payoutBlockedAssets: s.payoutBlockedAssets,
+    payoutPreview: s.payoutPreview,
     events: s.ledger.events(),
   };
 }
@@ -75,6 +77,7 @@ export function deserializeSession(stored: StoredSession): Session {
     paymentsMode: stored.paymentsMode,
     claim: stored.claim,
     payoutBlockedAssets: stored.payoutBlockedAssets,
+    payoutPreview: stored.payoutPreview,
   };
   if (ACTIVE.includes(session.phase)) {
     session.phase = "failed";

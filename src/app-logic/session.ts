@@ -46,6 +46,8 @@ export interface Session {
   payouts?: PayoutSummary;
   /** Assets whose creator could not be paid (no payout email), known once a bundle is verified. Payment re-checks it either way. */
   payoutBlockedAssets?: string[];
+  /** Who would be paid what once the payment is captured, known once a bundle is verified. Addresses are masked; only the plan is kept. */
+  payoutPreview?: PayoutPreviewLine[];
   /** The buyer's money was returned because the creators could not be paid. */
   refund?: { id: string; status: string; amount: { currency: string; value: string }; at: string };
   /** Present until a person takes over an agent-started run: only a hash of the one-time claim token is kept. */
@@ -241,6 +243,7 @@ export async function runPipeline(session: Session, deps: Deps, carried?: { from
     session.phase = "verified";
     recordMandateCheck(session);
     session.payoutBlockedAssets = payoutBlockers(session, deps);
+    session.payoutPreview = payoutPreviewOf(session, deps);
   } else {
     session.phase = "failed";
     const frontier = minimumCompliantCost(session.input.project, session.input.requiredAssetIds, session.candidates, { today: session.runDate });
@@ -260,6 +263,21 @@ function finePrintShown(session: Session): number {
     const text = byId.get(o.evidence[0]?.documentId ?? "");
     return n + (text ? finePrint(text).length : 0);
   }, 0);
+}
+
+export interface PayoutPreviewLine {
+  assetId: string;
+  licensorName: string;
+  emailMasked: string;
+  amountCents: number;
+  currency: string;
+}
+
+/** The payout plan for the verified bundle, so the buyer sees who receives what before approving. Empty where payouts do not happen. */
+function payoutPreviewOf(session: Session, deps: Deps): PayoutPreviewLine[] {
+  const bundle = session.loop?.bundle;
+  if (!bundle || !deps.payments?.createPayout) return [];
+  return planPayouts(bundle.offers, session.input.documents, deps.payeeOverrides).lines.map((l) => ({ assetId: l.assetId, licensorName: l.licensorName, emailMasked: maskEmail(l.email), amountCents: l.amountCents, currency: l.currency }));
 }
 
 /** An agent that stated a spending cap has the verified bundle checked against it; the result is written to the ledger for the person who approves. */
@@ -480,6 +498,8 @@ export interface SessionView {
   canRefund?: boolean;
   /** Assets whose creator has no payout email, so this purchase cannot be paid until a new run supplies one. */
   payoutBlockedAssets?: string[];
+  /** Who would be paid what after capture (addresses masked). Absent when payouts are not available or the run is not verified. */
+  payoutPreview?: PayoutPreviewLine[];
   payouts?: Omit<PayoutSummary, "lines"> & { lines: (Omit<PayoutSummary["lines"][number], "email"> & { emailMasked: string })[] };
   events: LedgerEvent[];
   chainValid: boolean;
@@ -511,6 +531,7 @@ export function viewOf(session: Session): SessionView {
     refund: session.refund,
     canRefund: session.capture ? refundBlockedReason(session) === undefined : undefined,
     payoutBlockedAssets: session.payoutBlockedAssets?.length ? session.payoutBlockedAssets : undefined,
+    payoutPreview: session.payoutPreview?.length ? session.payoutPreview : undefined,
     payouts: session.payouts && { ...session.payouts, lines: session.payouts.lines.map(({ email, ...rest }) => ({ ...rest, emailMasked: maskEmail(email) })) },
     events: session.ledger.events(),
     chainValid: session.ledger.verify(),

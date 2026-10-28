@@ -273,6 +273,34 @@ describe("createPayPalClient payouts", () => {
   });
 });
 
+describe("the payout preview a buyer sees before approving", () => {
+  it("lists each creator with the amount and a masked address, never the address itself, and omits creators who cannot be paid", async () => {
+    const { deps } = makeDeps();
+    const i = input();
+    i.documents = i.documents.map((d) => (d.id === "font" ? { ...d, licensor: { name: d.licensor!.name } } : d));
+    const s = createSession(i);
+    await runPipeline(s, deps);
+    const preview = viewOf(s).payoutPreview!;
+    expect(preview.map((l) => [l.assetId, l.amountCents])).toEqual([["song", 20_000], ["image", 8_000]]);
+    for (const l of preview) {
+      expect(l.emailMasked).toMatch(/^..•+@/);
+      expect(JSON.stringify(viewOf(s))).not.toContain(i.documents.find((d) => d.assetId === l.assetId)!.licensor!.email);
+    }
+  });
+
+  it("totals what the payout will send, survives a restart, and is absent without payments", async () => {
+    const { deps } = makeDeps();
+    const s = createSession(input());
+    await runPipeline(s, deps);
+    expect(viewOf(s).payoutPreview!.reduce((n, l) => n + l.amountCents, 0)).toBe(viewOf(s).bundle!.totalCents);
+    expect(viewOf(deserializeSession(JSON.parse(JSON.stringify(serializeSession(s))))).payoutPreview).toEqual(viewOf(s).payoutPreview);
+
+    const bare = createSession(input());
+    await runPipeline(bare, { ...deps, payments: undefined });
+    expect(viewOf(bare).payoutPreview).toBeUndefined();
+  });
+});
+
 describe("refusing to charge for a purchase that cannot be paid out", () => {
   const withoutEmail = (): ReturnType<typeof input> => {
     const i = input();

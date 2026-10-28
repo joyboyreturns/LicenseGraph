@@ -68,6 +68,24 @@ export function BundleTable({ view, catalog, onSelectOffer }: { view: SessionVie
   );
 }
 
+/** Who receives what once the payment is captured, so the buyer approves knowing where the money goes. Same plan the payout uses. */
+function PayoutPreview({ view }: { view: SessionView }) {
+  const lines = view.payoutPreview;
+  if (!lines?.length) return null;
+  return (
+    <div className={styles.finePrint} data-testid="payout-preview">
+      <h3 className={styles.finePrintTitle}>Creators are paid after the payment is captured</h3>
+      <ul>
+        {lines.map((l) => (
+          <li key={`${l.assetId}-${l.emailMasked}`}>
+            <b>{l.licensorName}</b> · {assetLabel(l.assetId)}: {formatMoney(l.amountCents, l.currency)} to <code>{l.emailMasked}</code>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 /** Clauses the rules engine does not check, quoted from the bought licences, so "verified" is not read as "nothing else to read". */
 function FinePrint({ view, catalog }: { view: SessionView; catalog: Catalog }) {
   const rows = (view.bundle?.offers ?? []).flatMap((o) => {
@@ -138,6 +156,7 @@ export function ApprovalPanel({ view, catalog, onApprove, busy, onSelectOffer }:
         </div>
       </div>
       <BundleTable view={view} catalog={catalog} onSelectOffer={onSelectOffer} />
+      <PayoutPreview view={view} />
       <FinePrint view={view} catalog={catalog} />
       <MandateNote view={view} />
       {view.payoutBlockedAssets && (
