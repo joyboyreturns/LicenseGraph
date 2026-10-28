@@ -24,7 +24,7 @@ const METHODS = ["get", "post", "put", "patch", "delete"];
 
 // Every route.ts under app/api and the public discovery routes, as the OpenAPI path and the HTTP methods it exports.
 function routeFiles(dir?: string): { path: string; methods: string[] }[] {
-  if (!dir) return ["app/api", "app/.well-known", "app/llms.txt"].flatMap((d) => routeFiles(join(process.cwd(), d)));
+  if (!dir) return ["app/api", "app/.well-known", "app/llms.txt", "app/llms-full.txt"].flatMap((d) => routeFiles(join(process.cwd(), d)));
   const out: { path: string; methods: string[] }[] = [];
   for (const name of readdirSync(dir)) {
     const full = join(dir, name);

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { GET as getCard } from "../app/.well-known/mcp.json/route";
 import { GET as getKeys } from "../app/.well-known/licensegraph-keys.json/route";
+import { GET as getLlmsFull } from "../app/llms-full.txt/route";
 import { GET as getLlms } from "../app/llms.txt/route";
 import { RULE_CATALOG } from "../src/core/rules";
 import { listedTools, llmsTxt, mcpServerCard } from "../src/mcp/discovery";
@@ -56,5 +57,13 @@ describe("agent discovery", () => {
     } finally {
       g.__licensegraph = before;
     }
+  });
+
+  it("serves llms-full.txt: the introduction, then every rule, then the buying playbook", async () => {
+    const text = await (await getLlmsFull()).text();
+    expect(text).toMatch(/^# LicenseGraph/);
+    expect(text.indexOf("# The rules LicenseGraph checks")).toBeGreaterThan(text.indexOf("## Tools"));
+    expect(text.indexOf("# The buying playbook")).toBeGreaterThan(text.indexOf("# The rules LicenseGraph checks"));
+    expect(text).toContain("You are buying creative licences for a person.");
   });
 });

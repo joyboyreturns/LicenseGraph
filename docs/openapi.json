@@ -1517,6 +1517,27 @@
         }
       }
     },
+    "/llms-full.txt": {
+      "get": {
+        "operationId": "getLlmsFullTxt",
+        "tags": [
+          "Service"
+        ],
+        "summary": "Plain-text introduction for AI agents, with the rules and the buying playbook",
+        "responses": {
+          "200": {
+            "description": "Markdown text.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/llm": {
       "post": {
         "operationId": "assistantProxy",

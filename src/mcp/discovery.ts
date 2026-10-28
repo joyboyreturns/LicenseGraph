@@ -1,6 +1,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createLicenseGraphServer } from "./server";
+import { purchasePlaybook, rulesGuide } from "./tools";
 
 export interface ToolSummary {
   name: string;
@@ -56,6 +57,7 @@ export function llmsTxt(appUrl: string, tools: ToolSummary[]): string {
     "",
     `- MCP endpoint (Streamable HTTP, no sign-in): ${appUrl}/api/mcp`,
     `- Server card: ${appUrl}/.well-known/mcp.json`,
+    `- This page with the rules and the buying playbook included: ${appUrl}/llms-full.txt`,
     `- REST API (OpenAPI 3.1): ${appUrl}/api/openapi.json`,
     `- Watch an agent work, and connect your own: ${appUrl}/agents`,
     `- Public key that checks Licence Passport signatures offline (Ed25519): ${appUrl}/.well-known/licensegraph-keys.json`,
@@ -75,4 +77,9 @@ export function llmsTxt(appUrl: string, tools: ToolSummary[]): string {
     `- ${appUrl}/verify: re-check a Licence Passport in the browser`,
     "",
   ].join("\n");
+}
+
+/** llms.txt plus everything an agent would otherwise fetch next: the rules and the working order, in one page. */
+export function llmsFullTxt(appUrl: string, tools: ToolSummary[]): string {
+  return [llmsTxt(appUrl, tools).trimEnd(), "", "---", "", rulesGuide(), "", "---", "", "# The buying playbook", "", purchasePlaybook(), ""].join("\n");
 }

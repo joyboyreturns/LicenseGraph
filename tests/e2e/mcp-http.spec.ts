@@ -65,6 +65,10 @@ test("an agent can find the MCP endpoint without being told: llms.txt, the serve
   expect(text).toContain(`${new URL("/api/mcp", baseURL).href}`);
   expect(text).toContain("- verify_licence_passport:");
 
+  const full = await (await request.get("/llms-full.txt")).text();
+  expect(full).toContain("## Territory (`territory`)");
+  expect(full).toContain("# The buying playbook");
+
   const card = await (await request.get("/.well-known/mcp.json")).json();
   expect(card.transport).toMatchObject({ type: "streamable-http", url: new URL("/api/mcp", baseURL).href });
   // The card lists what the live endpoint really offers.
