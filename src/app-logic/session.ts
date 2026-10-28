@@ -13,6 +13,7 @@ import { centsToValue } from "../payments/paypal";
 import { paymentRequestId } from "../payments/request-id";
 import { isIsoDate } from "../core/dates";
 import { minimumCompliantCost } from "../core/optimizer";
+import { checkMandate, type Mandate } from "../core/mandate";
 
 export type Phase = "created" | "extracting" | "proposing" | "verified" | "failed" | "approved" | "order_created" | "captured" | "settled" | "refunded";
 
@@ -21,7 +22,7 @@ export interface SessionInput {
   requiredAssetIds: string[];
   documents: SourceDocument[];
   /** Where the run came from, for display. */
-  meta?: { scenarioId?: string; brief?: string; /** "demo" replays recorded model output; "live" calls the model. */ runKind?: "demo" | "live"; /** Started by an AI agent through the API; a person must take control before anything can be approved or paid. */ startedBy?: "agent"; /** The run whose gap requests this one answers, with a licensor's revised licence added. */ revisedFrom?: string };
+  meta?: { scenarioId?: string; brief?: string; /** "demo" replays recorded model output; "live" calls the model. */ runKind?: "demo" | "live"; /** Started by an AI agent through the API; a person must take control before anything can be approved or paid. */ startedBy?: "agent"; /** The run whose gap requests this one answers, with a licensor's revised licence added. */ revisedFrom?: string; /** The spending cap an agent says its person gave it. */ mandate?: Mandate };
 }
 
 export interface Session {
@@ -237,6 +238,7 @@ export async function runPipeline(session: Session, deps: Deps, carried?: { from
 
   if (session.loop.status === "verified") {
     session.phase = "verified";
+    recordMandateCheck(session);
     session.payoutBlockedAssets = payoutBlockers(session, deps);
   } else {
     session.phase = "failed";
@@ -248,6 +250,17 @@ export async function runPipeline(session: Session, deps: Deps, carried?: { from
         : "The agent ran out of attempts before finding a compliant bundle.";
   }
   touch(session);
+}
+
+/** An agent that stated a spending cap has the verified bundle checked against it; the result is written to the ledger for the person who approves. */
+function recordMandateCheck(session: Session): void {
+  const mandate = session.input.meta?.mandate;
+  const bundle = session.loop?.bundle;
+  const total = session.loop?.verdict?.totalCents;
+  if (!mandate || !bundle || total === undefined) return;
+  const currency = bundle.offers[0]?.currency ?? "USD";
+  const check = checkMandate(mandate, { totalCents: total, currency });
+  session.ledger.append("mandate_checked", { ...check, maxTotalCents: mandate.maxTotalCents, currency: mandate.currency, totalCents: total, ...(mandate.note ? { note: mandate.note } : {}) });
 }
 
 /**

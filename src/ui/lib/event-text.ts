@@ -13,6 +13,7 @@ export const KIND_LABEL: Record<LedgerKind, string> = {
   proposal_error: "Proposal unusable",
   handed_over: "Run handed to a person",
   answers_run: "Answers an earlier run",
+  mandate_checked: "Checked against the agent's spending mandate",
   approved: "Human approved",
   order_created: "PayPal order created",
   captured: "Payment captured",
@@ -27,7 +28,7 @@ export const KIND_LABEL: Record<LedgerKind, string> = {
 /** Who acted: the model, the deterministic verifier, a person, or the payment rail. */
 export function eventActor(kind: LedgerKind | string): "agent" | "engine" | "human" | "payment" {
   if (kind === "extracted" || kind === "extraction_failed" || kind === "proposed" || kind === "revised" || kind === "proposal_error") return "agent";
-  if (kind === "rejected" || kind === "verified") return "engine";
+  if (kind === "rejected" || kind === "verified" || kind === "mandate_checked") return "engine";
   if (kind === "approved" || kind === "handed_over" || kind === "answers_run") return "human";
   return "payment";
 }
@@ -58,6 +59,11 @@ export function eventTitle(e: Pick<LedgerEvent, "kind" | "payload">, catalog?: P
     case "answers_run": {
       const asked = count(p.asked);
       return `Answers an earlier run that ${p.earlierOutcome === "verified" ? "had a verified bundle" : "had no compliant bundle"}${asked ? `, where ${pluralise(asked, "licensor")} ${asked === 1 ? "was" : "were"} asked to change terms` : ""}; ${pluralise(count(p.addedDocumentIds), "revised licence")} added`;
+    }
+    case "mandate_checked": {
+      const cur = String(p.currency ?? "USD");
+      const [cap, total] = [formatMoney(Number(p.maxTotalCents), cur), formatMoney(Number(p.totalCents), cur)];
+      return p.status === "within" ? `Within the agent's mandate: ${total} of ${cap}` : p.status === "over" ? `Over the agent's mandate: ${total} against a cap of ${cap}` : `The agent's mandate is in ${cur}, so ${total} could not be compared`;
     }
     case "approved":
       return `Approved by ${String(p.approvedBy ?? "a person")}`;

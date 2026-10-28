@@ -29,6 +29,7 @@ export function Certificate({ passport: p, qrSrc, verifyUrl }: { passport: Passp
   const dates = passportLicenceDates(p);
   const answers = p.ledger.events.find((e) => e.kind === "answers_run");
   const negotiation = answers ? `${eventTitle(answers)}.` : undefined;
+  const mandate = p.ledger.events.find((e) => e.kind === "mandate_checked");
   return (
     <article className={styles.cert} aria-labelledby="cert-title">
       <div className={styles.border} aria-hidden />
@@ -225,6 +226,17 @@ export function Certificate({ passport: p, qrSrc, verifyUrl }: { passport: Passp
           </h2>
           <p className={styles.compare}>
             This purchase followed a negotiation. {negotiation} The earlier run is recorded in the first entry of this passport&rsquo;s ledger, so it cannot be removed without breaking the hash chain.
+          </p>
+        </section>
+      )}
+
+      {mandate && (
+        <section className={styles.section} aria-labelledby="cert-mandate">
+          <h2 id="cert-mandate" className={styles.h2}>
+            Agent mandate
+          </h2>
+          <p className={styles.compare}>
+            An AI agent started this purchase. {eventTitle(mandate)}. A person took control and approved it; the agent could not.
           </p>
         </section>
       )}

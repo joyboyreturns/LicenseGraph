@@ -139,6 +139,22 @@ describe("start_licence_purchase", () => {
     expect(await purchaseStatus(app, started.runId)).toMatchObject({ awaitingPerson: false });
   });
 
+  it("records the spending cap the agent was given, checks it against the verified total, and reports it", async () => {
+    const run = async (maxSpend?: number) => {
+      const started = await startPurchase(app, { ...input(), ...(maxSpend ? { mandate: { maxSpend, note: "Nothing over the budget we agreed" } } : {}) });
+      if (!started.ok) throw new Error(started.error);
+      let status = await purchaseStatus(app, started.runId);
+      for (let i = 0; i < 100 && status.ok && status.phase !== "verified"; i++) {
+        await new Promise((r) => setTimeout(r, 20));
+        status = await purchaseStatus(app, started.runId);
+      }
+      return status;
+    };
+    expect(await run(400)).toMatchObject({ ok: true, mandate: { status: "within", capCents: 40_000, totalCents: 32_900, currency: "USD" } });
+    expect(await run(300)).toMatchObject({ ok: true, mandate: { status: "over", capCents: 30_000, totalCents: 32_900 }, awaitingPerson: true });
+    expect(await run()).toMatchObject({ ok: true, mandate: null });
+  });
+
   it("reports the app's refusal rather than throwing", async () => {
     const res = await startPurchase(app, { ...input(), requiredAssetIds: ["song", "missing"] });
     expect(res).toMatchObject({ ok: false });

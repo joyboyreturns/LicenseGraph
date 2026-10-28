@@ -106,6 +106,31 @@ describe("an agent starting a purchase for a person", () => {
   });
 });
 
+describe("an agent's spending mandate", () => {
+  it("is written to the ledger beside the verified total, and survives the person taking control", async () => {
+    const res = await postSession(req("http://app/api/sessions", { scenarioId: "documentary", handoff: true, mandate: { maxTotalCents: 40_000, currency: "USD", note: "Under $400" } }));
+    expect(res.status).toBe(201);
+    const { id } = await json(res);
+    let v: any;
+    for (let i = 0; i < 100 && v?.phase !== "verified"; i++) {
+      v = await json(await getSession(new Request("http://app"), ctx(id)));
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    const event = v.events.find((e: { kind: string }) => e.kind === "mandate_checked");
+    expect(event.payload).toMatchObject({ status: "within", marginCents: 7_100, maxTotalCents: 40_000, totalCents: 32_900, currency: "USD", note: "Under $400" });
+    expect(v.chainValid).toBe(true);
+  });
+
+  it("is refused when malformed, and absent when not stated", async () => {
+    for (const mandate of [{ maxTotalCents: -5, currency: "USD" }, { maxTotalCents: 100, currency: "ZZZ" }, { maxTotalCents: 1.5, currency: "USD" }]) {
+      expect((await postSession(req("http://app/api/sessions", { scenarioId: "documentary", handoff: true, mandate }))).status).toBe(400);
+    }
+    const { id } = await json(await postSession(req("http://app/api/sessions", { scenarioId: "documentary", handoff: true })));
+    await new Promise((r) => setTimeout(r, 100));
+    expect((await json(await getSession(new Request("http://app"), ctx(id)))).events.some((e: { kind: string }) => e.kind === "mandate_checked")).toBe(false);
+  });
+});
+
 describe("claim tokens", () => {
   const make = () => {
     const sc = scenarioById("documentary")!;

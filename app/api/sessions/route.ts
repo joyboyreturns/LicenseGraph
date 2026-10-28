@@ -10,13 +10,21 @@ export const dynamic = "force-dynamic";
 /** Each live run makes several model requests; cap concurrency so one visitor cannot exhaust the gateway. */
 const MAX_ACTIVE_RUNS = 3;
 
-type Body = { scenarioId?: unknown; brief?: unknown; handoff?: unknown } & Partial<SessionInput>;
+type Body = { scenarioId?: unknown; brief?: unknown; handoff?: unknown; mandate?: unknown } & Partial<SessionInput>;
 
 function parse(body: Body | null): SessionInput {
   const parsed = inputSchema.safeParse(body);
   if (!parsed.success) throw new SessionError(`Invalid run input: ${parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}`);
-  const { project, requiredAssetIds, documents, brief } = parsed.data;
-  return { project, requiredAssetIds, documents, meta: { brief } };
+  const { project, requiredAssetIds, documents, brief, mandate } = parsed.data;
+  return { project, requiredAssetIds, documents, meta: { brief, ...(mandate ? { mandate } : {}) } };
+}
+
+/** An agent may state a spending cap on a built-in scenario too, so the approval screen can be tried without licences of one's own. */
+function scenarioMandate(body: Body | null): Pick<NonNullable<SessionInput["meta"]>, "mandate"> {
+  if (body?.mandate === undefined) return {};
+  const parsed = inputSchema.shape.mandate.safeParse(body.mandate);
+  if (!parsed.success) throw new SessionError(`Invalid mandate: ${parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}`);
+  return parsed.data ? { mandate: parsed.data } : {};
 }
 
 export async function POST(req: Request) {
@@ -28,7 +36,7 @@ export async function POST(req: Request) {
     const scenario = typeof body?.scenarioId === "string" ? scenarioById(body.scenarioId) : undefined;
     if (typeof body?.scenarioId === "string" && !scenario) throw new SessionError("Unknown scenario.");
     const input: SessionInput = scenario
-      ? { project: { ...scenario.project }, requiredAssetIds: [...scenario.requiredAssetIds], documents: scenario.documents.map((d) => ({ ...d })), meta: { scenarioId: scenario.id, brief: scenario.brief, runKind: "demo" } }
+      ? { project: { ...scenario.project }, requiredAssetIds: [...scenario.requiredAssetIds], documents: scenario.documents.map((d) => ({ ...d })), meta: { scenarioId: scenario.id, brief: scenario.brief, runKind: "demo", ...scenarioMandate(body) } }
       : (() => {
           const i = parse(body);
           return { ...i, meta: { ...i.meta, runKind: rt.mode } };

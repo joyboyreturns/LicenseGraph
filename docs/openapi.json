@@ -1668,6 +1668,7 @@
               "proposal_error",
               "handed_over",
               "answers_run",
+              "mandate_checked",
               "approved",
               "order_created",
               "captured",
@@ -3190,6 +3191,27 @@
           "brief": {
             "type": "string",
             "maxLength": 2000
+          },
+          "mandate": {
+            "type": "object",
+            "properties": {
+              "maxTotalCents": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "currency": {
+                "type": "string"
+              },
+              "note": {
+                "type": "string",
+                "maxLength": 200
+              }
+            },
+            "required": [
+              "maxTotalCents",
+              "currency"
+            ]
           }
         },
         "required": [

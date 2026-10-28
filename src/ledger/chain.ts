@@ -13,6 +13,7 @@ export const LEDGER_KINDS = [
   "proposal_error",
   "handed_over",
   "answers_run",
+  "mandate_checked",
   "approved",
   "order_created",
   "captured",

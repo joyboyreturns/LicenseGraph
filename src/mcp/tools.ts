@@ -146,13 +146,25 @@ export function purchasePlaybook(brief?: string): string {
     "1. Read each licence into an offer: the price, and each term it states, with the exact sentence it came from. A term the licence does not state stays blank; a blank is not a yes.",
     "2. Call cheapest_compliant_bundle. It gives the exact minimum cost, what each requirement adds to it, and, where an asset has no compliant offer, the closest offer and what to ask its licensor to change.",
     "3. If nothing can be bought, read gapRequests and ifLicensorsAgree. Tell the person plainly: what blocks each asset, what to ask each licensor, the best-case total if they all said yes, and how far each price could rise before the budget breaks. Call what_if_brief to price a smaller scope (a different territory, a shorter term, one requirement dropped). Do not offer to proceed with a bundle the tools did not verify.",
-    "4. If a bundle exists, call licence_end_dates so the person knows when each licence runs out, then start_licence_purchase with the raw licence texts. LicenseGraph re-reads them and re-verifies the bundle itself.",
+    "4. If a bundle exists, call licence_end_dates so the person knows when each licence runs out, then start_licence_purchase with the raw licence texts and, if the person gave you a spending limit, that limit as the mandate. LicenseGraph re-reads the licences, re-verifies the bundle itself and checks its total against your mandate for the person to see.",
     "5. Give the person the claim link. Only they can approve and pay; you cannot, and you must not say a payment happened until get_purchase_status shows it.",
     "6. Report the Licence Passport link once the purchase is paid.",
   ].join("\n\n");
 }
 
-export const startPurchaseInput = z.object({ project: projectSchema, requiredAssetIds: z.array(textId).min(1).max(12), documents: z.array(documentSchema).min(1).max(12) });
+export const startPurchaseInput = z.object({
+  project: projectSchema,
+  requiredAssetIds: z.array(textId).min(1).max(12),
+  documents: z.array(documentSchema).min(1).max(12),
+  mandate: z
+    .object({
+      maxSpend: z.number().positive().max(10_000_000).describe("The most the person said you may spend, in whole currency units, for example 800 for $800."),
+      currency: z.string().length(3).optional().describe("Defaults to the project's currency, or USD."),
+      note: z.string().max(200).optional().describe("The person's instruction in their own words."),
+    })
+    .optional()
+    .describe("Your spending mandate. It is recorded, checked against the verified bundle and shown to the person who approves; it does not let you pay."),
+});
 
 export interface AppClient {
   baseUrl: string;
@@ -169,7 +181,9 @@ async function call(app: AppClient, path: string, init?: RequestInit): Promise<{
  * it gets no way to approve or pay, because the run belongs to nobody until the person takes control.
  */
 export async function startPurchase(app: AppClient, input: z.infer<typeof startPurchaseInput>) {
-  const { status, body } = await call(app, "/api/sessions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...input, handoff: true }) });
+  const { mandate, ...run } = input;
+  const stated = mandate && { maxTotalCents: Math.round(mandate.maxSpend * 100), currency: (mandate.currency ?? (run.project as { currency?: string }).currency ?? "USD").toUpperCase(), ...(mandate.note ? { note: mandate.note } : {}) };
+  const { status, body } = await call(app, "/api/sessions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...run, ...(stated ? { mandate: stated } : {}), handoff: true }) });
   if (status !== 201) return { ok: false as const, error: body?.error ?? `The app answered ${status}.` };
   return {
     ok: true as const,
@@ -192,6 +206,7 @@ export async function purchaseStatus(app: AppClient, runId: string) {
     approvedBy: body.approval?.approvedBy ?? null,
     payment: body.capture ? { orderId: body.capture.id, captureId: body.capture.captureId, amount: body.capture.amount } : null,
     creatorPayouts: body.payouts ? { status: body.payouts.status, lines: body.payouts.lines.map((l: any) => ({ assetId: l.assetId, status: l.status })) } : null,
+    mandate: ((e) => (e ? { status: e.payload.status as string, capCents: e.payload.maxTotalCents as number, totalCents: e.payload.totalCents as number, currency: e.payload.currency as string } : null))((body.events as { kind: string; payload: Record<string, unknown> }[] | undefined)?.find((x) => x.kind === "mandate_checked")),
     ledgerIntact: body.chainValid as boolean,
     passportUrl: body.capture ? `${app.baseUrl.replace(/\/$/, "")}/passport/${runId}` : null,
   };

@@ -1,8 +1,9 @@
 "use client";
 
-import { FileSearch, Lock, UserCheck } from "lucide-react";
+import { Bot, FileSearch, Lock, UserCheck } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import type { SessionView } from "@/src/app-logic/session";
+import { checkMandate } from "@/src/core/mandate";
 import type { Catalog } from "@/src/ui/lib/catalog";
 import { assetLabel, formatMoney, termsSummary } from "@/src/ui/lib/format";
 import { AssetIcon, Spinner, storageGet, storageSet } from "../bits";
@@ -66,6 +67,27 @@ export function BundleTable({ view, catalog, onSelectOffer }: { view: SessionVie
   );
 }
 
+/** What the agent said its person allowed it to spend, checked against the verified total. Informs the approval; never replaces it. */
+function MandateNote({ view }: { view: SessionView }) {
+  const mandate = view.meta?.mandate;
+  const bundle = view.bundle;
+  if (!mandate || !bundle) return null;
+  const check = checkMandate(mandate, bundle);
+  const cap = formatMoney(mandate.maxTotalCents, mandate.currency);
+  const text =
+    check.status === "within"
+      ? `Within the agent's mandate: it was told to spend at most ${cap}, and this bundle costs ${formatMoney(bundle.totalCents, bundle.currency)}.`
+      : check.status === "over"
+        ? `Over the agent's mandate by ${formatMoney(check.overByCents, bundle.currency)}: it was told to spend at most ${cap}. Only approve if you meant to allow more.`
+        : `The agent's mandate (${cap}) is in ${mandate.currency} but this bundle is in ${bundle.currency}, so they cannot be compared.`;
+  return (
+    <p className={styles.lockNote} role="note" data-tone={check.status === "within" ? undefined : "warn"} data-testid="mandate-note">
+      <Bot aria-hidden /> {text}
+      {mandate.note ? ` Its instruction: \u201c${mandate.note}\u201d` : ""}
+    </p>
+  );
+}
+
 export function ApprovalPanel({ view, catalog, onApprove, busy, onSelectOffer }: { view: SessionView; catalog: Catalog; onApprove: (name: string) => void; busy: boolean; onSelectOffer: (id: string) => void }) {
   const [name, setName] = useState("");
   const id = useId();
@@ -93,6 +115,7 @@ export function ApprovalPanel({ view, catalog, onApprove, busy, onSelectOffer }:
         </div>
       </div>
       <BundleTable view={view} catalog={catalog} onSelectOffer={onSelectOffer} />
+      <MandateNote view={view} />
       {view.payoutBlockedAssets && (
         <p className={styles.lockNote} role="note" data-tone="warn">
           <Lock aria-hidden /> No payout email for {view.payoutBlockedAssets.map(assetLabel).join(", ")}, so those creators cannot be paid and the payment will not be created. Start a new run with a payout email for each licensor to complete a purchase.

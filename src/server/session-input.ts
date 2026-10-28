@@ -37,4 +37,10 @@ export const sessionInputSchema = z.object({
     licensor: z.object({ name: z.string().trim().min(1).max(80), email: z.string().max(127).regex(EMAIL).optional() }).optional(),
   })).min(1).max(MAX_DOCS),
   brief: z.string().max(2000).optional(),
+  /** What an agent was told it may spend; checked against the verified bundle and shown to the person who approves. */
+  mandate: z.object({
+    maxTotalCents: z.number().int().safe().positive(),
+    currency: z.string().refine(supportsCentCurrency, "Unsupported settlement currency"),
+    note: z.string().trim().max(200).optional(),
+  }).optional(),
 });
