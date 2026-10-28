@@ -1,6 +1,6 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { AGREED_SUFFIX, concede, negotiationOutlook } from "../src/core/negotiation";
+import { AGREED_SUFFIX, concede, negotiationOutlook, savingLevers } from "../src/core/negotiation";
 import { evaluateOffer, verifyBundle } from "../src/core/rules";
 import type { LicenseOffer, LicenseTerms, Project } from "../src/core/types";
 
@@ -123,5 +123,60 @@ describe("negotiationOutlook properties", () => {
       { numRuns: 300 },
     );
     expect(defined).toBeGreaterThan(30); // the property is not passing by never having an outlook to check
+  });
+});
+
+describe("savingLevers", () => {
+  const p: Project = { name: "P", commercial: true, territories: ["US"], termMonths: 12, budgetCents: 50_000 };
+  const good = (id: string, asset: string, price: number, terms: Partial<LicenseTerms> = {}, cur = "USD") => offer(id, asset, price, { exclusive: undefined, sublicensing: undefined, mediums: undefined, ...terms }, cur);
+
+  it("finds the cheaper offer that only needs a term changed, and the exact saving", () => {
+    const chosen = good("pricey", "image", 8_000);
+    const cheap = good("cheap", "image", 4_500, { commercialUse: false });
+    const levers = savingLevers(p, ["image"], [chosen, cheap], ["pricey"], options);
+    expect(levers).toHaveLength(1);
+    expect(levers[0]).toMatchObject({ assetId: "image", offerId: "cheap", priceCents: 4_500, chosenOfferId: "pricey", chosenPriceCents: 8_000, savingCents: 3_500 });
+    expect(levers[0]!.asks.map((a) => a.rule)).toEqual(["commercial-use"]);
+  });
+
+  it("offers nothing when no cheaper offer exists, when the cheaper one is another currency, or when its gap is not the licensor's to close", () => {
+    const chosen = good("chosen", "image", 8_000);
+    expect(savingLevers(p, ["image"], [chosen], ["chosen"], options)).toEqual([]);
+    expect(savingLevers(p, ["image"], [chosen, good("eur", "image", 100, { commercialUse: false }, "EUR")], ["chosen"], options)).toEqual([]);
+    // A price that is not a valid amount is not something a licensor can agree away.
+    expect(savingLevers(p, ["image"], [chosen, good("free", "image", 0, { commercialUse: false })], ["chosen"], options)).toEqual([]);
+  });
+
+  it("takes the cheapest such offer per asset, and lists the biggest saving first", () => {
+    const offers = [
+      good("a-chosen", "a", 5_000), good("a-mid", "a", 3_000, { commercialUse: false }), good("a-low", "a", 2_000, { commercialUse: false, termMonths: 6 }),
+      good("b-chosen", "b", 9_000), good("b-cheap", "b", 1_000, { territories: ["CA"] }),
+    ];
+    const levers = savingLevers(p, ["a", "b"], offers, ["a-chosen", "b-chosen"], options);
+    expect(levers.map((l) => [l.assetId, l.offerId, l.savingCents])).toEqual([["b", "b-cheap", 8_000], ["a", "a-low", 3_000]]);
+  });
+
+  it("every lever, once its licensor agrees, passes every rule and costs exactly what was quoted", () => {
+    const terms = fc.record({
+      commercialUse: fc.boolean(),
+      territories: fc.constantFrom(["US"], ["CA"], ["WORLD"], ["US", "CA"]),
+      termMonths: fc.constantFrom(3, 6, 12, 24, "perpetual" as const),
+      attributionRequired: fc.option(fc.boolean(), { nil: undefined }),
+    });
+    fc.assert(
+      fc.property(fc.array(fc.record({ price: fc.integer({ min: 1, max: 20_000 }), terms }), { minLength: 2, maxLength: 6 }), (rows) => {
+        const offers = rows.map((r, i) => offer(`o${i}`, "x", r.price, { ...r.terms, mediums: undefined, sublicensing: undefined, exclusive: undefined }));
+        const compliant = offers.filter((o) => failing(o, p).length === 0).sort((a, b) => a.priceCents - b.priceCents);
+        if (!compliant[0]) return;
+        for (const l of savingLevers(p, ["x"], offers, [compliant[0].id], options)) {
+          const original = offers.find((o) => o.id === l.offerId)!;
+          expect(l.savingCents).toBe(compliant[0].priceCents - original.priceCents);
+          expect(l.savingCents).toBeGreaterThan(0);
+          const agreed = concede(p, original, failing(original, p), options);
+          expect(failing(agreed, p)).toEqual([]);
+          expect(agreed.priceCents).toBe(l.priceCents);
+        }
+      }),
+    );
   });
 });

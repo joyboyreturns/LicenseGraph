@@ -13,6 +13,17 @@ test("the run says what each requirement costs, with the exact figures", async (
   await expect(row("Territory")).toContainText("costs nothing");
 });
 
+test("a verified run shows where it could cost less, with what to ask each licensor", async ({ page }) => {
+  await startScenario(page, "Documentary promo");
+  const levers = page.getByTestId("saving-levers");
+  await expect(levers).toContainText("$35.00 less");
+  await expect(levers).toContainText("saves $35.00");
+  await expect(levers).toContainText("$45.00 instead of $80.00");
+  await expect(levers).toContainText("Allow commercial use");
+  const mail = levers.getByRole("link", { name: /Open in email/ });
+  expect(decodeURIComponent((await mail.getAttribute("href"))!)).toContain("Allow commercial use");
+});
+
 test("an agent can start a purchase, but only a person who takes control can approve it", async ({ page, browser }) => {
   // The agent: no cookie, so it owns nothing. It receives a claim link and nothing it can approve with.
   const agent = await browser.newContext();

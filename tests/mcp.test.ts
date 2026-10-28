@@ -50,6 +50,8 @@ describe("cheapest_compliant_bundle", () => {
     expect(r.plans[0]).toMatchObject({ currency: "USD", totalCents: 32_900, offerIds: ["offer-font", "offer-archive", "offer-song"] });
     expect(r.requirementCosts?.items.find((i) => i.rule === "commercial-use")).toMatchObject({ extraCents: 3_500 });
     expect(r.gapRequests).toEqual([]);
+    // The non-commercial photo is cheaper than the archive image that was chosen; its licensor would only have to allow commercial use.
+    expect(r.savingLevers).toEqual([expect.objectContaining({ assetId: "image", offerId: "offer-photo", savingCents: 3_500 })]);
   });
 
   it("says what to ask for when nothing passes", () => {

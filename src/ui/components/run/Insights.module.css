@@ -140,3 +140,33 @@
 .reply[open] > summary {
   margin-bottom: 8px;
 }
+
+.lever {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 12px;
+  align-items: baseline;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed var(--line);
+}
+.lever:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+.lever .hint {
+  grid-column: 1 / -1;
+}
+.leverActions {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.levers {
+  padding: 4px 16px 16px;
+}
+.lever .name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}

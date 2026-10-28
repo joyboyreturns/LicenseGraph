@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { finePrint } from "../core/fine-print";
 import { gapRequests, requirementCosts } from "../core/insights";
-import { negotiationOutlook } from "../core/negotiation";
+import { negotiationOutlook, savingLevers } from "../core/negotiation";
 import { buildIcs, licenceEnds } from "../core/renewals";
 import { isIsoDate } from "../core/dates";
 import { minimumCompliantCost } from "../core/optimizer";
@@ -88,6 +88,8 @@ export function cheapestBundle(input: z.infer<typeof cheapestBundleInput>) {
     gapRequests: gapRequests(project, input.requiredAssetIds, candidates, options),
     // Best case if every licensor agreed to every ask at its quoted price, and how much each asset could rise before the budget breaks. Not an offer.
     ifLicensorsAgree: negotiationOutlook(project, input.requiredAssetIds, candidates, project.currency ?? "USD", options) ?? null,
+    // Where the cheapest compliant bundle could cost less: a cheaper offer whose licensor would only have to change terms. Not an offer.
+    savingLevers: frontier.plans[0] ? savingLevers(project, input.requiredAssetIds, candidates, frontier.plans[0].offerIds, options) : [],
   };
 }
 

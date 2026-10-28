@@ -130,3 +130,43 @@ export function negotiationOutlook(project: Project, requiredAssetIds: string[],
     headroomCents: project.budgetCents !== undefined ? project.budgetCents - plan.totalCents : undefined,
   };
 }
+
+export interface SavingLever {
+  assetId: string;
+  /** The cheaper offer that fails only on terms its licensor could change. */
+  offerId: string;
+  priceCents: Cents;
+  currency: string;
+  /** The compliant offer in the verified bundle that this would replace, and what it costs. */
+  chosenOfferId: string;
+  chosenPriceCents: Cents;
+  savingCents: Cents;
+  /** What to ask that licensor for. */
+  asks: { rule: RuleId; ask: string }[];
+}
+
+/**
+ * Where a verified bundle could cost less. For each bought asset, the cheapest offer below the chosen one that
+ * fails only on terms its licensor could change: if they agreed at the price they quoted, the saving is the
+ * difference. Each lever is checked by the rules engine on the changed terms. Not an offer: a licensor may say no,
+ * or ask for more, and nothing changes until revised terms are checked.
+ */
+export function savingLevers(project: Project, requiredAssetIds: string[], candidates: LicenseOffer[], chosenOfferIds: string[], options: VerifyOptions = {}): SavingLever[] {
+  const required = new Set(requiredAssetIds);
+  const out: SavingLever[] = [];
+  for (const chosen of candidates.filter((o) => chosenOfferIds.includes(o.id) && required.has(o.assetId))) {
+    const options_ = candidates
+      .filter((o) => o.assetId === chosen.assetId && o.currency === chosen.currency && o.priceCents < chosen.priceCents)
+      .flatMap((offer) => {
+        const failing = evaluateOffer(project, offer, options).filter((r) => r.status === "fail").map((r) => r.rule);
+        if (!failing.length || !failing.every((r) => CONCEDABLE.includes(r))) return [];
+        if (evaluateOffer(project, concede(project, offer, failing, options), options).some((r) => r.status === "fail")) return [];
+        const asks = gapRequests(project, [offer.assetId], [offer], options)[0]?.asks ?? [];
+        return asks.length ? [{ offer, asks }] : [];
+      })
+      .sort((a, b) => a.offer.priceCents - b.offer.priceCents || a.asks.length - b.asks.length || (a.offer.id < b.offer.id ? -1 : 1));
+    const best = options_[0];
+    if (best) out.push({ assetId: chosen.assetId, offerId: best.offer.id, priceCents: best.offer.priceCents, currency: chosen.currency, chosenOfferId: chosen.id, chosenPriceCents: chosen.priceCents, savingCents: chosen.priceCents - best.offer.priceCents, asks: best.asks });
+  }
+  return out.sort((a, b) => b.savingCents - a.savingCents || (a.assetId < b.assetId ? -1 : 1));
+}

@@ -1,5 +1,6 @@
 "use client";
 
+import { savingLevers } from "@/src/core/negotiation";
 import { ArrowDown, BadgeCheck, CircleX, ExternalLink, FastForward, FileBadge, LayoutGrid, RefreshCw, Scale, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -15,6 +16,7 @@ import { AgentTimeline } from "./AgentTimeline";
 import { ApprovalPanel } from "./ApprovalPanel";
 import { AskPanel } from "./AskPanel";
 import { ComplianceSummary } from "./ComplianceSummary";
+import { SavingLevers } from "./SavingLevers";
 import { WhatIf } from "./WhatIf";
 import { EvidenceViewer } from "./EvidenceViewer";
 import { FailurePanel } from "./FailurePanel";
@@ -104,6 +106,10 @@ function Theatre({ view, accept, refresh }: { view: SessionView; accept: (v: Ses
   const replay = useReplay(view.events, { autoplay, reducedMotion });
   const catalog = useMemo(() => buildCatalog(view.documents, view.candidates), [view.documents, view.candidates]);
   const requiredAssetIds = useMemo(() => view.analysis?.assets.map((a) => a.assetId) ?? [...new Set(view.documents.map((d) => d.assetId))], [view.analysis, view.documents]);
+  const levers = useMemo(
+    () => (view.bundle && view.analysis ? savingLevers(view.project, requiredAssetIds, view.candidates, view.bundle.offers.map((o) => o.id), { today: view.runDate }) : []),
+    [view.bundle, view.analysis, view.project, view.candidates, view.runDate, requiredAssetIds],
+  );
   const nonCompliant = useMemo(() => new Set(view.analysis?.evaluations.filter((e) => !e.compliant).map((e) => e.offerId) ?? []), [view.analysis]);
   const state = useMemo(
     () => deriveRunState({ events: view.events, cursor: replay.cursor, documents: view.documents, offers: view.candidates, requiredAssetIds, livePhase: view.phase, nonCompliant }),
@@ -324,6 +330,17 @@ function Theatre({ view, accept, refresh }: { view: SessionView; accept: (v: Ses
               <span className="small muted">Every figure is a price from an uploaded licence</span>
             </div>
             <ComplianceSummary analysis={view.analysis} catalog={catalog} currency={currency} verified={Boolean(view.bundle)} project={view.project} />
+          </section>
+        )}
+        {levers.length > 0 && (
+          <section className="card" aria-labelledby="levers-title">
+            <div className="card-head">
+              <h2 id="levers-title" className="card-title">
+                Where you could pay less
+              </h2>
+              <span className="small muted">Ask first; nothing changes until the revised licence is checked</span>
+            </div>
+            <SavingLevers levers={levers} project={view.project} catalog={catalog} />
           </section>
         )}
         {!live && view.candidates.length > 0 && view.analysis && (

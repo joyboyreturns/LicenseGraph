@@ -19,7 +19,7 @@ export function createLicenseGraphServer(app: AppClient): McpServer {
 
   server.registerTool(
     "cheapest_compliant_bundle",
-    { description: "From a set of licence offers, find the exact minimum cost of a bundle that satisfies the project, what each requirement adds to that cost, and, where an asset has no compliant offer, the nearest offer, what to ask the licensor to change, and (ifLicensorsAgree) the best-case total and per-asset price ceiling if every licensor agreed at its quoted price.", inputSchema: cheapestBundleInput.shape },
+    { description: "From a set of licence offers, find the exact minimum cost of a bundle that satisfies the project, what each requirement adds to that cost, and, where an asset has no compliant offer, the nearest offer, what to ask the licensor to change, and (ifLicensorsAgree) the best-case total and per-asset price ceiling if every licensor agreed at its quoted price. Also savingLevers: where the cheapest compliant bundle could cost less if a licensor changed terms, with what to ask and the exact saving.", inputSchema: cheapestBundleInput.shape },
     async (input) => text(cheapestBundle(input)),
   );
 
