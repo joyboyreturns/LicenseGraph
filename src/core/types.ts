@@ -49,6 +49,8 @@ export interface Project {
   /** How long the project needs the assets for. */
   termMonths: number;
   budgetCents?: Cents;
+  /** Budget/settlement currency. A budget without this field is USD, as in the brief editor. */
+  currency?: string;
   /** Constraints below are checked only when declared; the offer must then state that it meets them. */
   mediums?: string[];
   /** False when the project cannot credit creators. */
@@ -64,6 +66,8 @@ export interface Bundle {
 }
 
 export type RuleId =
+  | "amount"
+  | "requirements"
   | "coverage"
   | "duplicate-asset"
   | "commercial-use"

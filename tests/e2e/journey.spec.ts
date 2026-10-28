@@ -13,6 +13,8 @@ test("a scenario goes from licences to a verified, paid and independently checka
   await expect(page.locator('button[data-state="rejected"]').first()).toBeVisible();
   await expect(page.locator('button[data-state="chosen"]')).toHaveCount(3);
   await expect(page.getByText("Rules engine (code, not AI)").first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Independent cost check" })).toBeVisible();
+  await expect(page.getByText(/Optimality checked independently/)).toBeVisible();
 
   // Trying to complete the payment before the buyer approves gives a clear message, not a crash.
   await approveAndCreateOrder(page);

@@ -6,6 +6,8 @@ import { sampleDocuments, sampleProject, sampleRequiredAssets } from "../src/dem
 import { issuePassport } from "../src/passport/issue";
 import { PassportError, verifyPassport, type Passport } from "../src/passport/passport";
 import { checkSignature, signPassport } from "../src/server/passport-signing";
+import { bundleCanonical, sha256Hex } from "../src/core/digest";
+import { eventCanonical, GENESIS_HASH } from "../src/ledger/chain";
 
 const payments = {
   createOrder: vi.fn().mockResolvedValue({ id: "ORD1", status: "PAYER_ACTION_REQUIRED", approveUrl: "https://www.sandbox.paypal.com/checkoutnow?token=ORD1" }),
@@ -56,6 +58,21 @@ describe("issuePassport", () => {
 });
 
 describe("verifyPassport", () => {
+  it("still verifies historical downloaded passports with the original digest format", async () => {
+    const p = clone(issuePassport(await paidSession()));
+    p.bundle.digestVersion = undefined;
+    p.bundle.digest = await sha256Hex(bundleCanonical(p.bundle.offers, 1));
+    p.approval.bundleDigest = p.bundle.digest;
+    let previous = GENESIS_HASH;
+    for (const event of p.ledger.events) {
+      if (event.kind === "approved") event.payload.bundleDigest = p.bundle.digest;
+      event.prevHash = previous;
+      event.hash = await sha256Hex(eventCanonical(event));
+      previous = event.hash;
+    }
+    p.ledger.head = previous;
+    expect((await verifyPassport(p)).ok).toBe(true);
+  });
   it("passes an untouched passport on every check", async () => {
     const result = await verifyPassport(issuePassport(await paidSession()));
     expect(result.checks.map((c) => c.id)).toEqual(["ledger-chain", "bundle-digest", "approval-recorded", "terms-in-ledger", "evidence", "rules", "payment", "payouts"]);
@@ -73,10 +90,10 @@ describe("verifyPassport", () => {
     expect(await failing(p)).toEqual(expect.arrayContaining(["bundle-digest", "terms-in-ledger", "payment"]));
   });
 
-  it("catches changed terms, even ones the digest does not cover", async () => {
+  it("catches changed terms in both the digest and ledger", async () => {
     const p = clone(issuePassport(await paidSession()));
     p.bundle.offers[0]!.terms.territories = ["US"];
-    expect(await failing(p)).toContain("terms-in-ledger");
+    expect(await failing(p)).toEqual(expect.arrayContaining(["bundle-digest", "terms-in-ledger"]));
   });
 
   it("catches an edited ledger event", async () => {
@@ -98,6 +115,24 @@ describe("verifyPassport", () => {
     const q = clone(issuePassport(await paidSession()));
     q.paypal.amount.value = "1.00";
     expect(await failing(q)).toContain("payment");
+  });
+
+  it("catches a different payment currency or order id", async () => {
+    for (const change of [
+      (p: Passport) => { p.paypal.amount.currency = "EUR"; },
+      (p: Passport) => { p.paypal.orderId = "OTHER"; },
+    ]) {
+      const p = clone(issuePassport(await paidSession()));
+      change(p);
+      expect(await failing(p)).toContain("payment");
+    }
+  });
+
+  it("catches redistributed creator payments even if the total is unchanged", async () => {
+    const p = clone(issuePassport(await paidSession()));
+    p.payouts!.lines[0]!.amountCents += 100;
+    p.payouts!.lines[1]!.amountCents -= 100;
+    expect(await failing(p)).toContain("payouts");
   });
 
   it("catches a bundle that would not pass the rules, by re-running them", async () => {
@@ -122,6 +157,21 @@ describe("verifyPassport", () => {
 });
 
 describe("passport signing", () => {
+  it("authenticates every passport field, including source documents and project requirements", async () => {
+    const signed = signPassport(issuePassport(await paidSession()), "secret");
+    for (const change of [
+      (p: Passport) => { p.project.name = "Other project"; },
+      (p: Passport) => { p.project.commercial = false; },
+      (p: Passport) => { p.documents[0]!.text += " Extra terms"; },
+      (p: Passport) => { p.paypal.environment = "simulator"; },
+      (p: Passport) => { p.payouts!.lines[0]!.licensor = "Other creator"; },
+      (p: Passport) => { p.comparison.naiveTotalCents = 0; },
+    ]) {
+      const copy = clone(signed);
+      change(copy);
+      expect(checkSignature(copy, "secret")).toBe("invalid");
+    }
+  });
   it("signs with a secret and recognises its own signature", async () => {
     const signed = signPassport(issuePassport(await paidSession()), "s3cret");
     expect(signed.signature).toMatchObject({ algorithm: "HMAC-SHA256" });

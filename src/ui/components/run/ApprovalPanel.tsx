@@ -89,7 +89,7 @@ export function ApprovalPanel({ view, catalog, onApprove, busy, onSelectOffer }:
         </span>
         <div>
           <h2 className={styles.h2}>Approve the verified bundle</h2>
-          <p className={styles.lead}>The agent proposed it and the rules engine verified it. Nothing is bought until a person signs off.</p>
+          <p className={styles.lead}>The agent proposed it and the rules engine verified it. Review the quoted source terms before signing off: quote checks confirm the text exists, not that the model interpreted it correctly.</p>
         </div>
       </div>
       <BundleTable view={view} catalog={catalog} onSelectOffer={onSelectOffer} />

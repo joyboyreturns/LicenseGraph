@@ -1,4 +1,5 @@
 import type { Cents } from "../core/types";
+import { supportsCentCurrency } from "../core/money";
 
 export interface PayPalConfig {
   clientId: string;
@@ -37,9 +38,19 @@ export interface PayoutStatus {
 
 const SANDBOX_HOST = "api-m.sandbox.paypal.com";
 
+class PayPalRequestError extends Error {
+  constructor(path: string, readonly status: number, readonly body: any) {
+    const codes = [body?.name, ...(Array.isArray(body?.details) ? body.details.map((d: any) => d?.issue) : [])]
+      .filter((code): code is string => typeof code === "string" && /^[A-Z0-9_]+$/.test(code));
+    // The raw response is retained privately for duplicate recovery. Messages may be public
+    // ledger entries, so never include echoed recipients, request values or provider prose.
+    super(`PayPal ${path} failed: ${status} ${codes.join(", ")}`.trim());
+  }
+}
+
 /** 1234 -> "12.34". Integer maths only; PayPal wants a decimal string. */
 export function centsToValue(cents: Cents): string {
-  if (!Number.isInteger(cents) || cents <= 0) throw new Error(`Invalid amount in cents: ${cents}`);
+  if (!Number.isSafeInteger(cents) || cents <= 0) throw new Error(`Invalid amount in cents: ${cents}`);
   return `${Math.floor(cents / 100)}.${String(cents % 100).padStart(2, "0")}`;
 }
 
@@ -51,7 +62,8 @@ export function configFromEnv(env: Record<string, string | undefined> = process.
 
 export function createPayPalClient(config: PayPalConfig) {
   // Sandbox only: there is deliberately no live path.
-  if (new URL(config.baseUrl).host !== SANDBOX_HOST) {
+  const base = new URL(config.baseUrl);
+  if (base.origin !== `https://${SANDBOX_HOST}` || base.username || base.password || base.pathname !== "/" || base.search || base.hash) {
     throw new Error(`Refusing non-Sandbox PayPal host: ${config.baseUrl}`);
   }
   const doFetch = config.fetch ?? fetch;
@@ -60,7 +72,7 @@ export function createPayPalClient(config: PayPalConfig) {
   async function accessToken(): Promise<string> {
     if (token && Date.now() < token.expiresAt) return token.value;
     const basic = Buffer.from(`${config.clientId}:${config.clientSecret}`).toString("base64");
-    const res = await doFetch(`${config.baseUrl}/v1/oauth2/token`, {
+    const res = await doFetch(`${base.origin}/v1/oauth2/token`, {
       method: "POST",
       headers: { Authorization: `Basic ${basic}`, "Content-Type": "application/x-www-form-urlencoded" },
       body: "grant_type=client_credentials",
@@ -72,7 +84,7 @@ export function createPayPalClient(config: PayPalConfig) {
   }
 
   async function request(method: "GET" | "POST", path: string, requestId?: string, body?: unknown): Promise<any> {
-    const res = await doFetch(`${config.baseUrl}${path}`, {
+    const res = await doFetch(`${base.origin}${path}`, {
       method,
       headers: {
         Authorization: `Bearer ${await accessToken()}`,
@@ -83,7 +95,7 @@ export function createPayPalClient(config: PayPalConfig) {
       body: body === undefined ? undefined : JSON.stringify(body),
     });
     const json = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(`PayPal ${path} failed: ${res.status} ${JSON.stringify(json)}`);
+    if (!res.ok) throw new PayPalRequestError(path, res.status, json);
     return json;
   }
   const call = (path: string, requestId: string, body?: unknown) => request("POST", path, requestId, body);
@@ -98,6 +110,7 @@ export function createPayPalClient(config: PayPalConfig) {
       returnUrl?: string;
       cancelUrl?: string;
     }): Promise<CreatedOrder> {
+      if (!supportsCentCurrency(input.currency)) throw new Error("Unsupported currency for settlement in cents");
       const json = await call("/v2/checkout/orders", input.requestId, {
         intent: "CAPTURE",
         purchase_units: [
@@ -124,16 +137,34 @@ export function createPayPalClient(config: PayPalConfig) {
 
     /** Pay several recipients in one batch. `batchId` doubles as the idempotency key. */
     async createPayout(input: { batchId: string; subject: string; items: PayoutItemInput[] }): Promise<{ batchId: string; status: string }> {
-      const json = await call("/v1/payments/payouts", input.batchId, {
-        sender_batch_header: { sender_batch_id: input.batchId, email_subject: input.subject },
-        items: input.items.map((i) => ({
-          recipient_type: "EMAIL",
-          receiver: i.receiver,
-          amount: { value: centsToValue(i.amountCents), currency: i.currency },
-          note: i.note,
-          sender_item_id: i.itemId,
-        })),
-      });
+      if (input.items.some((i) => !supportsCentCurrency(i.currency))) throw new Error("Unsupported payout currency for settlement in cents");
+      let json;
+      try {
+        json = await call("/v1/payments/payouts", input.batchId, {
+          sender_batch_header: { sender_batch_id: input.batchId, email_subject: input.subject },
+          items: input.items.map((i) => ({
+            recipient_type: "EMAIL",
+            receiver: i.receiver,
+            amount: { value: centsToValue(i.amountCents), currency: i.currency },
+            note: i.note,
+            sender_item_id: i.itemId,
+          })),
+        });
+      } catch (error) {
+        if (!(error instanceof PayPalRequestError) || !JSON.stringify(error.body).includes("BATCH_ID_ALREADY_EXISTS")) throw error;
+        const links = [...(error.body.links ?? []), ...(error.body.details ?? []).flatMap((d: any) => d.links ?? [])];
+        // PayPal supplies the original batch on duplicate submissions. Restrict the recovery
+        // link to the Sandbox batch endpoint before sending a bearer token to it.
+        const original = links.find((l: any) => {
+          try {
+            const url = new URL(l.href);
+            return url.origin === base.origin && !url.username && !url.password && /^\/v1\/payments\/payouts\/[A-Za-z0-9-]+$/.test(url.pathname) && !url.search && !url.hash;
+          } catch { return false; }
+        });
+        if (!original) throw error;
+        json = await request("GET", new URL(original.href).pathname);
+        if (json.batch_header?.sender_batch_header?.sender_batch_id !== input.batchId) throw new Error("Recovered payout does not match the original sender batch id");
+      }
       return { batchId: json.batch_header.payout_batch_id, status: json.batch_header.batch_status };
     },
 
@@ -150,7 +181,8 @@ export function createPayPalClient(config: PayPalConfig) {
       const json = await call(`/v2/checkout/orders/${encodeURIComponent(orderId)}/capture`, requestId);
       const capture = json.purchase_units?.[0]?.payments?.captures?.[0];
       if (!capture) throw new Error(`PayPal capture returned no capture (status ${json.status})`);
-      return { id: json.id, status: json.status, captureId: capture.id, amount: { currency: capture.amount.currency_code, value: capture.amount.value } };
+      if (json.status !== "COMPLETED" || capture.status !== "COMPLETED") throw new Error("PayPal capture is not completed; no fulfilment is allowed yet");
+      return { id: json.id, status: capture.status, captureId: capture.id, amount: { currency: capture.amount.currency_code, value: capture.amount.value } };
     },
   };
 }

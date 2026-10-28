@@ -35,6 +35,26 @@ export function ComplianceSummary({ analysis, catalog, currency, verified }: { a
         </div>
       </div>
 
+      {analysis.optimization && (
+        <div className={styles.blocked}>
+          <h3 className={styles.h3}>Independent cost check</h3>
+          <p className={styles.note}>Code checks the cheapest compliant choice for each asset in each currency, covering {analysis.optimization.candidateCombinations} possible bundles from the uploaded offers. No rights requirement is relaxed.</p>
+          {analysis.optimization.plans.map((plan) => (
+            <p className={styles.reasons} key={plan.currency}>
+              <b>Minimum compliant cost: {formatMoney(plan.totalCents, plan.currency)}.</b>{" "}
+              {plan.budgetShortfallCents > 0
+                ? <>The budget needs {formatMoney(plan.budgetShortfallCents, plan.currency)} more. Approval and payment stay blocked.</>
+                : verified && plan.currency === currency
+                  ? analysis.chosenTotalCents === plan.totalCents
+                    ? <>The agent found the cheapest compliant bundle. Optimality checked independently.</>
+                    : <>A compliant alternative costs {formatMoney(plan.totalCents, plan.currency)}. Review the offer matrix before approving.</>
+                  : <>A compliant bundle exists within the budget; the agent has not secured approval for it.</>}
+            </p>
+          ))}
+          {!analysis.optimization.plans.length && <p className={styles.reasons}>{analysis.optimization.uncoveredAssets.length ? <>No compliant offer for: {analysis.optimization.uncoveredAssets.map(assetLabel).join(", ")}. Add or renegotiate those licences.</> : <>No complete bundle shares one currency. Obtain offers in a common currency.</>}</p>}
+        </div>
+      )}
+
       {blocked.length > 0 && (
         <div className={styles.blocked}>
           <h3 className={styles.h3}>What a price-only buyer would have bought and could not use</h3>

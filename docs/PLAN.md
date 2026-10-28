@@ -24,7 +24,7 @@ Prize targets: Best Overall, Best Use of Agentic Commerce, Best Use of AG Grid. 
 
 ## Step 3: Data models and extraction (29 Oct-31 Oct)
 
-- [x] Fixture licence texts (music, image, font, footage) with known terms and verbatim quotes (`tests/fixtures/licenses.ts`)
+- [x] Fixture licence texts (music, image, font, footage) with known terms and verbatim quotes (`src/demo/fixtures.ts`)
 - [x] `src/extraction/extract.ts`: schema for `LicenseOffer` with per-field evidence; every quote is located in the source text and given offsets, and an invented quote is rejected and retried with the reason
 - [x] `src/extraction/model.ts`: gateway client behind a `ModelClient` interface; mock-model tests, one live run (`npm run test:gateway`)
 - [x] Free-models-only guard: `assertModelIsFree` checks the gateway price list before any request is sent
@@ -65,7 +65,7 @@ Prize targets: Best Overall, Best Use of Agentic Commerce, Best Use of AG Grid. 
 
 - PIVOT submission days. Only fix bugs here.
 - [x] Done early, as a review pass: the in-memory session store is capped (200, never evicting a run in progress) and at most 3 runs can be active at once (HTTP 429 beyond that), so a public deployment cannot grow without bound or exhaust the gateway.
-- Known limits, accepted for the demo: sessions live in memory and are lost on restart; a session link is a bearer link (anyone holding it can approve and pay), which is fine for Sandbox only.
+- Superseded by persistence and browser ownership: runs survive restarts; only the creating browser can approve or pay. Interrupted extraction/proposal runs must be restarted.
 
 ## Step 8: AG Grid dashboard (9-10 Nov)
 
@@ -76,7 +76,7 @@ Prize targets: Best Overall, Best Use of Agentic Commerce, Best Use of AG Grid. 
 - [x] Three plain-parameter tools (`create_chart`, `create_table`, `create_kpi`) with closed field lists and validated arguments (`src/dashboard/widget-tools.ts`); a small free model could not configure Studio's own add-widget tool, so it only chose from these
 - [x] Verified in a browser: one plain-English request produced a rendered chart in about 17 seconds (2 model calls)
 - [ ] Request the AG Studio trial licence key (email info@ag-grid.com) before the public deploy, to remove the watermark
-- [ ] Confirm the exact AG Grid prize requirements on the official page
+- [x] Confirm the exact AG Grid prize requirements on the official page; see `docs/HACKATHON.md`
 - Known limits: assistant-built widgets live in the browser session (reloading restores the starting dashboard); Studio data is a snapshot of the run when the page opens.
 - Done when: the dashboard shows the live ledger.
 
@@ -106,4 +106,4 @@ Prize targets: Best Overall, Best Use of Agentic Commerce, Best Use of AG Grid. 
 
 ## Open questions
 
-- Official rules details that the Devpost overview does not settle: eligibility for India, team size, IP terms, whether one project can win several categories.
+- Official rules and sponsor brief were reviewed on 28 October 2026; see `docs/HACKATHON.md`. Each participant must verify their own eligibility. The FAQ states no maximum team size; the rules limit prize stacking.

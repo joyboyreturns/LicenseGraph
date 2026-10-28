@@ -9,6 +9,10 @@ import { approve, startCheckout, type Approval, type PayPalClient } from "../pay
 import type { SessionRepository } from "./persistence";
 import { applyPayoutStatus, isFinalPayout, planPayouts, toPayoutItems, type PayoutSummary } from "../payments/payouts";
 import type { CapturedOrder, CreatedOrder } from "../payments/paypal";
+import { centsToValue } from "../payments/paypal";
+import { paymentRequestId } from "../payments/request-id";
+import { isIsoDate } from "../core/dates";
+import { minimumCompliantCost } from "../core/optimizer";
 
 export type Phase = "created" | "extracting" | "proposing" | "verified" | "failed" | "approved" | "order_created" | "captured" | "settled";
 
@@ -74,18 +78,34 @@ export function createSession(input: SessionInput, ledger: Ledger = new Ledger()
   if (!project.name.trim()) throw new SessionError("Project needs a name.");
   if (project.territories.length === 0) throw new SessionError("Project needs at least one territory.");
   if (!Number.isInteger(project.termMonths) || project.termMonths <= 0) throw new SessionError("Project term must be a whole number of months.");
+  if (project.budgetCents !== undefined && (!Number.isSafeInteger(project.budgetCents) || project.budgetCents < 0)) throw new SessionError("Budget must be non-negative safe integer cents.");
+  if (project.endDate !== undefined && !isIsoDate(project.endDate)) throw new SessionError("Project end date must be a real calendar date.");
   if (requiredAssetIds.length === 0) throw new SessionError("List at least one required asset.");
+  if (requiredAssetIds.some((id) => !id.trim()) || new Set(requiredAssetIds).size !== requiredAssetIds.length) throw new SessionError("Required asset ids must be non-empty and unique.");
   if (documents.length === 0) throw new SessionError("Add at least one licence document.");
   if (documents.some((d) => !d.text.trim())) throw new SessionError("A licence document is empty.");
   if (new Set(documents.map((d) => d.id)).size !== documents.length) throw new SessionError("Licence document ids must be unique.");
   const uncovered = requiredAssetIds.filter((a) => !documents.some((d) => d.assetId === a));
   if (uncovered.length) throw new SessionError(`No licence document for: ${uncovered.join(", ")}.`);
-  const session: Session = { id: randomUUID(), createdAt: new Date().toISOString(), input, ledger, phase: "created", candidates: [] };
+  const session: Session = { id: randomUUID(), createdAt: new Date().toISOString(), input: structuredClone(input), ledger, phase: "created", candidates: [] };
   ledger.onAppend = () => session.onChange?.();
   return session;
 }
 
 const touch = (s: Session) => s.onChange?.();
+
+// Join duplicate requests while an external operation is pending. A rejected request releases
+// the lock so the owner can retry with the same durable PayPal idempotency key.
+function singleFlight<T>(pending: WeakMap<Session, Promise<T>>, session: Session, work: () => Promise<T>): Promise<T> {
+  const existing = pending.get(session);
+  if (existing) return existing;
+  const result = Promise.resolve().then(work).finally(() => pending.delete(session));
+  pending.set(session, result);
+  return result;
+}
+const ordersInFlight = new WeakMap<Session, Promise<CreatedOrder>>();
+const capturesInFlight = new WeakMap<Session, Promise<CapturedOrder>>();
+const payoutsInFlight = new WeakMap<Session, Promise<PayoutSummary | undefined>>();
 
 /** Extract terms from every document, then run the propose-verify-revise loop. Runs once per session. */
 export async function runPipeline(session: Session, deps: Deps): Promise<void> {
@@ -121,16 +141,18 @@ export async function runPipeline(session: Session, deps: Deps): Promise<void> {
     candidates: session.candidates,
     proposer: deps.proposer,
     ledger: session.ledger,
-    verifyOptions: { today: today(deps) },
+    verifyOptions: { today: session.runDate },
   });
 
   if (session.loop.status === "verified") {
     session.phase = "verified";
   } else {
     session.phase = "failed";
-    session.failure =
-      session.loop.status === "stalled"
-        ? "No licence bundle in the uploaded documents satisfies the project's constraints."
+    const frontier = minimumCompliantCost(session.input.project, session.input.requiredAssetIds, session.candidates, { today: session.runDate });
+    session.failure = frontier.plans.some((p) => p.budgetShortfallCents === 0)
+      ? "The agent stopped before selecting an available compliant bundle. See the independent cost check for the available choices."
+      : session.loop.status === "stalled"
+        ? "No licence bundle in the uploaded documents satisfies the project's constraints. See the independent cost check for missing rights or a budget shortfall."
         : "The agent ran out of attempts before finding a compliant bundle.";
   }
   touch(session);
@@ -148,7 +170,11 @@ export function approveSession(session: Session, approvedBy: string): Approval {
 }
 
 /** Creates the PayPal Sandbox order through the gate, which re-verifies and checks the approval. */
-export async function startPayment(session: Session, deps: Deps): Promise<CreatedOrder> {
+export function startPayment(session: Session, deps: Deps): Promise<CreatedOrder> {
+  return singleFlight(ordersInFlight, session, () => startPaymentOnce(session, deps));
+}
+
+async function startPaymentOnce(session: Session, deps: Deps): Promise<CreatedOrder> {
   if (!deps.payments) throw new SessionError("PayPal is not configured. Set PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET.");
   if (session.phase !== "approved" || !session.loop?.bundle) throw new SessionError("Approve the verified bundle before paying.");
   const order = await startCheckout(deps.payments, {
@@ -173,10 +199,19 @@ export async function startPayment(session: Session, deps: Deps): Promise<Create
  * Captures the payment once the buyer has approved the order at PayPal, then pays the creators.
  * A payout problem never undoes the capture: it is recorded and can be retried.
  */
-export async function completePayment(session: Session, deps: Deps): Promise<CapturedOrder> {
+export function completePayment(session: Session, deps: Deps): Promise<CapturedOrder> {
+  return singleFlight(capturesInFlight, session, () => completePaymentOnce(session, deps));
+}
+
+async function completePaymentOnce(session: Session, deps: Deps): Promise<CapturedOrder> {
   if (!deps.payments) throw new SessionError("PayPal is not configured.");
   if (session.phase !== "order_created" || !session.order) throw new SessionError("No PayPal order is waiting to be captured.");
-  const captured = await deps.payments.captureOrder(session.order.id, `lg-capture-${session.id}`);
+  const captured = await deps.payments.captureOrder(session.order.id, paymentRequestId("capture", session.id));
+  const bundle = session.loop?.bundle;
+  const total = bundle?.offers.reduce((n, o) => n + o.priceCents, 0);
+  if (!bundle || total === undefined || captured.id !== session.order.id || captured.status !== "COMPLETED" || !captured.captureId || captured.amount.currency !== bundle.offers[0]?.currency || captured.amount.value !== centsToValue(total)) {
+    throw new SessionError("Payment is not a completed capture for the approved order, currency and amount. No creator payouts were sent.");
+  }
   session.capture = captured;
   session.phase = "captured";
   touch(session);
@@ -186,27 +221,40 @@ export async function completePayment(session: Session, deps: Deps): Promise<Cap
 }
 
 /** Pay each licensor the price of their licence in one PayPal Payouts batch. Safe to call again after a failure. */
-export async function settleCreators(session: Session, deps: Deps): Promise<PayoutSummary | undefined> {
+export function settleCreators(session: Session, deps: Deps): Promise<PayoutSummary | undefined> {
+  return singleFlight(payoutsInFlight, session, () => settleCreatorsOnce(session, deps));
+}
+
+async function settleCreatorsOnce(session: Session, deps: Deps): Promise<PayoutSummary | undefined> {
   const bundle = session.loop?.bundle;
   if (!deps.payments?.createPayout || !bundle || !session.capture) return undefined;
   if (session.payouts && session.payouts.status !== "FAILED") return session.payouts;
+  const previous = session.payouts;
 
   const plan = planPayouts(bundle.offers, session.input.documents, deps.payeeOverrides);
-  if (plan.lines.length === 0) return undefined;
 
-  const batchId = `lg-payout-${session.id}${session.payouts ? `-retry${Date.now().toString(36)}` : ""}`;
-  const currency = plan.lines[0]!.currency;
+  // A timeout can mean PayPal accepted the batch but the response was lost. Never change this
+  // key on retry: a new key could pay every creator a second time, including after a restart.
+  const batchId = paymentRequestId("payout", session.id);
+  const currency = bundle.offers[0]!.currency;
   const totalCents = plan.lines.reduce((n, l) => n + l.amountCents, 0);
-  const base = { batchId, totalCents, currency, createdAt: new Date().toISOString() };
+  const base = { batchId, totalCents, currency, createdAt: session.payouts?.createdAt ?? new Date().toISOString() };
   try {
-    const created = await deps.payments.createPayout({ batchId, subject: "Licence payment via LicenseGraph", items: toPayoutItems(plan.lines, (l) => `Licence for ${l.assetId} (${session.input.project.name})`) });
-    session.payouts = { ...base, batchId: created.batchId, status: created.status, lines: plan.lines.map((l) => ({ ...l, status: "PENDING" })) };
-    session.phase = "settled";
+    if (plan.unpaid.length) throw new SessionError(`No payout recipient for: ${plan.unpaid.map((l) => l.assetId).join(", ")}. No payouts were sent.`);
+    if (Date.now() - Date.parse(base.createdAt) > 29 * 24 * 60 * 60 * 1000) throw new SessionError("Payout retry window expired. Reconcile the original batch with PayPal before sending any further payment.");
+    const payload = toPayoutItems(plan.lines, (l) => `Licence for ${l.assetId} (${session.input.project.name})`);
+    if (session.payouts && JSON.stringify(payload) !== JSON.stringify(toPayoutItems(session.payouts.lines, (l) => `Licence for ${l.assetId} (${session.input.project.name})`))) throw new SessionError("Payout recipients or amounts changed. Reconcile the original batch before retrying.");
+    // Save the ambiguous state before I/O. A restart after PayPal accepts the request must
+    // still offer a retry of this same key rather than forget the attempt ever happened.
+    session.payouts = { ...base, status: "FAILED", lines: plan.lines.map((l) => ({ ...l, status: "PENDING" })), error: "Payout submission awaiting confirmation. Retry to reconcile the original batch." };
+    touch(session);
+    const created = await deps.payments.createPayout({ batchId, subject: "Licence payment via LicenseGraph", items: payload });
+    session.payouts = { ...base, batchId: created.batchId, status: created.status === "SUCCESS" ? "PROCESSING" : created.status, lines: plan.lines.map((l) => ({ ...l, status: "PENDING" })) };
     touch(session);
     session.ledger.append("payout_created", { batchId: created.batchId, status: created.status, totalCents, currency, lines: plan.lines.map((l) => ({ assetId: l.assetId, licensor: l.licensorName, amountCents: l.amountCents })) });
   } catch (e) {
     const error = e instanceof Error ? e.message : "Payout failed";
-    session.payouts = { ...base, status: "FAILED", lines: plan.lines.map((l) => ({ ...l, status: "FAILED" })), error };
+    session.payouts = { ...(previous ?? { ...base, lines: plan.lines.map((l) => ({ ...l, status: "FAILED" })) }), status: "FAILED", error };
     touch(session);
     session.ledger.append("payout_failed", { error: error.slice(0, 300) });
   }
@@ -221,6 +269,7 @@ export async function refreshPayouts(session: Session, deps: Deps, now: () => nu
   session.payoutsCheckedAt = now();
   try {
     session.payouts = applyPayoutStatus(payouts, await deps.payments.getPayout(payouts.batchId));
+    if (session.payouts.status === "SUCCESS") session.phase = "settled";
     touch(session);
     if (isFinalPayout(session.payouts.status)) session.ledger.append("payout_settled", { batchId: payouts.batchId, status: session.payouts.status, lines: session.payouts.lines.map((l) => ({ assetId: l.assetId, status: l.status })) });
   } catch {

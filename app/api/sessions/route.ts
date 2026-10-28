@@ -3,6 +3,9 @@ import { scenarioById } from "@/src/demo/scenarios";
 import { fail, json } from "@/src/server/http";
 import { ownerCookie, ownerFor, readOwner } from "@/src/server/owner";
 import { getRuntime } from "@/src/server/runtime";
+import { z } from "zod";
+import { isIsoDate } from "@/src/core/dates";
+import { supportsCentCurrency } from "@/src/core/money";
 
 export const dynamic = "force-dynamic";
 
@@ -11,38 +14,37 @@ const MAX_TEXT = 20_000;
 /** Each live run makes several model requests; cap concurrency so one visitor cannot exhaust the gateway. */
 const MAX_ACTIVE_RUNS = 3;
 const EMAIL = /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/;
+const textId = z.string().trim().min(1).max(55);
+const inputSchema = z.object({
+  project: z.object({
+    name: z.string().trim().min(1).max(120),
+    commercial: z.boolean(),
+    territories: z.array(z.string().trim().toUpperCase().regex(/^(WORLD|[A-Z]{2})$/)).min(1).max(250),
+    termMonths: z.number().int().safe().positive().max(1200),
+    budgetCents: z.number().int().safe().nonnegative().optional(),
+    currency: z.string().refine(supportsCentCurrency, "Unsupported settlement currency").optional(),
+    mediums: z.array(z.string().trim().toLowerCase().min(1).max(40)).max(20).optional(),
+    canCredit: z.boolean().optional(),
+    needsSublicensing: z.boolean().optional(),
+    requiresExclusive: z.boolean().optional(),
+    endDate: z.string().refine(isIsoDate, "Expected a real calendar date").optional(),
+  }),
+  requiredAssetIds: z.array(textId).min(1).max(MAX_DOCS),
+  documents: z.array(z.object({
+    id: textId, assetId: textId,
+    text: z.string().min(1).max(MAX_TEXT),
+    licensor: z.object({ name: z.string().trim().min(1).max(80), email: z.string().max(127).regex(EMAIL) }).optional(),
+  })).min(1).max(MAX_DOCS),
+  brief: z.string().max(2000).optional(),
+});
 
 type Body = { scenarioId?: unknown; brief?: unknown } & Partial<SessionInput>;
 
 function parse(body: Body | null): SessionInput {
-  if (!body || typeof body !== "object" || !body.project || !Array.isArray(body.requiredAssetIds) || !Array.isArray(body.documents)) {
-    throw new SessionError("Send a project, requiredAssetIds and documents.");
-  }
-  if (body.documents.length > MAX_DOCS) throw new SessionError(`At most ${MAX_DOCS} documents.`);
-  if (body.documents.some((d) => typeof d?.text !== "string" || d.text.length > MAX_TEXT)) throw new SessionError(`Each document must be text of at most ${MAX_TEXT} characters.`);
-  const p = body.project;
-  return {
-    project: {
-      name: String(p.name ?? "").slice(0, 120),
-      commercial: Boolean(p.commercial),
-      territories: (p.territories ?? []).map(String),
-      termMonths: Number(p.termMonths),
-      budgetCents: p.budgetCents == null ? undefined : Number(p.budgetCents),
-      mediums: p.mediums?.length ? p.mediums.map(String) : undefined,
-      canCredit: p.canCredit === false ? false : undefined,
-      needsSublicensing: p.needsSublicensing ? true : undefined,
-      requiresExclusive: p.requiresExclusive ? true : undefined,
-      endDate: p.endDate ? String(p.endDate) : undefined,
-    },
-    requiredAssetIds: body.requiredAssetIds.map(String),
-    documents: body.documents.map((d) => ({
-      id: String(d.id),
-      assetId: String(d.assetId),
-      text: d.text,
-      licensor: d.licensor && typeof d.licensor.name === "string" && EMAIL.test(String(d.licensor.email)) ? { name: d.licensor.name.slice(0, 80), email: String(d.licensor.email) } : undefined,
-    })),
-    meta: { brief: typeof body.brief === "string" ? body.brief.slice(0, 2000) : undefined },
-  };
+  const parsed = inputSchema.safeParse(body);
+  if (!parsed.success) throw new SessionError(`Invalid run input: ${parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}`);
+  const { project, requiredAssetIds, documents, brief } = parsed.data;
+  return { project, requiredAssetIds, documents, meta: { brief } };
 }
 
 export async function POST(req: Request) {

@@ -5,6 +5,8 @@ import { demoModel } from "../src/demo/mock-model";
 import { sampleDocuments, sampleProject, sampleRequiredAssets } from "../src/demo/sample";
 import { applyPayoutStatus, planPayouts } from "../src/payments/payouts";
 import { createPayPalClient } from "../src/payments/paypal";
+import { paymentRequestId } from "../src/payments/request-id";
+import { deserializeSession, serializeSession } from "../src/app-logic/persistence";
 
 const created = { id: "ORD1", status: "PAYER_ACTION_REQUIRED", approveUrl: "https://www.sandbox.paypal.com/checkoutnow?token=ORD1" };
 const captured = { id: "ORD1", status: "COMPLETED", captureId: "CAP1", amount: { currency: "USD", value: "329.00" } };
@@ -64,10 +66,10 @@ describe("settling creators after capture", () => {
     const { deps, payments } = makeDeps();
     const s = await paid(deps);
 
-    expect(s.phase).toBe("settled");
+    expect(s.phase).toBe("captured");
     expect(payments.createPayout).toHaveBeenCalledTimes(1);
     const call = payments.createPayout.mock.calls[0]![0];
-    expect(call.batchId).toBe(`lg-payout-${s.id}`);
+    expect(call.batchId).toBe(paymentRequestId("payout", s.id));
     expect(call.items.map((i: { itemId: string; amountCents: number }) => [i.itemId, i.amountCents])).toEqual([["offer-song", 20_000], ["offer-archive", 8_000], ["offer-font", 4_900]]);
     expect(s.ledger.events().map((e) => e.kind).slice(-3)).toEqual(["order_created", "captured", "payout_created"]);
     expect(s.payouts).toMatchObject({ batchId: "BATCH1", status: "PENDING", totalCents: 32_900 });
@@ -99,10 +101,11 @@ describe("settling creators after capture", () => {
     expect(s.ledger.events().at(-1)!.kind).toBe("payout_failed");
 
     await settleCreators(s, deps);
-    expect(s.phase).toBe("settled");
+    expect(s.phase).toBe("captured");
     expect(s.payouts!.status).toBe("PENDING");
     expect(s.payouts!.batchId).toBe("BATCH1");
     expect(payments.createPayout).toHaveBeenCalledTimes(2);
+    expect(payments.createPayout.mock.calls[0]![0].batchId).toBe(payments.createPayout.mock.calls[1]![0].batchId);
   });
 
   it("does not pay twice", async () => {
@@ -110,6 +113,50 @@ describe("settling creators after capture", () => {
     const s = await paid(deps);
     await settleCreators(s, deps);
     expect(payments.createPayout).toHaveBeenCalledTimes(1);
+  });
+
+  it("joins concurrent payout retries after an ambiguous network failure", async () => {
+    const { deps, payments } = makeDeps();
+    payments.createPayout.mockRejectedValueOnce(new Error("Connection lost after PayPal accepted the batch"));
+    const s = await paid(deps);
+    await Promise.all([settleCreators(s, deps), settleCreators(s, deps), settleCreators(s, deps)]);
+    expect(payments.createPayout).toHaveBeenCalledTimes(2);
+    expect(payments.createPayout.mock.calls[0]![0]).toEqual(payments.createPayout.mock.calls[1]![0]);
+    expect(s.ledger.events().filter((e) => e.kind === "payout_created")).toHaveLength(1);
+  });
+
+  it("preserves the payout identity and original recipients across a restart", async () => {
+    const { deps, payments } = makeDeps();
+    payments.createPayout.mockRejectedValueOnce(new Error("Lost response"));
+    const original = await paid(deps);
+    const restored = deserializeSession(JSON.parse(JSON.stringify(serializeSession(original))));
+    await settleCreators(restored, { ...deps, payeeOverrides: ["changed@example.test"] });
+    expect(payments.createPayout).toHaveBeenCalledTimes(1);
+    expect(restored.payouts!.error).toMatch(/recipients or amounts changed/);
+    await settleCreators(restored, deps);
+    expect(payments.createPayout.mock.calls[1]![0]).toEqual(payments.createPayout.mock.calls[0]![0]);
+  });
+
+  it("reconciles recipient statuses when a duplicate batch is already SUCCESS", async () => {
+    const { deps, payments } = makeDeps();
+    payments.createPayout.mockResolvedValue({ batchId: "BATCH1", status: "SUCCESS" });
+    const s = await paid(deps);
+    expect(s.payouts!.status).toBe("PROCESSING");
+    await refreshPayouts(s, deps, () => 10_000);
+    expect(s.phase).toBe("settled");
+    expect(s.payouts!.lines.every((l) => l.status === "SUCCESS")).toBe(true);
+  });
+
+  it("refuses to send a partial payout plan when a creator has no recipient", async () => {
+    const { deps, payments } = makeDeps();
+    const s = createSession(input());
+    s.input.documents.find((d) => d.id === "font")!.licensor = undefined;
+    await runPipeline(s, deps);
+    approveSession(s, "Kiran");
+    await startPayment(s, deps);
+    await completePayment(s, deps);
+    expect(s.payouts).toMatchObject({ status: "FAILED", error: expect.stringContaining("font") });
+    expect(payments.createPayout).not.toHaveBeenCalled();
   });
 
   it("skips payouts quietly when the client cannot do them", async () => {
@@ -128,6 +175,7 @@ describe("refreshPayouts", () => {
     let t = 10_000;
     await refreshPayouts(s, deps, () => t);
     expect(s.payouts!.status).toBe("SUCCESS");
+    expect(s.phase).toBe("settled");
     expect(s.payouts!.lines.every((l) => l.status === "SUCCESS")).toBe(true);
     expect(s.ledger.events().at(-1)).toMatchObject({ kind: "payout_settled", payload: { status: "SUCCESS" } });
 
@@ -145,10 +193,51 @@ describe("refreshPayouts", () => {
     expect(payments.getPayout).toHaveBeenCalledTimes(1);
     expect(s.payouts!.status).toBe("PENDING");
   });
+
+  it("keeps checking unclaimed items after the batch reports SUCCESS", async () => {
+    const { deps, payments } = makeDeps();
+    const s = await paid(deps);
+    payments.getPayout.mockResolvedValue({ batchId: "BATCH1", status: "SUCCESS", items: s.payouts!.lines.map((l) => ({ itemId: l.offerId, receiver: l.email, status: "UNCLAIMED" })) });
+    await refreshPayouts(s, deps, () => 10_000);
+    expect(s.payouts!.status).toBe("PROCESSING");
+    expect(s.phase).toBe("captured");
+    await refreshPayouts(s, deps, () => 15_000);
+    expect(payments.getPayout).toHaveBeenCalledTimes(2);
+    expect(s.ledger.events().filter((e) => e.kind === "payout_settled")).toHaveLength(0);
+  });
+
+  it("records partial failure without claiming settlement or resending successful payouts", async () => {
+    const { deps, payments } = makeDeps();
+    const s = await paid(deps);
+    payments.getPayout.mockResolvedValue({ batchId: "BATCH1", status: "SUCCESS", items: s.payouts!.lines.map((l, i) => ({ itemId: l.offerId, receiver: l.email, status: i ? "SUCCESS" : "FAILED" })) });
+    await refreshPayouts(s, deps, () => 10_000);
+    expect(s.payouts!.status).toBe("PARTIAL");
+    expect(s.phase).toBe("captured");
+    await settleCreators(s, deps);
+    expect(payments.createPayout).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("createPayPalClient payouts", () => {
   const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
+  it("recovers the original batch after PayPal rejects a duplicate sender batch id", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(json({ access_token: "t", expires_in: 3600 }))
+      .mockResolvedValueOnce(json({ name: "BATCH_ID_ALREADY_EXISTS", links: [{ href: "https://api-m.sandbox.paypal.com/v1/payments/payouts/PB1", rel: "self" }] }, 400))
+      .mockResolvedValueOnce(json({ batch_header: { payout_batch_id: "PB1", batch_status: "SUCCESS", sender_batch_header: { sender_batch_id: "same-key" } } }));
+    const client = createPayPalClient({ clientId: "id", clientSecret: "s", baseUrl: "https://api-m.sandbox.paypal.com", fetch: fetchMock });
+    expect(await client.createPayout({ batchId: "same-key", subject: "s", items: [{ itemId: "i", receiver: "r@x.test", amountCents: 100, currency: "USD", note: "n" }] })).toEqual({ batchId: "PB1", status: "SUCCESS" });
+    expect(fetchMock.mock.calls[2]![1].method).toBe("GET");
+  });
+
+  it("never follows an external duplicate-recovery link with a bearer token", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(json({ access_token: "t", expires_in: 3600 }))
+      .mockResolvedValueOnce(json({ name: "BATCH_ID_ALREADY_EXISTS", links: [{ href: "https://other.example/v1/payments/payouts/PB1" }] }, 400));
+    const client = createPayPalClient({ clientId: "id", clientSecret: "s", baseUrl: "https://api-m.sandbox.paypal.com", fetch: fetchMock });
+    await expect(client.createPayout({ batchId: "same-key", subject: "s", items: [] })).rejects.toThrow(/BATCH_ID_ALREADY_EXISTS/);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
   it("posts a batch with the batch id as the idempotency key and reads status back", async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(json({ access_token: "t", expires_in: 3600 }))

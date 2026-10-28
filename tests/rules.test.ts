@@ -51,6 +51,7 @@ describe("verifyBundle", () => {
     const v = verifyBundle(project, ["song", "font"], {
       offers: [offer({ priceCents: 40_000 }), offer({ id: "o2", assetId: "font", priceCents: 20_000, currency: "EUR" })],
     });
-    expect(v.violations.map((x) => x.rule).sort()).toEqual(["budget", "currency"]);
+    // The EUR line conflicts with the USD budget, and the complete bundle also mixes currencies.
+    expect(v.violations.map((x) => x.rule).sort()).toEqual(["budget", "currency", "currency"]);
   });
 });

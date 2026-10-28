@@ -103,3 +103,9 @@ The visible propose, verify, reject, revise cycle is the product. The model neve
 ## Out of scope
 
 PDF ingestion, multi-currency, licensor onboarding and verified payee accounts, refunds and disputes, authentication beyond the anonymous run owner.
+
+## Audit additions
+
+The independent cost frontier (`src/core/optimizer.ts`) computes minimum compliant cost per currency and rechecks each result with the verifier. It assumes the present rules remain independent between assets; coupled discounts or obligations would require a different optimizer.
+
+Payment operations coalesce concurrent requests within one server process. Payout submissions preserve the original identity and recipient plan across retries and restarts; batch status is reconciled per item before settlement. New approval digests include terms and evidence. Historical downloaded passports retain read-only support for the original digest; legacy unpaid approvals require reapproval, and old partial-field signatures must be reissued for full-content authentication. See `docs/AUDIT.md`.

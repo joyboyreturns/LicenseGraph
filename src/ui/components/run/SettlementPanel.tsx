@@ -54,7 +54,7 @@ export function SettlementPanel({ view, config, busy, actions }: { view: Session
   const payouts = view.payouts;
   const payoutsFailed = payouts?.status === "FAILED";
   const payoutsDone = Boolean(payouts && payouts.status !== "FAILED" && isPayoutFinal(payouts.status));
-  const allPaid = payoutsDone && payouts?.status === "SUCCESS";
+  const allPaid = payoutsDone && payouts?.status === "SUCCESS" && payouts.lines.every((l) => l.status === "SUCCESS") && payouts.totalCents === view.bundle?.totalCents;
   const captured = Boolean(view.capture);
 
   const s1: StepState = view.order ? "done" : phase === "approved" ? "current" : "todo";
@@ -217,6 +217,9 @@ export function SettlementPanel({ view, config, busy, actions }: { view: Session
                     </button>
                   </div>
                 </div>
+              )}
+              {payoutsDone && !allPaid && (
+                <p className="callout tone-warn" role="status">Some creators have not received their payment. Review each line above and reconcile the batch with PayPal. Sending the entire batch again could pay successful recipients twice.</p>
               )}
             </>
           )}

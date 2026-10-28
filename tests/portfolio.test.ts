@@ -29,7 +29,7 @@ describe("buildPortfolioData", () => {
 
     expect(def.sources.map((s) => s.id)).toEqual(["runs", "offers", "violations", "payouts", "events"]);
     const runs = def.sources[0]!.data;
-    expect(runs.map((r) => [r.run, r.status, r.paid, r.rounds])).toEqual([["Harbour documentary promo", "settled", "Paid", 2], ["Neon Drift launch trailer", "verified", "Not paid", 3], ["Signal & Noise podcast network", "settled", "Paid", 2]]);
+    expect(runs.map((r) => [r.run, r.status, r.paid, r.rounds])).toEqual([["Harbour documentary promo", "captured", "Paid", 2], ["Neon Drift launch trailer", "verified", "Not paid", 3], ["Signal & Noise podcast network", "captured", "Paid", 2]]);
     expect(runs[1]).toMatchObject({ verifiedTotal: 2170, priceOnlyTotal: 220, compliancePremium: 1950, blockedLicences: 3, source: "Replayed demo" });
   });
 

@@ -13,6 +13,7 @@ interface RuleText {
 }
 
 const BUNDLE_RULES: Partial<Record<RuleId, RuleText>> = {
+  requirements: { name: "Valid requirements", checks: "Project dates, term and budget are valid before verification." },
   coverage: { name: "Coverage", checks: "Every required asset has exactly one licence in the bundle." },
   "duplicate-asset": { name: "One licence per asset", checks: "The bundle does not buy two licences for the same asset." },
   currency: { name: "Single currency", checks: "Every licence in the bundle is priced in the same currency." },
@@ -20,6 +21,7 @@ const BUNDLE_RULES: Partial<Record<RuleId, RuleText>> = {
 };
 
 const OFFER_RULE_CHECKS: Record<string, string> = {
+  amount: "The price is a positive safe integer in cents and the total can be represented exactly.",
   "commercial-use": "The licence allows commercial use when the project is commercial.",
   territory: "The licence covers every territory the project is released in.",
   term: "The licence lasts at least as long as the project needs it, and does not end on an earlier fixed date.",

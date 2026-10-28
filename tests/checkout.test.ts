@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Bundle, LicenseOffer, Project } from "../src/core/types";
 import { approve, bundleDigest, PaymentRefused, startCheckout } from "../src/payments/checkout";
+import { paymentRequestId } from "../src/payments/request-id";
 
 const project: Project = { name: "Promo film", commercial: true, territories: ["US"], termMonths: 12, budgetCents: 50_000 };
 
@@ -27,7 +28,7 @@ describe("startCheckout", () => {
 
     expect(order).toEqual(created);
     expect(client.createOrder).toHaveBeenCalledWith(
-      expect.objectContaining({ amountCents: 20_000, currency: "USD", requestId: `lg-${bundleDigest(good).slice(0, 32)}` }),
+      expect.objectContaining({ amountCents: 20_000, currency: "USD", requestId: paymentRequestId("order", JSON.stringify([bundleDigest(good), ""])) }),
     );
   });
 
@@ -39,7 +40,7 @@ describe("startCheckout", () => {
     await startCheckout(client, { ...input(good), idempotencyScope: "s2" });
     expect(keys[0]).toBe(keys[1]);
     expect(keys[2]).not.toBe(keys[0]);
-    expect(keys[0]!.length).toBeLessThanOrEqual(108);
+    expect(keys[0]!.length).toBeLessThanOrEqual(38);
   });
 
   it("refuses a bundle that fails verification, even if approved", async () => {
@@ -62,6 +63,18 @@ describe("startCheckout", () => {
     const client = makeClient();
     const approvedOther = approve({ offers: [offer({ priceCents: 1_000 })] }, "owner");
     await expect(startCheckout(client, input(good, approvedOther))).rejects.toThrow(/does not match/);
+    expect(client.createOrder).not.toHaveBeenCalled();
+  });
+
+  it("requires approval again if compliant terms or evidence change after sign-off", async () => {
+    const original = { offers: [offer()] };
+    const approval = approve(original, "owner");
+    const client = makeClient();
+    original.offers[0]!.terms.termMonths = 36;
+    await expect(startCheckout(client, input(original, approval))).rejects.toThrow(/does not match/);
+    original.offers[0]!.terms.termMonths = 24;
+    original.offers[0]!.evidence[0]!.quote += " changed";
+    await expect(startCheckout(client, input(original, approval))).rejects.toThrow(/does not match/);
     expect(client.createOrder).not.toHaveBeenCalled();
   });
 

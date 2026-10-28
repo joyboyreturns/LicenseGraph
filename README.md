@@ -17,7 +17,7 @@ npm install && npm run demo          # then open http://localhost:3000
 
 That needs **no accounts and no API keys**: the three built-in scenarios replay recorded model output, and a clearly labelled payment simulator stands in for PayPal. Press **Run the 60-second demo**, then follow the steps (approve, create the order, approve as the buyer in the simulator, watch the creators get paid, open the passport).
 
-Requires Node.js 20 or newer (22 recommended). The first run builds the app (about a minute).
+Requires Node.js 20.19 or newer (22 recommended). The first run builds the app (about a minute).
 
 ## What you will see
 
@@ -26,7 +26,7 @@ Requires Node.js 20 or newer (22 recommended). The first run builds the app (abo
 | ![](docs/images/run-verified.jpg) | **The loop is visible.** A hand-built rights graph shows licences, the offers the agent read, and the assets you need. The agent proposes (amber); the rules engine (blue, "code, not AI") rejects offers that break a rule and sends the reasons back; the agent revises. Replay it, scrub it, or skip to the result. |
 | ![](docs/images/matrix.jpg) | **Every offer is checked against every rule**, not only the proposed bundle. A licence that is *silent* on something the project requires fails: gaps are never assumed away. |
 | ![](docs/images/evidence.jpg) | **Every term links to the sentence it came from.** Quotes the model invents are rejected by code; the evidence viewer highlights the exact text. |
-| ![](docs/images/settled.jpg) | **Settlement.** The order can only be created for the verified bundle a human approved. After the buyer approves, the payment is captured and each creator is paid. A payout failure never undoes the captured payment, and can be retried. |
+| ![](docs/images/settled.jpg) | **Settlement.** The order can only be created for the verified bundle a human approved. After the buyer approves, the payment is captured and each creator is paid. A submission failure never undoes the captured payment. Retries preserve the original batch id, recipients and amounts; individual failures require reconciliation rather than resending successful payments. |
 | ![](docs/images/passport.jpg) | **The Licence Passport** re-checks itself in your browser: the hash-chained ledger, the rules engine re-run on the exact terms, every quote found at its recorded position, and the PayPal capture and payout records. Print it, share it, or verify a downloaded file at `/verify`. |
 | ![](docs/images/portfolio.jpg) | **Portfolio dashboard** built with [AG Studio](https://www.ag-grid.com/studio/): spend, licences the rules blocked, creators paid, and every offer, violation and ledger event as linked tables. Its AI assistant builds new views from plain English (needs a model). |
 
@@ -38,10 +38,14 @@ On a phone it stays usable:
 
 Anyone who ships creative work (a game trailer, a podcast, a promo film) ends up with licences nobody has time to read: a song that is "worldwide" but only for web, an image that is "editorial only", a sound pack whose sale ended last month. A wrong licence can mean a takedown or a dispute, and the creators who made the work are paid late. In the demo scenarios a price-only buyer would have bought licences they could not legally use (for example a non-commercial image for a commercial promo); LicenseGraph shows exactly which rule blocked each one, and what staying compliant costs. Every number it shows is a price from an uploaded licence.
 
+## Independent cost verification
+
+The run page computes the exact cheapest compliant bundle from the uploaded offers, separately in each currency. It independently checks whether the agent found that minimum and shows the precise budget shortfall when no affordable bundle exists. All rights requirements stay in force. The method uses the current rules' independence between assets; every result is rechecked by the same rules engine, and property tests compare it with exhaustive enumeration.
+
 ## How PayPal is used
 
-- **Orders API (Sandbox):** create order, buyer approval, capture, with idempotent request ids so a retry can never double-charge. Orders are created only through a gate that re-verifies the bundle and requires a human approval for exactly that bundle.
-- **Payouts API (Sandbox):** after capture, each licensor is paid the price of their licence in one batch. Payout status is tracked to completion; a failure is recorded and retryable.
+- **Orders API (Sandbox):** create order, buyer approval, capture, with stable, bounded idempotency keys and coalesced concurrent requests. Orders are created only through a gate that re-verifies the bundle and requires a human approval for exactly that bundle.
+- **Payouts API (Sandbox):** after capture, each licensor is paid the price of their licence in one batch. Payout status is tracked per recipient. A batch is settled only when every creator payment succeeds; uncertain submissions reuse the same batch key when retried.
 - **Agentic commerce:** the AI agent initiates the purchase by proposing the bundle. Deterministic verification and a human approval stand between that proposal and any money moving.
 
 ## How AI is used
@@ -51,7 +55,7 @@ Anyone who ships creative work (a game trailer, a podcast, a promo film) ends up
 - A language model (with an offline fallback) turns a plain-English **brief** into project requirements; every assumption is shown separately from what the text said.
 - **Ask about this run** answers questions only from the run's recorded facts; cited offers are checked by code.
 - The AG Studio **dashboard assistant** builds charts and tables through a few validated tools.
-- The model **never** verifies its own output, never creates orders, and never sees payment credentials. It is also never trusted: it can only choose real offers by id, and anything it says is checked.
+- The model **never** verifies its own output, never creates orders, and never sees payment credentials. It is also never trusted: it can only choose real offers by id, and its structured output and quote locations are checked. Quote matching does not prove the interpretation is correct; the approver must review the source terms.
 
 Models run through the Vercel AI Gateway, and the client **refuses any model the gateway does not list as free**, so credits cannot be spent.
 
@@ -95,12 +99,12 @@ verified ──► human approval (locks the bundle digest) ──► PayPal ord
 
 More detail, including the trust boundaries and decisions, is in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
-**Trust boundaries in one line each:** the agent may extract, propose and revise, but may not verify, create orders, or see credentials. The rules engine decides and never calls a model. Payment code requires a passing verdict **and** an approval for exactly that bundle. Money is integer cents in one currency per bundle. PayPal calls go only to the Sandbox.
+**Trust boundaries in one line each:** the agent may extract, propose and revise, but may not verify, create orders, or see credentials. The rules engine decides and never calls a model. Payment code requires a passing verdict **and** an approval for exactly that bundle. Money is integer cents in one supported two-decimal currency per bundle. Budgets in the brief editor are USD; the API can declare a different project currency, and never assumes an exchange rate. PayPal calls go only to the Sandbox.
 
 ## Tests
 
 ```bash
-npm test               # ~360 unit and API tests, no network
+npm test               # unit, property and API tests, no network
 npm run typecheck
 npm run test:e2e       # real browser journeys against the offline demo (needs: npx playwright install chromium)
 npm run test:live      # PayPal Sandbox (needs credentials)
@@ -120,6 +124,8 @@ The suite covers the rules, the payment gate, payouts and their failure and retr
 
 - **In the product:** a free language model through the Vercel AI Gateway (licence term extraction, bundle proposals, brief reading, run Q&A and the dashboard assistant), as described above.
 - **In development:** AI coding tools were used to help write and test the code, under the author's direction. The author reviewed the work and takes responsibility for it.
+
+Audit results and the remaining submission work are in [`docs/AUDIT.md`](docs/AUDIT.md) and [`docs/HACKATHON.md`](docs/HACKATHON.md).
 
 ## Documents
 

@@ -13,6 +13,16 @@ const input = () => ({ project: { ...sampleProject }, requiredAssetIds: [...samp
 const tmp = () => mkdtempSync(join(tmpdir(), "lg-sessions-"));
 
 describe("serialize and deserialize", () => {
+  it("requires new full-term approval for an unpaid legacy approval", async () => {
+    const s = createSession(input());
+    await runPipeline(s, deps);
+    approveSession(s, "Kiran");
+    const stored = serializeSession(s);
+    delete stored.approval!.digestVersion;
+    const back = deserializeSession(stored);
+    expect(back.phase).toBe("verified");
+    expect(back.approval).toBeUndefined();
+  });
   it("round-trips a finished run, including its ledger chain", async () => {
     const s = createSession(input());
     await runPipeline(s, deps);

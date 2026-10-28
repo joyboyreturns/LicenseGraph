@@ -1,11 +1,18 @@
 import { expect, test } from "@playwright/test";
+import { startScenario } from "./helpers";
 
 test("a plain-English brief is read, and assumptions are shown separately from what the text said", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/");
-  await page.getByLabel(/What are you making/).fill("A US ad for our shoe brand, 12 months, under $500, with a song and a font.");
+  // Accessibility roles exclude the hidden server-rendered streaming copy during hydration.
+  const brief = page.getByRole("textbox", { name: /What are you making/ });
+  await expect(brief).toHaveCount(1);
+  await brief.fill("A US ad for our shoe brand, 12 months, under $500, with a song and a font.");
   await page.getByRole("button", { name: "Read my brief" }).click();
   await expect(page.getByText("Found in your text")).toBeVisible();
   await expect(page.getByText(/Territory: US/)).toBeVisible();
+  expect(errors).toEqual([]);
   await expect(page.getByText(/Term: 12 months/)).toBeVisible();
 });
 
@@ -37,4 +44,13 @@ test("the page has no horizontal scroll on a phone", async ({ page }) => {
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     expect(overflow, path).toBeLessThanOrEqual(0);
   }
+});
+
+test("the mobile run shows the independent cost proof without horizontal overflow", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await startScenario(page, "Game launch trailer");
+  const proof = page.getByRole("heading", { name: "Independent cost check" }).locator("..");
+  await expect(proof.getByText(/Optimality checked independently/)).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
+  await proof.screenshot({ path: test.info().outputPath("mobile-cost-proof.png") });
 });

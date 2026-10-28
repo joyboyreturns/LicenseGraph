@@ -1,4 +1,6 @@
 import type { Bundle, LicenseOffer, Project, RuleId, Verdict, Violation } from "./types";
+import { addMonths, isIsoDate } from "./dates";
+import { supportsCentCurrency } from "./money";
 
 export interface VerifyOptions {
   /** Today's date (YYYY-MM-DD). Needed only to check offer expiry; passed in so verification stays deterministic. */
@@ -24,14 +26,20 @@ const territory: Rule = (project, offer, at) =>
     ? []
     : [{ rule: "territory", ...at, message: "Licence territory does not cover the project's territories." }];
 
-const term: Rule = (project, offer, at) => {
+const term: Rule = (project, offer, at, options) => {
   const out: Violation[] = [];
   const { termMonths, fixedEndDate } = offer.terms;
-  if (termMonths !== "perpetual" && termMonths < project.termMonths) {
+  if (termMonths !== "perpetual" && (!Number.isSafeInteger(termMonths) || termMonths <= 0 || termMonths < project.termMonths)) {
     out.push({ rule: "term", ...at, message: `Licence lasts ${termMonths} months; project needs ${project.termMonths}.` });
   }
-  if (fixedEndDate && project.endDate && fixedEndDate < project.endDate) {
-    out.push({ rule: "term", ...at, message: `Licence ends ${fixedEndDate}; project needs it until ${project.endDate}.` });
+  const durationEnd = options.today && addMonths(options.today, project.termMonths);
+  const until = project.endDate && durationEnd ? (project.endDate > durationEnd ? project.endDate : durationEnd) : project.endDate ?? durationEnd;
+  if (project.endDate && options.today && termMonths !== "perpetual") {
+    const offeredEnd = addMonths(options.today, termMonths);
+    if (!offeredEnd || offeredEnd < project.endDate) out.push({ rule: "term", ...at, message: `Licence duration does not reach the required end date ${project.endDate}.` });
+  }
+  if (fixedEndDate && (!isIsoDate(fixedEndDate) || !until || fixedEndDate < until)) {
+    out.push({ rule: "term", ...at, message: !until ? "Licence has a fixed end date but no project end date or purchase date was supplied." : `Licence ends ${fixedEndDate}; project needs it until ${until}.` });
   }
   return out;
 };
@@ -69,7 +77,7 @@ const exclusivity: Rule = (project, offer, at) => {
 const expiry: Rule = (_project, offer, at, options) => {
   const until = offer.terms.offerValidUntil;
   if (!until) return [];
-  if (!options.today) return [{ rule: "expiry", ...at, message: "Offer has an expiry date but no current date was supplied to check it." }];
+  if (!options.today || !isIsoDate(options.today) || !isIsoDate(until)) return [{ rule: "expiry", ...at, message: "Offer expiry requires valid calendar dates for the offer and purchase." }];
   return until < options.today ? [{ rule: "expiry", ...at, message: `Offer expired on ${until}.` }] : [];
 };
 
@@ -78,7 +86,15 @@ const evidence: Rule = (_project, offer, at) =>
     ? [{ rule: "evidence", ...at, message: "Offer terms are not linked to source text." }]
     : [];
 
-const OFFER_RULES: Rule[] = [commercialUse, territory, term, medium, attribution, sublicensing, exclusivity, expiry, evidence];
+const amount: Rule = (_project, offer, at) => Number.isSafeInteger(offer.priceCents) && offer.priceCents > 0
+  ? [] : [{ rule: "amount", ...at, message: "Licence price must be a positive safe integer in cents." }];
+const currency: Rule = (project, offer, at) => {
+  if (!supportsCentCurrency(offer.currency)) return [{ rule: "currency", ...at, message: "Licence currency is not supported for settlement in two-decimal cents." }];
+  const required = project.currency ?? (project.budgetCents !== undefined ? "USD" : undefined);
+  return required && offer.currency !== required ? [{ rule: "currency", ...at, message: `Licence is priced in ${offer.currency}; the project budget/settlement currency is ${required}. No currency conversion is assumed.` }] : [];
+};
+
+const OFFER_RULES: Rule[] = [commercialUse, territory, term, medium, attribution, sublicensing, exclusivity, expiry, evidence, amount, currency];
 
 export type RuleStatus = "pass" | "fail" | "skip";
 
@@ -101,6 +117,8 @@ export const RULE_CATALOG: { id: RuleId; label: string; applies: (p: Project, o:
   { id: "exclusivity", label: "Exclusivity", applies: (p) => Boolean(p.requiresExclusive) },
   { id: "expiry", label: "Offer validity", applies: (_p, o) => Boolean(o.terms.offerValidUntil) },
   { id: "evidence", label: "Evidence", applies: () => true },
+  { id: "amount", label: "Price in cents", applies: () => true },
+  { id: "currency", label: "Currency code", applies: () => true },
 ];
 
 /**
@@ -127,6 +145,12 @@ export function evaluateOffer(project: Project, offer: LicenseOffer, options: Ve
  */
 export function verifyBundle(project: Project, requiredAssetIds: string[], bundle: Bundle, options: VerifyOptions = {}): Verdict {
   const violations: Violation[] = [];
+  if (!Number.isSafeInteger(project.termMonths) || project.termMonths <= 0 || !project.territories.length || (project.endDate !== undefined && !isIsoDate(project.endDate)) || (project.budgetCents !== undefined && (!Number.isSafeInteger(project.budgetCents) || project.budgetCents < 0))) {
+    violations.push({ rule: "requirements", message: "Project needs valid territories, a positive whole-month term, a valid end date and a non-negative budget in safe integer cents." });
+  }
+  if (!requiredAssetIds.length || requiredAssetIds.some((id) => !id.trim()) || bundle.offers.some((o) => !o.id.trim()) || new Set(requiredAssetIds).size !== requiredAssetIds.length || new Set(bundle.offers.map((o) => o.id)).size !== bundle.offers.length) {
+    violations.push({ rule: "coverage", message: "Required assets and offer ids must be non-empty and unique." });
+  }
 
   const seen = new Map<string, number>();
   for (const o of bundle.offers) seen.set(o.assetId, (seen.get(o.assetId) ?? 0) + 1);
@@ -135,6 +159,7 @@ export function verifyBundle(project: Project, requiredAssetIds: string[], bundl
     if (!seen.has(id)) violations.push({ rule: "coverage", assetId: id, message: "No licence offer covers this asset." });
   }
   for (const [id, n] of seen) {
+    if (!requiredAssetIds.includes(id)) violations.push({ rule: "coverage", assetId: id, message: "Bundle includes an asset the project did not request." });
     if (n > 1) violations.push({ rule: "duplicate-asset", assetId: id, message: "More than one offer for this asset." });
   }
 
@@ -149,8 +174,10 @@ export function verifyBundle(project: Project, requiredAssetIds: string[], bundl
   }
 
   const totalCents = bundle.offers.reduce((sum, o) => sum + o.priceCents, 0);
+  if (!Number.isSafeInteger(totalCents)) violations.push({ rule: "amount", message: "Bundle total exceeds safe integer cents." });
   if (project.budgetCents !== undefined && totalCents > project.budgetCents) {
-    const money = (c: number) => (c / 100).toLocaleString("en-US", { style: "currency", currency: bundle.offers[0]?.currency ?? "USD" });
+    const code = bundle.offers[0]?.currency ?? "USD";
+    const money = (c: number) => /^[A-Z]{3}$/.test(code) ? (c / 100).toLocaleString("en-US", { style: "currency", currency: code }) : `${c} cents`;
     violations.push({ rule: "budget", message: `Bundle costs ${money(totalCents)}; budget is ${money(project.budgetCents)}.` });
   }
 

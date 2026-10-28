@@ -280,14 +280,14 @@ export function runKindLabel(runKind: string | undefined): { label: string; long
 /** True for ids made by the local payment simulator rather than PayPal Sandbox. */
 export const isSimulatedId = (id: string | undefined) => Boolean(id && /^SIM/i.test(id));
 
-const PAYOUT_FINAL = new Set(["SUCCESS", "DENIED", "CANCELED", "FAILED"]);
+const PAYOUT_FINAL = new Set(["SUCCESS", "DENIED", "CANCELED", "FAILED", "PARTIAL", "RETURNED", "BLOCKED", "REFUNDED", "REVERSED"]);
 /** A payout batch or line status that will not change again. */
 export const isPayoutFinal = (status: string | undefined) => Boolean(status && PAYOUT_FINAL.has(status.toUpperCase()));
 
 export function payoutTone(status: string): Tone {
   const s = status.toUpperCase();
   if (s === "SUCCESS") return "ok";
-  if (s === "FAILED" || s === "DENIED" || s === "CANCELED" || s === "RETURNED" || s === "BLOCKED") return "bad";
+  if (s === "FAILED" || s === "DENIED" || s === "CANCELED" || s === "RETURNED" || s === "BLOCKED" || s === "PARTIAL" || s === "REFUNDED" || s === "REVERSED") return "bad";
   if (s === "UNCLAIMED" || s === "ONHOLD") return "warn";
   return "info";
 }

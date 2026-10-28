@@ -22,7 +22,7 @@ describe("evaluateOffer", () => {
 
   it("marks rules the brief does not declare as skipped, and the rest as passed", () => {
     expect(status(project, offer("a", "x", 1))).toEqual({
-      "commercial-use": "pass", territory: "pass", term: "pass", medium: "skip", attribution: "skip", sublicensing: "skip", exclusivity: "skip", expiry: "skip", evidence: "pass",
+      "commercial-use": "pass", territory: "pass", term: "pass", medium: "skip", attribution: "skip", sublicensing: "skip", exclusivity: "skip", expiry: "skip", evidence: "pass", amount: "pass", currency: "pass",
     });
   });
 

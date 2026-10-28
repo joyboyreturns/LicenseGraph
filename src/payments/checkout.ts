@@ -3,11 +3,13 @@ import { bundleCanonical } from "../core/digest";
 import { verifyBundle } from "../core/rules";
 import type { Bundle, Project, Violation } from "../core/types";
 import type { CreatedOrder, createPayPalClient } from "./paypal";
+import { paymentRequestId } from "./request-id";
 
 export type PayPalClient = ReturnType<typeof createPayPalClient>;
 
 /** A human's sign-off on one specific bundle. */
 export interface Approval {
+  digestVersion?: 2;
   approvedBy: string;
   approvedAt: string;
   /** Digest of the bundle that was shown to the approver. */
@@ -30,7 +32,7 @@ export function bundleDigest(bundle: Bundle): string {
 }
 
 export function approve(bundle: Bundle, approvedBy: string, now: Date = new Date()): Approval {
-  return { approvedBy, approvedAt: now.toISOString(), bundleDigest: bundleDigest(bundle) };
+  return { digestVersion: 2, approvedBy, approvedAt: now.toISOString(), bundleDigest: bundleDigest(bundle) };
 }
 
 /**
@@ -42,12 +44,12 @@ export async function startCheckout(
   input: { project: Project; requiredAssetIds: string[]; bundle: Bundle; approval: Approval | undefined; today?: string; returnUrl?: string; cancelUrl?: string; idempotencyScope?: string },
 ): Promise<CreatedOrder> {
   const { project, requiredAssetIds, bundle, approval } = input;
+  if (bundle.offers.length === 0) throw new PaymentRefused("Bundle is empty");
 
   // Offer expiry is checked against the real date at the moment of purchase.
   const today = input.today ?? new Date().toISOString().slice(0, 10);
   const verdict = verifyBundle(project, requiredAssetIds, bundle, { today });
   if (!verdict.ok) throw new PaymentRefused("Bundle failed verification", verdict.violations);
-  if (bundle.offers.length === 0) throw new PaymentRefused("Bundle is empty");
 
   if (!approval) throw new PaymentRefused("Bundle has not been approved");
   const digest = bundleDigest(bundle);
@@ -60,7 +62,7 @@ export async function startCheckout(
     description: `LicenseGraph licence bundle for ${project.name}`,
     // Same approved bundle in the same scope (e.g. one session), same key: a retry can never
     // create a second order, while a genuine second purchase of the same bundle still can.
-    requestId: `lg-${digest.slice(0, 32)}${input.idempotencyScope ? `-${input.idempotencyScope}` : ""}`,
+    requestId: paymentRequestId("order", JSON.stringify([digest, input.idempotencyScope ?? ""])),
     returnUrl: input.returnUrl,
     cancelUrl: input.cancelUrl,
   });

@@ -66,7 +66,7 @@ beforeEach(() => {
   // Like PayPal, capture exactly what was ordered.
   payments.captureOrder.mockImplementation(async () => ({ id: "ORD1", status: "COMPLETED", captureId: "CAP1", amount: { currency: "USD", value: ((payments.createOrder.mock.calls.at(-1)?.[0].amountCents ?? 0) / 100).toFixed(2) } }));
   payments.createPayout.mockResolvedValue({ batchId: "BATCH1", status: "PENDING" });
-  payments.getPayout.mockResolvedValue({ batchId: "BATCH1", status: "SUCCESS", items: [] });
+  payments.getPayout.mockImplementation(async () => ({ batchId: "BATCH1", status: "SUCCESS", items: (payments.createPayout.mock.calls.at(-1)?.[0].items ?? []).map((i: { itemId: string; receiver: string }) => ({ ...i, status: "SUCCESS" })) }));
 });
 afterEach(() => {
   delete (globalThis as unknown as { __licensegraph?: Runtime }).__licensegraph;
@@ -107,7 +107,8 @@ describe("a scenario run from start to passport", () => {
     expect(payments.createOrder.mock.calls[0]![0]).toMatchObject({ amountCents: 217_000, returnUrl: `http://app/api/sessions/${id}/return` });
 
     const done = await body(await postCapture(post("http://app"), ctx(id)));
-    expect(done.phase).toBe("settled");
+    expect(done.phase).toBe("captured");
+    expect((await waitFor(id, "settled")).phase).toBe("settled");
     expect(done.payouts).toMatchObject({ batchId: "BATCH1", totalCents: 217_000 });
     expect(JSON.stringify(done)).not.toMatch(/boomline[a-z]*@|pixelhymns@|vectororchard@/);
 
@@ -163,7 +164,7 @@ describe("a scenario run from start to passport", () => {
     expect(captured).toMatchObject({ phase: "captured", payouts: { status: "FAILED" } });
 
     const retried = await body(await postPayouts(post("http://app"), ctx(id)));
-    expect(retried).toMatchObject({ phase: "settled", payouts: { status: "PENDING" } });
+    expect(retried).toMatchObject({ phase: "captured", payouts: { status: "PENDING" } });
     expect(payments.captureOrder).toHaveBeenCalledTimes(1);
   });
 });
@@ -186,7 +187,7 @@ describe("the payment simulator, end to end", () => {
     const approved = await body(await postSimApprove(post("http://app"), ctx(order.id)));
     expect(approved.returnUrl).toBe(`http://app/api/sessions/${id}/return`);
 
-    const back = await getReturn(new Request(approved.returnUrl), ctx(id));
+    const back = await getReturn(get(approved.returnUrl), ctx(id));
     expect(back.headers.get("location")).toContain(`/run/${id}`);
     const done = await waitFor(id, "settled");
     expect(done.capture).toMatchObject({ status: "COMPLETED", amount: { value: "690.00" } });
@@ -207,7 +208,7 @@ describe("the payment simulator, end to end", () => {
 });
 
 describe("custom runs and the portfolio", () => {
-  const custom = { project: { name: "Mine", commercial: true, territories: ["US"], termMonths: 12 }, requiredAssetIds: ["song"], documents: [{ id: "d", assetId: "song", text: "some licence text", licensor: { name: "Bad Email", email: "not-an-email" } }] };
+  const custom = { project: { name: "Mine", commercial: true, territories: ["US"], termMonths: 12 }, requiredAssetIds: ["song"], documents: [{ id: "d", assetId: "song", text: "some licence text", licensor: { name: "Bad Email", email: "creator@example.test" } }] };
 
   it("needs a model for the user's own licences", async () => {
     install();
@@ -221,6 +222,20 @@ describe("custom runs and the portfolio", () => {
     expect((await postSession(post("http://app/api/sessions", { scenarioId: "nope" }))).status).toBe(400);
     expect((await postSession(post("http://app/api/sessions", { hello: 1 }))).status).toBe(400);
     expect((await postSession(new Request("http://app/api/sessions", { method: "POST", body: "{broken" }))).status).toBe(400);
+  });
+
+  it.each([
+    { project: { ...custom.project, territories: "US" } },
+    { project: { ...custom.project, commercial: "false" } },
+    { project: { ...custom.project, termMonths: "12" } },
+    { project: { ...custom.project, endDate: "2026-02-29" } },
+    { project: { ...custom.project, budgetCents: -1 } },
+    { documents: [null] },
+  ])("returns a client error for malformed input instead of coercing or throwing: %j", async (changes) => {
+    install({ mode: "live" });
+    const response = await postSession(post("http://app/api/sessions", { ...custom, ...changes }));
+    expect(response.status).toBe(400);
+    expect((await body(response)).error).toMatch(/Invalid run input/);
   });
 
   it("limits concurrent custom runs", async () => {
@@ -304,6 +319,15 @@ describe("run ownership", () => {
     expect((await postApprove(new Request("http://app", { method: "POST", body: JSON.stringify({ approvedBy: "x" }) }), ctx(id))).status).toBe(403);
   });
 
+  it("does not let a shared return URL bypass capture ownership", async () => {
+    const { id } = await paidRun();
+    await postApprove(post("http://app", { approvedBy: "Kiran" }), ctx(id));
+    await postPay(post("http://app"), ctx(id));
+    const response = await getReturn(get(`http://app/api/sessions/${id}/return`, STRANGER), ctx(id));
+    expect(response.status).toBe(307);
+    expect(payments.captureOrder).not.toHaveBeenCalled();
+  });
+
   it("still lets anyone with the link read the run and its passport", async () => {
     const { id } = await paidRun();
     await postApprove(post("http://app", { approvedBy: "Kiran" }), ctx(id));
@@ -341,7 +365,7 @@ describe("portfolio", () => {
     await postApprove(post("http://app", { approvedBy: "Kiran" }), ctx(id));
     await postPay(post("http://app"), ctx(id));
     await postCapture(post("http://app"), ctx(id));
-    payments.getPayout.mockResolvedValue({ batchId: "BATCH1", status: "SUCCESS", items: [] });
+    payments.getPayout.mockImplementation(async () => ({ batchId: "BATCH1", status: "SUCCESS", items: (payments.createPayout.mock.calls.at(-1)?.[0].items ?? []).map((i: { itemId: string; receiver: string }) => ({ ...i, status: "SUCCESS" })) }));
 
     const { views } = await body(await getPortfolio(get()));
     expect(views).toHaveLength(1);

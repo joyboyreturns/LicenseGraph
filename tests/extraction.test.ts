@@ -23,6 +23,13 @@ describe("locateQuote", () => {
 });
 
 describe("extractOffer with a well-behaved model", () => {
+  it.each([{ priceCents: Number.MAX_SAFE_INTEGER + 1 }, { currency: "123" }, { fixedEndDate: "2026-02-29" }, { termMonths: null }])("rejects invalid or unstated source terms %j", async (changes) => {
+    const f = fixtures[0]!;
+    const reply = { ...JSON.parse(cannedReply(f)), ...changes };
+    const result = await extractOffer(replying(JSON.stringify(reply)), f.doc, { attempts: 1 });
+    expect(result.offer).toBeUndefined();
+    expect(result.problems.length).toBeGreaterThan(0);
+  });
   it.each(fixtures)("extracts $doc.id with the expected terms and located evidence", async (f) => {
     const result = await extractOffer(replying(cannedReply(f)), f.doc);
 

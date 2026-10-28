@@ -71,6 +71,12 @@ export function deserializeSession(stored: StoredSession): Session {
     session.phase = "failed";
     session.failure = "This run was interrupted by a server restart. Start it again.";
   }
+  // Unpaid legacy approvals covered prices only. Ask the owner to approve the full terms once
+  // before creating a new order; historical paid passports retain their original digest format.
+  if (session.phase === "approved" && session.approval?.digestVersion !== 2 && !session.order && !session.capture) {
+    session.phase = "verified";
+    session.approval = undefined;
+  }
   ledger.onAppend = () => session.onChange?.();
   return session;
 }

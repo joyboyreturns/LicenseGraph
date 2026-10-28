@@ -1,5 +1,6 @@
 import { evaluateOffer, type RuleResult, type VerifyOptions } from "./rules";
 import type { Cents, LicenseOffer, Project } from "./types";
+import { minimumCompliantCost, type CostFrontier } from "./optimizer";
 
 export interface OfferEvaluation {
   offerId: string;
@@ -25,6 +26,7 @@ export interface AssetAnalysis {
 }
 
 export interface RunAnalysis {
+  optimization: CostFrontier;
   evaluations: OfferEvaluation[];
   assets: AssetAnalysis[];
   /** Total of the cheapest offer per asset: what shopping on price alone would cost. */
@@ -71,6 +73,7 @@ export function analyzeRun(input: { project: Project; requiredAssetIds: string[]
   const naiveTotalCents = assets.reduce((n, a) => n + a.cheapestCents, 0);
   const chosenTotalCents = assets.reduce((n, a) => n + (a.chosenCents ?? 0), 0);
   return {
+    optimization: minimumCompliantCost(project, requiredAssetIds, candidates, options),
     evaluations,
     assets,
     naiveTotalCents,

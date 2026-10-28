@@ -25,7 +25,7 @@ export interface PayoutSummary {
   error?: string;
 }
 
-const FINAL = new Set(["SUCCESS", "DENIED", "CANCELED"]);
+const FINAL = new Set(["SUCCESS", "DENIED", "CANCELED", "PARTIAL"]);
 export const isFinalPayout = (status: string) => FINAL.has(status);
 
 /**
@@ -56,7 +56,8 @@ export const toPayoutItems = (lines: Omit<PayoutLine, "status">[], note: (l: Omi
 
 /** Fold a fresh status from PayPal into the summary without losing the lines we already know. */
 export function applyPayoutStatus(summary: PayoutSummary, status: PayoutStatus): PayoutSummary {
-  return {
+  if (status.batchId !== summary.batchId) throw new Error("Payout status belongs to a different batch");
+  const updated = {
     ...summary,
     status: status.status,
     lines: summary.lines.map((l) => {
@@ -64,4 +65,10 @@ export function applyPayoutStatus(summary: PayoutSummary, status: PayoutStatus):
       return item ? { ...l, status: item.status, error: item.error } : l;
     }),
   };
+  // A successful batch means processing finished, not that every recipient received funds.
+  if (status.status === "SUCCESS" && !updated.lines.every((l) => l.status === "SUCCESS")) {
+    const waiting = new Set(["PENDING", "UNCLAIMED", "ONHOLD"]);
+    updated.status = updated.lines.some((l) => waiting.has(l.status)) ? "PROCESSING" : "PARTIAL";
+  }
+  return updated;
 }

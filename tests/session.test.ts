@@ -3,6 +3,7 @@ import { greedyProposer } from "../src/agent/greedy";
 import { approveSession, completePayment, createSession, runPipeline, SessionError, SessionStore, startPayment, viewOf, type Deps, type SessionInput } from "../src/app-logic/session";
 import { demoModel } from "../src/demo/mock-model";
 import { sampleDocuments, sampleProject, sampleRequiredAssets } from "../src/demo/sample";
+import { paymentRequestId } from "../src/payments/request-id";
 
 const created = { id: "ORD1", status: "PAYER_ACTION_REQUIRED", approveUrl: "https://www.sandbox.paypal.com/checkoutnow?token=ORD1" };
 const captured = { id: "ORD1", status: "COMPLETED", captureId: "CAP1", amount: { currency: "USD", value: "329.00" } };
@@ -32,11 +33,11 @@ describe("full flow", () => {
 
     const order = await startPayment(s, deps);
     expect(order.id).toBe("ORD1");
-    expect(payments.createOrder).toHaveBeenCalledWith(expect.objectContaining({ amountCents: 20_000 + 8_000 + 4_900, currency: "USD", requestId: expect.stringContaining(s.id) }));
+    expect(payments.createOrder).toHaveBeenCalledWith(expect.objectContaining({ amountCents: 20_000 + 8_000 + 4_900, currency: "USD", requestId: expect.stringMatching(/^lg-o-[a-f0-9]{32}$/) }));
 
     await completePayment(s, deps);
     expect(s.phase).toBe("captured");
-    expect(payments.captureOrder).toHaveBeenCalledWith("ORD1", `lg-capture-${s.id}`);
+    expect(payments.captureOrder).toHaveBeenCalledWith("ORD1", paymentRequestId("capture", s.id));
 
     expect(kinds(s)).toEqual(["extracted", "extracted", "extracted", "extracted", "proposed", "rejected", "revised", "verified", "approved", "order_created", "captured"]);
     expect(s.ledger.verify()).toBe(true);
@@ -64,6 +65,38 @@ describe("full flow", () => {
 });
 
 describe("the order of steps is enforced", () => {
+  it("coalesces simultaneous order and capture requests into one ledger transition each", async () => {
+    const { deps, payments } = makeDeps();
+    const s = createSession(input());
+    await runPipeline(s, deps);
+    approveSession(s, "Kiran");
+    const orders = await Promise.all([startPayment(s, deps), startPayment(s, deps), startPayment(s, deps)]);
+    expect(new Set(orders.map((o) => o.id)).size).toBe(1);
+    await Promise.all([completePayment(s, deps), completePayment(s, deps), completePayment(s, deps)]);
+    expect(payments.createOrder).toHaveBeenCalledTimes(1);
+    expect(payments.captureOrder).toHaveBeenCalledTimes(1);
+    expect(kinds(s).filter((k) => k === "captured")).toHaveLength(1);
+    expect(kinds(s).filter((k) => k === "order_created")).toHaveLength(1);
+  });
+
+  it.each([
+    { ...captured, status: "PENDING" },
+    { ...captured, id: "OTHER-ORDER" },
+    { ...captured, amount: { currency: "EUR", value: "329.00" } },
+    { ...captured, amount: { currency: "USD", value: "328.99" } },
+  ])("never marks an incorrect capture as paid: %j", async (response) => {
+    const { deps, payments } = makeDeps();
+    payments.captureOrder.mockResolvedValue(response);
+    const s = createSession(input());
+    await runPipeline(s, deps);
+    approveSession(s, "Kiran");
+    await startPayment(s, deps);
+    await expect(completePayment(s, deps)).rejects.toThrow(/completed capture/);
+    expect(s.phase).toBe("order_created");
+    expect(s.capture).toBeUndefined();
+    expect(kinds(s)).not.toContain("captured");
+  });
+
   it("cannot approve before verification, or with no name", async () => {
     const { deps } = makeDeps();
     const s = createSession(input());
@@ -127,6 +160,14 @@ describe("the order of steps is enforced", () => {
 });
 
 describe("when no compliant bundle exists", () => {
+  it("distinguishes an agent stall from proof that no compliant bundle exists", async () => {
+    const { deps } = makeDeps({ proposer: { propose: async () => ({ offerIds: ["offer-song", "offer-photo", "offer-font"], rationale: "Always pick the cheap offer" }) } });
+    const s = createSession(input());
+    await runPipeline(s, deps);
+    expect(s.phase).toBe("failed");
+    expect(s.failure).toMatch(/available compliant bundle/);
+    expect(viewOf(s).analysis!.optimization.plans[0]!.totalCents).toBe(32_900);
+  });
   it("fails the session, explains why, and blocks approval and payment", async () => {
     const { deps, payments } = makeDeps();
     const i = input();
