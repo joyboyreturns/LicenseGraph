@@ -42,7 +42,7 @@ export interface Session {
   order?: CreatedOrder;
   capture?: CapturedOrder;
   payouts?: PayoutSummary;
-  /** Assets whose creator could not be paid (no payout email), known once a bundle is verified. Not persisted: payment re-checks. */
+  /** Assets whose creator could not be paid (no payout email), known once a bundle is verified. Payment re-checks it either way. */
   payoutBlockedAssets?: string[];
   /** The buyer's money was returned because the creators could not be paid. */
   refund?: { id: string; status: string; amount: { currency: string; value: string }; at: string };

@@ -289,6 +289,14 @@ describe("refusing to charge for a purchase that cannot be paid out", () => {
     expect(viewOf(s).documents.find((d) => d.id === "font")?.licensorName).toBe("TypeForge Studio");
   });
 
+  it("still says so after the server restarts", async () => {
+    const { deps } = makeDeps();
+    const s = createSession(withoutEmail());
+    await runPipeline(s, deps);
+    const back = deserializeSession(JSON.parse(JSON.stringify(serializeSession(s))));
+    expect(viewOf(back).payoutBlockedAssets).toEqual(["font"]);
+  });
+
   it("creates no PayPal order, so nothing is charged", async () => {
     const { deps, payments } = makeDeps();
     const s = createSession(withoutEmail());

@@ -1,9 +1,10 @@
 "use client";
 
+import { Mail } from "lucide-react";
 import type { SessionView } from "@/src/app-logic/session";
 import { draftLicensorMessage } from "@/src/core/insights";
 import type { Catalog } from "@/src/ui/lib/catalog";
-import { assetLabel, formatMoney } from "@/src/ui/lib/format";
+import { assetLabel, formatMoney, mailtoHref } from "@/src/ui/lib/format";
 import { AssetIcon, CopyButton } from "../bits";
 import styles from "./Insights.module.css";
 
@@ -40,10 +41,13 @@ export function GapRequests({ view, catalog }: { view: SessionView; catalog: Cat
                 ))}
               </ul>
               <pre className={styles.draft}>{text}</pre>
-              <div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                 <CopyButton text={text} label={`Copy the message to the ${assetLabel(gap.assetId)} licensor`} announce="Message copied" className="btn btn-sm">
                   Copy message
                 </CopyButton>
+                <a className="btn btn-sm" href={mailtoHref(message.subject, message.body)}>
+                  <Mail aria-hidden /> Open in email
+                </a>
               </div>
             </div>
           );

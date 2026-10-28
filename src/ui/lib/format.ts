@@ -294,3 +294,6 @@ export function payoutTone(status: string): Tone {
 }
 
 export const pluralise = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+/** A link that opens a drafted message in the person's email app. No address: the app asks who it is for. */
+export const mailtoHref = (subject: string, body: string) => `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body.replace(/\r?\n/g, "\r\n"))}`;

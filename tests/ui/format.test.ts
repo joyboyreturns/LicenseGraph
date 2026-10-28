@@ -7,6 +7,7 @@ import {
   formatMoney,
   isPayoutFinal,
   isSimulatedId,
+  mailtoHref,
   mediumsText,
   phaseInfo,
   projectRequirements,
@@ -126,5 +127,15 @@ describe("labels", () => {
     expect(isPayoutFinal("SUCCESS")).toBe(true);
     expect(isPayoutFinal("PENDING")).toBe(false);
     expect(isPayoutFinal(undefined)).toBe(false);
+  });
+});
+
+describe("mailtoHref", () => {
+  it("round-trips a subject and a multi-line body, including characters that break a link", () => {
+    const body = "Hi,\nCould you allow 12 months & worldwide use?\n\nThanks #1";
+    const url = new URL(mailtoHref("Licence: 50% off? yes", body));
+    expect(url.protocol).toBe("mailto:");
+    expect(url.searchParams.get("subject")).toBe("Licence: 50% off? yes");
+    expect(url.searchParams.get("body")).toBe(body.replace(/\n/g, "\r\n"));
   });
 });
