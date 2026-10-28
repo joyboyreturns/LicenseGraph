@@ -38,6 +38,8 @@ On a phone it stays usable:
 
 Anyone who ships creative work (a game trailer, a podcast, a promo film) ends up with licences nobody has time to read: a song that is "worldwide" but only for web, an image that is "editorial only", a sound pack whose sale ended last month. A wrong licence can mean a takedown or a dispute, and the creators who made the work are paid late. In the demo scenarios a price-only buyer would have bought licences they could not legally use (for example a non-commercial image for a commercial promo); LicenseGraph shows exactly which rule blocked each one, and what staying compliant costs. Every number it shows is a price from an uploaded licence.
 
+Licences can be pasted or loaded as a PDF or text file. A PDF is read in the browser with pdf.js, so the file itself is never uploaded; only the extracted text is sent when you start a run. A scanned PDF with no selectable text is rejected with an explanation instead of becoming an empty licence.
+
 ## Independent cost verification
 
 The run page computes the exact cheapest compliant bundle from the uploaded offers, separately in each currency. It independently checks whether the agent found that minimum and shows the precise budget shortfall when no affordable bundle exists. All rights requirements stay in force. The method uses the current rules' independence between assets; every result is rechecked by the same rules engine, and property tests compare it with exhaustive enumeration.

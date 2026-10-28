@@ -21,6 +21,7 @@ const EXAMPLES = [
 const MEDIA = ["web", "social", "print", "broadcast", "film", "audio", "app"];
 const KNOWN_ASSETS = ["song", "image", "font", "footage", "voiceover", "sfx"];
 const MAX_DOC = 20_000;
+const MAX_PDF_BYTES = 5 * 1024 * 1024;
 
 interface DocDraft {
   key: string;
@@ -127,12 +128,30 @@ export function BriefWizard({ scenarios, onStartScenario, starting }: { scenario
 
   const loadFile = async (key: string, file: File | undefined) => {
     if (!file) return;
-    if (file.size > MAX_DOC * 4) {
+    const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+    if (file.size > (isPdf ? MAX_PDF_BYTES : MAX_DOC * 4)) {
       setProblems([`${file.name} is too large. Paste the licence text instead (up to ${MAX_DOC.toLocaleString()} characters).`]);
       return;
     }
-    const t = (await file.text()).slice(0, MAX_DOC);
-    setDocs((d) => d.map((x) => (x.key === key ? { ...x, text: t, fileName: file.name } : x)));
+    let full: string;
+    const notes: string[] = [];
+    if (isPdf) {
+      try {
+        // Read on this device: the PDF is never uploaded. The reader loads only when a PDF is chosen.
+        const { extractPdfText } = await import("@/src/ui/lib/pdf-text");
+        const read = await extractPdfText(new Uint8Array(await file.arrayBuffer()));
+        full = read.text;
+        if (read.pagesSkipped) notes.push(`${file.name}: only the first ${read.pages} pages were read.`);
+      } catch (e) {
+        setProblems([`${file.name}: ${errorMessage(e)}`]);
+        return;
+      }
+    } else {
+      full = await file.text();
+    }
+    if (full.length > MAX_DOC) notes.push(`${file.name} is longer than ${MAX_DOC.toLocaleString()} characters; only the start was kept. Check that the terms you need are in it.`);
+    setProblems(notes);
+    setDocs((d) => d.map((x) => (x.key === key ? { ...x, text: full.slice(0, MAX_DOC), fileName: file.name } : x)));
   };
 
   const submit = async () => {
@@ -403,9 +422,10 @@ export function BriefWizard({ scenarios, onStartScenario, starting }: { scenario
                     <div className={styles.docHead}>
                       <span className={styles.docNo}>Licence {i + 1}</span>
                       <label className={`btn btn-sm ${styles.fileBtn}`}>
-                        <FileUp aria-hidden /> {d.fileName ? "Replace file" : "Load a .txt file"}
-                        <input type="file" accept=".txt,.md,text/plain" className="visually-hidden" onChange={(e) => loadFile(d.key, e.target.files?.[0])} />
+                        <FileUp aria-hidden /> {d.fileName ? "Replace file" : "Load a PDF or text file"}
+                        <input type="file" accept=".pdf,.txt,.md,application/pdf,text/plain" className="visually-hidden" onChange={(e) => loadFile(d.key, e.target.files?.[0])} />
                       </label>
+                      {d.fileName && <span className="small muted">{d.fileName}</span>}
                       <button type="button" className="btn btn-ghost btn-sm btn-icon" aria-label={`Remove licence ${i + 1} for ${assetLabel(a).toLowerCase()}`} onClick={() => setDocs(docs.filter((x) => x.key !== d.key))}>
                         <Trash2 aria-hidden />
                       </button>
