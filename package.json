@@ -17,6 +17,7 @@
     "sandbox:order": "tsx --env-file=.env scripts/sandbox-order.ts",
     "demo": "node scripts/demo.mjs",
     "openapi": "tsx scripts/openapi.ts",
+    "verify:passport": "tsx scripts/verify-passport.ts",
     "test:e2e": "node scripts/demo.mjs --build --build-only && playwright test"
   },
   "devDependencies": {

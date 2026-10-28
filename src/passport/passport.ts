@@ -118,7 +118,7 @@ export async function verifyPassport(p: Passport): Promise<{ ok: boolean; checks
   add("evidence", "Every quote appears in the licence text", total > 0 && located === total, `${located} of ${total} quotes found at their recorded position`);
 
   const rules = verifyBundle(p.project, p.requiredAssetIds, { offers: p.bundle.offers }, { today: p.runDate });
-  add("rules", "Rules engine agrees", rules.ok, rules.ok ? "Re-run in this browser on the exact terms: no violations" : rules.violations.map((v) => v.message).join("; "));
+  add("rules", "Rules engine agrees", rules.ok, rules.ok ? "Re-run here, from the recorded terms alone: no violations" : rules.violations.map((v) => v.message).join("; "));
 
   const sum = p.bundle.offers.reduce((n, o) => n + o.priceCents, 0);
   const captured = events.find((e) => e.kind === "captured");
