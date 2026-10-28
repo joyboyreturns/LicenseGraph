@@ -95,8 +95,10 @@ Prize targets: Best Overall, Best Use of Agentic Commerce, Best Use of AG Grid. 
 - [x] Plain-English brief reader and grounded run Q&A with offline fallbacks
 - [x] Four scenarios (documentary, game trailer, podcast network, and an exclusive theme tune that has no compliant bundle) replayed from recorded model output
 - [x] Front-end redesign: home, run theatre (rights graph, replay, matrix, evidence viewer), settlement, passport, verify, simulator checkout
-- [x] End-to-end browser tests (11) and API-level tests; model calls paced to the free model's rate limit
+- [x] End-to-end browser tests (30, including axe accessibility scans) and API-level tests; model calls paced to the free model's rate limit
 - [x] README with local-run steps, `.env.example`, demo script and submission text drafts
+- [x] Requirement costs, gap requests and an "if every licensor said yes" outlook; what-if panel (controls or a typed sentence); negotiation loop (a licensor's revised licence is checked as a new run, linked in the ledger and shown on the passport)
+- [x] Licence end dates with a calendar download; accessibility scans in light and dark; OpenAPI document, PayPal webhooks, custom AG Studio widget, MCP tools
 - [ ] Deployment (deferred by the owner): home Ubuntu server with Tailscale Funnel, see `docs/DEPLOY.md`
 - [ ] Request the AG Studio trial licence key (info@ag-grid.com) to remove the dashboard watermark
 - [ ] Create US Sandbox personal accounts for the demo creators (`LICENSEGRAPH_CREATOR_EMAILS`) so payouts show SUCCESS on camera
