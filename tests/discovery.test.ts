@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { GET as getCard } from "../app/.well-known/mcp.json/route";
 import { GET as getLlms } from "../app/llms.txt/route";
+import { RULE_CATALOG } from "../src/core/rules";
 import { listedTools, llmsTxt, mcpServerCard } from "../src/mcp/discovery";
+import { rulesGuide } from "../src/mcp/tools";
 
 describe("agent discovery", () => {
   it("lists exactly the tools the MCP server registers", async () => {
@@ -27,5 +29,13 @@ describe("agent discovery", () => {
     const res = await getLlms();
     expect(res.headers.get("content-type")).toContain("text/plain");
     expect(await res.text()).toMatch(/^# LicenseGraph/);
+  });
+
+  it("publishes the rules as a resource that names every rule the engine has, with what silence means", () => {
+    const guide = rulesGuide();
+    for (const r of RULE_CATALOG) expect(guide).toContain(`## ${r.label} (\`${r.id}\`)`);
+    expect(guide.match(/If the licence is silent:/g)).toHaveLength(RULE_CATALOG.length);
+    expect(guide).not.toContain("See the rules page");
+    expect(mcpServerCard("https://lg.example", []).resources).toEqual(["licensegraph://rules"]);
   });
 });

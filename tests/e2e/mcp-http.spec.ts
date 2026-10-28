@@ -11,6 +11,11 @@ test("an MCP client connects to the running server over HTTP, prices a purchase 
     expect(tools).toContain("cheapest_compliant_bundle");
     expect(tools).toContain("start_licence_purchase");
     expect((await client.listPrompts()).prompts.map((p) => p.name)).toEqual(["buy_licences"]);
+    // The rules are a resource an agent can read before it argues with a verdict.
+    expect((await client.listResources()).resources.map((r) => r.uri)).toEqual(["licensegraph://rules"]);
+    const rules = (await client.readResource({ uri: "licensegraph://rules" })).contents[0] as { text: string };
+    expect(rules.text).toContain("## Territory (`territory`)");
+    expect(rules.text).toContain("If the licence is silent:");
 
     // The agent's view of a verified-by-code price: a one-asset project with one offer.
     const offer = { id: "o1", assetId: "song", priceCents: 12_000, currency: "USD", terms: { commercialUse: true, territories: ["WORLD"], termMonths: 24 }, evidence: [{ documentId: "d1", quote: "USD 120.00" }] };

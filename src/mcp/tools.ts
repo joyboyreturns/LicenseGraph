@@ -5,7 +5,8 @@ import { negotiationOutlook, savingLevers } from "../core/negotiation";
 import { buildIcs, licenceEnds } from "../core/renewals";
 import { isIsoDate } from "../core/dates";
 import { minimumCompliantCost } from "../core/optimizer";
-import { verifyBundle } from "../core/rules";
+import { RULE_CATALOG, verifyBundle } from "../core/rules";
+import { RULE_NOTES } from "../ui/lib/rule-notes";
 import { whatIf } from "../core/whatif";
 import type { LicenseOffer, Project } from "../core/types";
 
@@ -243,4 +244,13 @@ export async function purchaseStatus(app: AppClient, runId: string) {
     // Once paid, a printable receipt per creator, which the person can forward to each licensor.
     creatorReceipts: body.capture && body.bundle ? (body.bundle.offers as LicenseOffer[]).map((o) => ({ assetId: o.assetId, url: `${app.baseUrl.replace(/\/$/, "")}/passport/${runId}/receipt/${encodeURIComponent(o.assetId)}` })) : [],
   };
+}
+
+/** Every rule the engine checks, when it applies and what a licence's silence means, as Markdown an agent can read before it argues with a verdict. */
+export function rulesGuide(): string {
+  const lines = RULE_CATALOG.map((r) => {
+    const n = RULE_NOTES[r.id];
+    return `## ${r.label} (\`${r.id}\`)\n- Applies: ${n?.applies ?? "See the rules page."}\n- If the licence is silent: ${n?.silent ?? "Treated as not meeting it."}`;
+  });
+  return ["# The rules LicenseGraph checks every licence against", "", "Plain code decides, not a model: the same terms always get the same verdict. A rule applies only when the brief makes it relevant, and where it applies a licence that is silent does not get the benefit of the doubt. Bundle-level checks (coverage, one licence per asset, a single currency, the budget) are applied on top.", "", ...lines.flatMap((l) => [l, ""])].join("\n");
 }

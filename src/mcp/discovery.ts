@@ -37,6 +37,7 @@ export function mcpServerCard(appUrl: string, tools: ToolSummary[]) {
     authentication: "none",
     tools,
     prompts: ["buy_licences"],
+    resources: ["licensegraph://rules"],
     humanInTheLoop: "An agent can start a purchase and receives a claim link. Only the person who opens it can approve, and PayPal moves the money.",
     docs: { passportKeys: `${appUrl}/.well-known/licensegraph-keys.json`, openapi: `${appUrl}/api/openapi.json`, agents: `${appUrl}/agents`, rules: `${appUrl}/rules` },
   };
@@ -65,7 +66,7 @@ export function llmsTxt(appUrl: string, tools: ToolSummary[]): string {
     "",
     "## Working order",
     "",
-    "Prompt `buy_licences` gives the order: check, price, negotiate, hand over. Read the fine print with licence_fine_print before handing a bundle to the person, and re-check a paid purchase with verify_licence_passport before relying on it.",
+    "Prompt `buy_licences` gives the order: check, price, negotiate, hand over. Resource `licensegraph://rules` lists every rule and what a licence's silence means. Read the fine print with licence_fine_print before handing a bundle to the person, and re-check a paid purchase with verify_licence_passport before relying on it.",
     "",
     "## Pages",
     "",
