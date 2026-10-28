@@ -1,10 +1,11 @@
 "use client";
 
-import { ArrowLeft, Download, FileClock, Link2, Printer, RotateCcw, ServerCrash, ShieldCheck, ShieldQuestion } from "lucide-react";
+import { ArrowLeft, CalendarPlus, Download, FileClock, Link2, Printer, RotateCcw, ServerCrash, ShieldCheck, ShieldQuestion } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { verifyPassport, type Passport, type PassportCheck } from "@/src/passport/passport";
 import { api, ApiError, errorMessage } from "@/src/ui/lib/api";
+import { passportCalendar } from "@/src/ui/lib/licence-dates";
 import { useToast } from "../Providers";
 import { Certificate } from "./Certificate";
 import { VerifyChecks } from "./VerifyChecks";
@@ -100,6 +101,16 @@ export function PassportPage({ id }: { id: string }) {
   }
 
   const p = load.passport;
+  const calendar = passportCalendar(p);
+  const hasDates = calendar.count > 0;
+  const downloadCalendar = () => {
+    const url = URL.createObjectURL(new Blob([calendar.ics], { type: "text/calendar" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `licence-end-dates-${p.id.slice(0, 8)}.ics`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
   const sig = signature && signature !== "error" ? SIGNATURE_TEXT[signature] : null;
   return (
     <div className={`container-wide ${styles.page}`}>
@@ -111,6 +122,11 @@ export function PassportPage({ id }: { id: string }) {
         <a href={`/api/passports/${encodeURIComponent(p.id)}?download=1`} className="btn" download>
           <Download aria-hidden /> Download JSON
         </a>
+        {hasDates && (
+          <button type="button" className="btn" onClick={downloadCalendar}>
+            <CalendarPlus aria-hidden /> Add licence end dates to my calendar
+          </button>
+        )}
         <button type="button" className="btn" onClick={() => window.print()}>
           <Printer aria-hidden /> Print or save as PDF
         </button>

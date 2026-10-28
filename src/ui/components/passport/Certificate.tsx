@@ -2,8 +2,9 @@
 
 import type { Passport } from "@/src/passport/passport";
 import { buildCatalog } from "@/src/ui/lib/catalog";
+import { boughtOn, passportLicenceDates } from "@/src/ui/lib/licence-dates";
 import { eventTitle } from "@/src/ui/lib/event-text";
-import { assetLabel, dateTimeText, formatMoney, isSimulatedId, projectRequirements, shortHash, termsSummary } from "@/src/ui/lib/format";
+import { assetLabel, dateText, dateTimeText, formatMoney, isSimulatedId, projectRequirements, shortHash, termsSummary } from "@/src/ui/lib/format";
 import { LogoMark } from "../Logo";
 import { AssetIcon } from "../bits";
 import styles from "./Certificate.module.css";
@@ -25,6 +26,7 @@ export function Certificate({ passport: p, qrSrc, verifyUrl }: { passport: Passp
   const currency = p.bundle.currency;
   const simulated = isSimulatedId(p.paypal.captureId) || isSimulatedId(p.paypal.orderId);
   const reqs = projectRequirements(p.project, currency);
+  const dates = passportLicenceDates(p);
   const answers = p.ledger.events.find((e) => e.kind === "answers_run");
   const negotiation = answers ? `${eventTitle(answers)}.` : undefined;
   return (
@@ -200,6 +202,20 @@ export function Certificate({ passport: p, qrSrc, verifyUrl }: { passport: Passp
             ))}
           </ul>
         )}
+      </section>
+
+      <section className={styles.section} aria-labelledby="cert-dates">
+        <h2 id="cert-dates" className={styles.h2}>
+          When each licence ends
+        </h2>
+        <ul className={styles.blocked}>
+          {dates.map((d) => (
+            <li key={d.offerId}>
+              <b>{d.label}:</b> {d.perpetual ? "perpetual, no end date" : d.endsOn ? `covered until ${dateText(d.endsOn)}` : "end date not stated"}
+            </li>
+          ))}
+        </ul>
+        <p className={styles.compare}>Counted from the day of purchase, {dateText(boughtOn(p))}, using each licence&rsquo;s own term.</p>
       </section>
 
       {negotiation && (

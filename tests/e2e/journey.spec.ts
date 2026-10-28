@@ -33,6 +33,15 @@ test("a scenario goes from licences to a verified, paid and independently checka
   await expect(page.getByText("SIMULATED").first()).toBeVisible();
   expect(await accessibilityViolations(page)).toEqual([]);
 
+  // Each licence's end date, counted from the day of purchase, and a calendar file with a reminder before each.
+  await expect(page.getByRole("heading", { name: "When each licence ends" })).toBeVisible();
+  const [calendar] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Add licence end dates to my calendar" }).click()]);
+  const ics = readFileSync(await calendar.path(), "utf8");
+  expect(calendar.suggestedFilename()).toMatch(/^licence-end-dates-.*\.ics$/);
+  expect(ics).toMatch(/^BEGIN:VCALENDAR\r\n/);
+  expect(ics.match(/BEGIN:VEVENT/g)?.length ?? 0).toBeGreaterThan(0);
+  expect(ics).toContain("TRIGGER:-P30D");
+
   // The downloaded file verifies on its own; a tampered copy does not.
   const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("link", { name: "Download JSON" }).click()]);
   const file = test.info().outputPath("passport.json");

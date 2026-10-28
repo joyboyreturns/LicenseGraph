@@ -172,6 +172,17 @@ export async function runPipeline(session: Session, deps: Deps): Promise<void> {
     return;
   }
 
+  // No point asking the proposer when the exact cost check proves some asset has no compliant offer: no bundle can pass,
+  // and a slow model would spend rounds finding that out. The run ends at once and says what to ask each licensor.
+  const options = { today: session.runDate };
+  const { uncoveredAssets } = minimumCompliantCost(session.input.project, session.input.requiredAssetIds, session.candidates, options);
+  if (uncoveredAssets.length) {
+    session.phase = "failed";
+    session.failure = `No licence on offer meets every requirement for: ${uncoveredAssets.join(", ")}. The agent was not asked to propose a bundle, because the independent cost check proves none can pass. See what to ask each licensor.`;
+    touch(session);
+    return;
+  }
+
   session.phase = "proposing";
   touch(session);
   session.loop = await runProposeVerifyLoop({

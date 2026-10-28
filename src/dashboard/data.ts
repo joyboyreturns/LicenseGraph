@@ -73,6 +73,15 @@ export function buildDashboardData(view: SessionView): DashboardTables {
         });
       });
     });
+  // A run that ended before any proposal (the cost check proved no bundle could pass) has no rejection events,
+  // so the rules each offer breaks on its own are listed instead, as round 0: checked, not proposed.
+  if (!violations.length && view.analysis) {
+    for (const ev of view.analysis.evaluations) {
+      ev.results
+        .filter((r) => r.status === "fail")
+        .forEach((r, i) => violations.push({ violationId: `c-${ev.offerId}-${i + 1}`, round: 0, offerId: ev.offerId, asset: ev.assetId, rule: r.rule, message: r.messages.join(" ") }));
+    }
+  }
   const rejected = new Set(violations.map((v) => v.offerId).filter((id): id is string => typeof id === "string"));
 
   const offers: Row[] = view.candidates.map((o: LicenseOffer) => ({
@@ -142,7 +151,7 @@ export function buildStudioData(view: SessionView) {
   return {
     currency: viewCurrency(view),
     description:
-      `LicenseGraph run for one project. 'assets' are the creative assets the project needs, 'offers' are the licence offers extracted from uploaded licences (each linked to quotes in the source text), 'violations' are the rules the verifier found broken when it rejected a proposed bundle, 'requirements' is what each requirement of the brief adds to the cheapest compliant bundle, 'gaps' lists what to ask a licensor to change when no offer for an asset passes, and 'events' is the tamper-evident ledger of every step. Prices are in ${viewCurrency(view)}.`,
+      `LicenseGraph run for one project. 'assets' are the creative assets the project needs, 'offers' are the licence offers extracted from uploaded licences (each linked to quotes in the source text), 'violations' are the rules the verifier found broken when it rejected a proposed bundle (round 0: rules an offer breaks on its own, in a run that ended before any proposal), 'requirements' is what each requirement of the brief adds to the cheapest compliant bundle, 'gaps' lists what to ask a licensor to change when no offer for an asset passes, and 'events' is the tamper-evident ledger of every step. Prices are in ${viewCurrency(view)}.`,
     sources: [
       {
         id: "assets",

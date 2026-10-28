@@ -253,8 +253,10 @@
 .offer[data-state="alternative"] {
   opacity: 0.66;
 }
+/* De-emphasised by a quieter surface and a dashed edge, not by fading its text, which would drop it below readable contrast. */
 .offer[data-state="ineligible"] {
-  opacity: 0.58;
+  background: var(--surface-2);
+  border-style: dashed;
 }
 .offerTop {
   display: flex;

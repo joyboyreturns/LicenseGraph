@@ -169,14 +169,19 @@ describe("when no compliant bundle exists", () => {
     expect(viewOf(s).analysis!.optimization.plans[0]!.totalCents).toBe(32_900);
   });
   it("fails the session, explains why, and blocks approval and payment", async () => {
-    const { deps, payments } = makeDeps();
+    const propose = vi.fn();
+    const { deps, payments } = makeDeps({ proposer: { propose } });
     const i = input();
     i.documents = i.documents.filter((d) => d.id !== "archive"); // only the non-commercial image remains
     const s = createSession(i);
     await runPipeline(s, deps);
 
     expect(s.phase).toBe("failed");
-    expect(s.failure).toMatch(/No licence bundle/);
+    expect(s.failure).toMatch(/No licence on offer meets every requirement for: image/);
+    // The exact cost check proves nothing can pass, so the (slow, paid or rate-limited) proposer is never asked.
+    expect(propose).not.toHaveBeenCalled();
+    expect(s.loop).toBeUndefined();
+    expect(viewOf(s).analysis!.gaps.map((g) => g.assetId)).toEqual(["image"]);
     expect(viewOf(s).bundle).toBeUndefined();
     expect(() => approveSession(s, "Kiran")).toThrow(/verified/);
     await expect(startPayment(s, deps)).rejects.toThrow();
