@@ -18,6 +18,12 @@ const runCurrency = (v: SessionView) => v.bundle?.currency ?? v.project.currency
  * Every run as linked tables for the portfolio dashboard: runs, offers, rule violations, creator
  * payouts and ledger events, joined on run id. Prices are dollars; unstated terms say "Not stated".
  */
+/** Whether an agent's stated spending cap held, from the ledger entry written when the bundle was verified. */
+function mandateLabel(v: SessionView): string {
+  const status = v.events.find((e) => e.kind === "mandate_checked")?.payload.status;
+  return status === "within" ? "Within cap" : status === "over" ? "Over cap" : status === "other_currency" ? "Not comparable" : "None stated";
+}
+
 export function buildPortfolioData(views: SessionView[]) {
   const runs: Row[] = [];
   const offers: Row[] = [];
@@ -48,6 +54,8 @@ export function buildPortfolioData(views: SessionView[]) {
       verifiedTotalLocal: v.bundle ? dollars(chosen) : null,
       blockedLicences: v.analysis?.blockedPurchases.length ?? 0,
       paid: v.capture ? "Paid" : "Not paid",
+      startedBy: v.meta?.startedBy === "agent" ? "AI agent" : "Person",
+      mandate: mandateLabel(v),
     });
     for (const o of t.offers) offers.push({ ...o, runId: v.id, run: runLabel(v) });
     for (const x of t.violations) violations.push({ ...x, runId: v.id, run: runLabel(v) });
@@ -90,7 +98,7 @@ export function buildPortfolioData(views: SessionView[]) {
         name: "Runs",
         description: "One row per licensing run.",
         data: runs,
-        fields: [text("runId", "Run id"), text("run", "Project"), text("started", "Started"), text("source", "Source"), text("status", "Status"), whole("rounds", "Agent rounds"), text("currency", "Currency"), money("verifiedTotal", "Verified total"), decimal("verifiedTotalLocal", "Verified total (own currency)"), money("priceOnlyTotal", "Price-only total"), money("compliancePremium", "Compliance premium"), whole("blockedLicences", "Licences blocked"), text("paid", "Payment")],
+        fields: [text("runId", "Run id"), text("run", "Project"), text("started", "Started"), text("source", "Source"), text("status", "Status"), whole("rounds", "Agent rounds"), text("currency", "Currency"), money("verifiedTotal", "Verified total"), decimal("verifiedTotalLocal", "Verified total (own currency)"), money("priceOnlyTotal", "Price-only total"), money("compliancePremium", "Compliance premium"), whole("blockedLicences", "Licences blocked"), text("paid", "Payment"), text("startedBy", "Started by"), text("mandate", "Agent mandate")],
       },
       {
         id: "offers",

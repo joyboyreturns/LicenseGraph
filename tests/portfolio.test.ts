@@ -57,6 +57,16 @@ describe("buildPortfolioData", () => {
     expect(by.image).toMatchObject({ licensor: "Greyscale Lane", endsOn: "Perpetual", endsYear: null, cover: "Perpetual" });
   });
 
+  it("says who started each run and whether an agent's spending cap held", async () => {
+    const person = await run("documentary", false);
+    const agent = structuredClone(person);
+    agent.id = "agent-run";
+    agent.meta = { ...agent.meta, startedBy: "agent" };
+    agent.events = [...agent.events, { seq: 99, at: "2026-11-05T00:00:00Z", kind: "mandate_checked", payload: { status: "over", overByCents: 100 }, prevHash: "x", hash: "y" }];
+    const rows = buildPortfolioData([person, agent]).sources.find((x) => x.id === "runs")!.data;
+    expect(rows.map((r) => [r.startedBy, r.mandate])).toEqual([["Person", "None stated"], ["AI agent", "Over cap"]]);
+  });
+
   it("is consistent: every row has every declared field, and relationships point at real fields", async () => {
     const def = buildPortfolioData([await run("game-trailer", true)]);
     const fields = Object.fromEntries(def.sources.map((s) => [s.id, new Set(s.fields.map((f) => f.id))]));
