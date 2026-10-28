@@ -89,3 +89,26 @@ test("a shared link carries a preview card: the page names an image, and the ima
   expect((await res.body()).subarray(0, 4).toString("hex")).toBe("89504e47");
   await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute("content", "summary_large_image");
 });
+
+test("a shared passport link has its own preview card, and an unpaid or unknown run gets the plain one", async ({ page, request }) => {
+  const { id } = await (await request.post("/api/sessions", { data: { scenarioId: "podcast" } })).json();
+  await expect.poll(async () => (await (await request.get(`/api/sessions/${id}`)).json()).phase, { timeout: 30_000 }).toBe("verified");
+  const card = async (runId: string) => {
+    const res = await request.get(`/passport/${runId}/opengraph-image`);
+    return { status: res.status(), type: res.headers()["content-type"], png: (await res.body()).subarray(0, 4).toString("hex"), bytes: (await res.body()).length };
+  };
+  const plain = await card(id); // verified but not paid: no passport yet
+  expect(plain).toMatchObject({ status: 200, type: "image/png", png: "89504e47" });
+
+  await request.post(`/api/sessions/${id}/approve`, { data: { approvedBy: "Kiran" } });
+  const paid = await (await request.post(`/api/sessions/${id}/pay`)).json();
+  await request.post(`/api/simulator/orders/${paid.order.id}`);
+  await request.post(`/api/sessions/${id}/capture`);
+  const real = await card(id);
+  expect(real).toMatchObject({ status: 200, type: "image/png", png: "89504e47" });
+  expect(real.bytes).not.toBe(plain.bytes); // it drew this purchase, not the plain card
+
+  expect(await card("no-such-run")).toMatchObject({ status: 200, type: "image/png" });
+  await page.goto(`/passport/${id}`);
+  await expect(page.locator('meta[property="og:image"]')).toHaveAttribute("content", new RegExp(`/passport/${id}/opengraph-image`));
+});
