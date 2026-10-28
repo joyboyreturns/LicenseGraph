@@ -126,7 +126,7 @@
 }
 .actor {
   font-size: 11px;
-  color: var(--faint);
+  color: var(--muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

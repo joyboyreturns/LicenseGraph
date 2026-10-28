@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, CircleDashed, FileText, FileWarning, X } from "lucide-react";
-import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { memo, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { LicenseOffer } from "@/src/core/types";
 import type { Catalog } from "@/src/ui/lib/catalog";
 import { assetLabel, formatMoney, termTags } from "@/src/ui/lib/format";
@@ -177,6 +177,8 @@ function OfferNode({ box, offer, state, catalog, selected, onSelect, compact, la
   const shown = latestRound === undefined ? [] : violations.filter((v) => v.round === latestRound);
   const tags = termTags(offer.terms);
   const below = box.y + box.h / 2 < layoutHeight * 0.55;
+  const descId = useId();
+  // The button's name is what it shows (so a voice-control user can say it); the fuller account is its description.
   const label = `${info?.licensor ?? ""}, ${info?.title ?? offer.id}, ${formatMoney(offer.priceCents, offer.currency)} for the ${assetLabel(offer.assetId).toLowerCase()}. ${OFFER_STATE_TEXT[s] ?? s}${shown.length ? `: ${shown.map((v) => `${ruleName(v.rule)}, ${v.message}`).join("; ")}` : ""}. Open evidence.`;
 
   return (
@@ -187,10 +189,13 @@ function OfferNode({ box, offer, state, catalog, selected, onSelect, compact, la
       data-selected={selected || undefined}
       style={boxStyle(box)}
       onClick={() => onSelect(offer.id)}
-      aria-label={label}
+      aria-describedby={descId}
       tabIndex={s === "hidden" ? -1 : 0}
       aria-hidden={s === "hidden" ? true : undefined}
     >
+      <span id={descId} hidden>
+        {label}
+      </span>
       <span className={styles.offerTop}>
         <span className={`${styles.price} num`}>{formatMoney(offer.priceCents, offer.currency, { trim: true })}</span>
         {!compact && <span className={styles.offerTitle}>{info?.title}</span>}

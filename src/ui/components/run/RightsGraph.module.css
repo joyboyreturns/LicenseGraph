@@ -326,7 +326,6 @@
 .round {
   font-family: var(--font-code);
   font-weight: 500;
-  opacity: 0.8;
 }
 .tags {
   display: flex;

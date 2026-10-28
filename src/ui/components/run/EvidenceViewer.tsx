@@ -129,7 +129,6 @@ function EvidenceBody({ offer, document, evaluation }: { offer: LicenseOffer; do
                 data-active={active?.field === l.key || undefined}
                 onClick={() => hasQuote && jump(l.key)}
                 aria-disabled={!hasQuote}
-                aria-label={`${l.label}: ${l.value}. ${status === "fail" ? "Fails the rules." : status === "pass" ? "Passes the rules." : l.key === "price" ? "" : "Not required by this project."} ${hasQuote ? "Show the quote." : "No quote: the licence does not state it."}`}
               >
                 <span className={styles.termLabel}>
                   {l.label}
@@ -140,6 +139,7 @@ function EvidenceBody({ offer, document, evaluation }: { offer: LicenseOffer; do
                   )}
                 </span>
                 <span className={styles.termValue}>{l.value}</span>
+                <span className="visually-hidden">{status === "fail" ? ". Fails the rules." : status === "pass" ? ". Passes the rules." : l.key === "price" ? "" : ". Not required by this project."}</span>
                 <span className={styles.termFoot}>{hasQuote ? <><Quote aria-hidden /> Show quote</> : <><CircleHelp aria-hidden /> Not in the licence</>}</span>
               </button>
             );

@@ -134,9 +134,10 @@ export function VerificationMatrix({ analysis, requiredAssetIds, catalog, state,
                 return (
                   <tr key={row.offerId} className={styles.row} data-state={s} data-chosen={row.chosen || undefined} data-selected={selectedOfferId === row.offerId || undefined}>
                     <th scope="row" className={`${styles.sticky} ${styles.licence}`}>
-                      <button type="button" className={styles.licenceBtn} onClick={() => onSelectOffer(row.offerId)} aria-label={`${info?.name ?? row.offerId}: open evidence`}>
+                      <button type="button" className={styles.licenceBtn} onClick={() => onSelectOffer(row.offerId)}>
                         <span className={styles.licensor}>{info?.licensor ?? row.offerId}</span>
                         <span className={styles.title}>{info?.title}</span>
+                        <span className="visually-hidden">: open evidence</span>
                       </button>
                     </th>
                     <td className={`${styles.right} ${styles.price} num`}>{formatMoney(row.priceCents, currency, { trim: true })}</td>

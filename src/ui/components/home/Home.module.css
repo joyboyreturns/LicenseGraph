@@ -185,7 +185,7 @@
 .stageNum {
   font-family: var(--font-code);
   font-size: 11px;
-  color: var(--faint);
+  color: var(--muted);
 }
 .stageTitle {
   margin-top: 6px;

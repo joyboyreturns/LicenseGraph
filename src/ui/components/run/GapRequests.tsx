@@ -112,7 +112,7 @@ export function GapRequests({ view, catalog }: { view: SessionView; catalog: Cat
               </ul>
               <pre className={styles.draft}>{text}</pre>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                <CopyButton text={text} label={`Copy the message to the ${assetLabel(gap.assetId)} licensor`} announce="Message copied" className="btn btn-sm">
+                <CopyButton text={text} label={`Copy message to the ${assetLabel(gap.assetId)} licensor`} announce="Message copied" className="btn btn-sm">
                   Copy message
                 </CopyButton>
                 <a className="btn btn-sm" href={mailtoHref(message.subject, message.body)}>

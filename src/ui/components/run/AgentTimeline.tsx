@@ -76,11 +76,12 @@ export function AgentTimeline({ events, state, loopStatus, catalog, currency, ru
                       const info = catalog.offer(r.offerId);
                       return (
                         <li key={r.seq} data-current={r.seq === currentSeq || undefined}>
-                          <button type="button" className={styles.readBtn} onClick={() => onSelectOffer(r.offerId)} aria-label={`${info?.name ?? r.offerId}: open evidence`}>
+                          <button type="button" className={styles.readBtn} onClick={() => onSelectOffer(r.offerId)}>
                             <FileText aria-hidden />
                             <span className="truncate">{info?.licensor ?? r.documentId}</span>
                             <span className={styles.readAsset}>{assetNoun(r.assetId)}</span>
                             <span className={`${styles.readPrice} num`}>{formatMoney(r.priceCents, currency, { trim: true })}</span>
+                            <span className="visually-hidden">: open evidence</span>
                           </button>
                         </li>
                       );
@@ -129,11 +130,12 @@ export function AgentTimeline({ events, state, loopStatus, catalog, currency, ru
 function OfferChip({ id, catalog, onSelect, tone }: { id: string; catalog: Catalog; onSelect: (id: string) => void; tone?: "bad" | "ok" }) {
   const info = catalog.offer(id);
   return (
-    <button type="button" className={styles.offerChip} data-tone={tone} onClick={() => onSelect(id)} aria-label={`${info?.name ?? id}: open evidence`}>
+    <button type="button" className={styles.offerChip} data-tone={tone} onClick={() => onSelect(id)}>
       <span className="truncate">{info?.licensor ?? id}</span>
       <span className={styles.offerChipMeta}>
         {info ? assetNoun(info.assetId) : ""} · <span className="num">{info?.price}</span>
       </span>
+      <span className="visually-hidden">: open evidence</span>
     </button>
   );
 }
