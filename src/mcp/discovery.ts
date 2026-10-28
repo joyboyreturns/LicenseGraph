@@ -38,7 +38,7 @@ export function mcpServerCard(appUrl: string, tools: ToolSummary[]) {
     authentication: "none",
     tools,
     prompts: ["buy_licences"],
-    resources: ["licensegraph://rules"],
+    resources: ["licensegraph://rules", "licensegraph://passport/{runId}"],
     humanInTheLoop: "An agent can start a purchase and receives a claim link. Only the person who opens it can approve, and PayPal moves the money.",
     docs: { passportKeys: `${appUrl}/.well-known/licensegraph-keys.json`, openapi: `${appUrl}/api/openapi.json`, agents: `${appUrl}/agents`, rules: `${appUrl}/rules` },
   };

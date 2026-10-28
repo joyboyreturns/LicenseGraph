@@ -43,6 +43,13 @@ test("an agent can re-check a Licence Passport over MCP before relying on a lice
     await request.post(`/api/simulator/orders/${paid.order.id}`);
     await request.post(`/api/sessions/${id}/capture`);
 
+    // The passport itself is a resource the agent can keep and re-check offline against the published key.
+    const doc = await client.readResource({ uri: `licensegraph://passport/${id}` });
+    const passport = JSON.parse((doc.contents[0] as { text: string }).text);
+    const { keys } = await (await request.get("/.well-known/licensegraph-keys.json")).json();
+    expect(verifyWithPublicKey(passport, keys[0].publicKey)).toBe("valid");
+    await expect(client.readResource({ uri: "licensegraph://passport/no-such-run" })).rejects.toThrow();
+
     const result = await verify(id);
     expect(result).toMatchObject({ ok: true, verified: true, failedChecks: [] });
     expect(result.checks).toHaveLength(9);

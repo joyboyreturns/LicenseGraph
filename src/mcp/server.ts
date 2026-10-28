@@ -1,6 +1,6 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { checkBundle, checkBundleInput, cheapestBundle, cheapestBundleInput, licenceEndDates, licenceEndDatesInput, licenceFinePrint, licenceFinePrintInput, purchasePlaybook, purchaseStatus, rulesGuide, startPurchase, startPurchaseInput, verifyPassportTool, whatIfBrief, whatIfInput, type AppClient } from "./tools";
+import { checkBundle, checkBundleInput, cheapestBundle, cheapestBundleInput, licenceEndDates, licenceEndDatesInput, licenceFinePrint, licenceFinePrintInput, purchasePlaybook, passportDocument, purchaseStatus, rulesGuide, startPurchase, startPurchaseInput, verifyPassportTool, whatIfBrief, whatIfInput, type AppClient } from "./tools";
 
 const text = (value: unknown) => ({ content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }] });
 
@@ -64,6 +64,17 @@ export function createLicenseGraphServer(app: AppClient): McpServer {
     "licensegraph://rules",
     { title: "The rules every licence is checked against", description: "Each rule, when it applies, and what a licence that says nothing about it gets. Read it before arguing with a verdict or drafting a request to a licensor.", mimeType: "text/markdown" },
     (uri) => ({ contents: [{ uri: uri.href, mimeType: "text/markdown", text: rulesGuide() }] }),
+  );
+
+  server.registerResource(
+    "passport",
+    new ResourceTemplate("licensegraph://passport/{runId}", { list: undefined }),
+    { title: "A Licence Passport", description: "The signed Licence Passport of a paid purchase, as JSON. Keep it, and re-check it offline with the server's public key (/.well-known/licensegraph-keys.json).", mimeType: "application/json" },
+    async (uri, { runId }) => {
+      const doc = await passportDocument(app, String(runId));
+      if (!doc.ok) throw new Error(doc.error);
+      return { contents: [{ uri: uri.href, mimeType: "application/json", text: doc.json }] };
+    },
   );
 
   server.registerPrompt(

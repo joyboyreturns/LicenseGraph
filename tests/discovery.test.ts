@@ -39,7 +39,7 @@ describe("agent discovery", () => {
     for (const r of RULE_CATALOG) expect(guide).toContain(`## ${r.label} (\`${r.id}\`)`);
     expect(guide.match(/If the licence is silent:/g)).toHaveLength(RULE_CATALOG.length);
     expect(guide).not.toContain("See the rules page");
-    expect(mcpServerCard("https://lg.example", []).resources).toEqual(["licensegraph://rules"]);
+    expect(mcpServerCard("https://lg.example", []).resources).toEqual(["licensegraph://rules", "licensegraph://passport/{runId}"]);
   });
 
   it("publishes the passport public key only when the server signs, and never the secret", async () => {

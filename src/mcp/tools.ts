@@ -254,3 +254,10 @@ export function rulesGuide(): string {
   });
   return ["# The rules LicenseGraph checks every licence against", "", "Plain code decides, not a model: the same terms always get the same verdict. A rule applies only when the brief makes it relevant, and where it applies a licence that is silent does not get the benefit of the doubt. Bundle-level checks (coverage, one licence per asset, a single currency, the budget) are applied on top.", "", ...lines.flatMap((l) => [l, ""])].join("\n");
 }
+
+/** The signed Licence Passport of a paid purchase, as the JSON an agent can keep and re-check offline with the server's public key. */
+export async function passportDocument(app: AppClient, runId: string): Promise<{ ok: true; json: string } | { ok: false; error: string }> {
+  const { status, body } = await call(app, `/api/passports/${encodeURIComponent(runId)}`);
+  if (status !== 200) return { ok: false, error: body?.error ?? `The app answered ${status}.` };
+  return { ok: true, json: JSON.stringify(body, null, 2) };
+}
