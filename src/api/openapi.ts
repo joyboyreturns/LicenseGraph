@@ -66,6 +66,7 @@ export function buildOpenApi(serverUrl = "http://localhost:3000"): Json {
     tags: [
       { name: "Runs", description: "Start a run, follow it, and settle it." },
       { name: "Passports", description: "The independently checkable record of a paid run." },
+      { name: "Agents", description: "Model Context Protocol endpoint for AI agents." },
       { name: "Intake", description: "Plain-English helpers." },
       { name: "Service", description: "Health, configuration and demo data." },
     ],
@@ -97,6 +98,9 @@ export function buildOpenApi(serverUrl = "http://localhost:3000"): Json {
       },
       "/api/sessions/{id}/approve": {
         post: { operationId: "approveRun", tags: ["Runs"], summary: "Approve the verified bundle", description: "Records who approved which exact bundle (by digest). Nothing is charged yet.", security: owner, parameters: [idParam], requestBody: body("ApproveInput"), responses: { ...ok("The run, approved.", ref("Run")), ...err(["400", "The run is not ready to approve."], ["403", "This run belongs to another browser."], ["404", "No such run."]) } },
+      },
+      "/api/mcp": {
+        post: { operationId: "mcp", tags: ["Agents"], summary: "The MCP server over HTTP", description: "Model Context Protocol, Streamable HTTP, stateless. Point an MCP client at this URL to use `check_licence_bundle`, `cheapest_compliant_bundle`, `what_if_brief`, `licence_end_dates`, `start_licence_purchase` and `get_purchase_status`, and the `buy_licences` prompt. Requests are JSON-RPC and must accept both `application/json` and `text/event-stream`. An agent can start a purchase but cannot approve or pay it: that needs the claim link a person opens.", requestBody: { required: true, content: { "application/json": { schema: { type: "object", description: "A JSON-RPC 2.0 message." } } } }, responses: { "200": { description: "The JSON-RPC response.", content: { "application/json": { schema: { type: "object" } } } }, "400": { description: "Not a valid MCP request.", content: { "application/json": { schema: { type: "object" } } } } } },
       },
       "/api/sessions/{id}/revise": {
         post: { operationId: "reviseRun", tags: ["Runs"], summary: "Answer a gap request with a licensor's revised licence", description: "Adds the revised licence to what the run read and checks everything again as a new run (`meta.revisedFrom` names this one). The earlier run is unchanged. Nothing is bought: only a bundle that passes the rules can be approved and paid.", security: owner, parameters: [idParam], requestBody: body("ReviseInput"), responses: { ...ok("The new run, started.", ref("Run"), "201"), ...err(["400", "The run is not finished, already has a payment, or the revision is invalid."], ["403", "This run belongs to another browser."], ["404", "No such run."], ["429", "Too many runs in progress."]) } },

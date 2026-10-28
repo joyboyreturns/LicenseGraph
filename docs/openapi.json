@@ -26,6 +26,10 @@
       "description": "The independently checkable record of a paid run."
     },
     {
+      "name": "Agents",
+      "description": "Model Context Protocol endpoint for AI agents."
+    },
+    {
       "name": "Intake",
       "description": "Plain-English helpers."
     },
@@ -307,6 +311,49 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mcp": {
+      "post": {
+        "operationId": "mcp",
+        "tags": [
+          "Agents"
+        ],
+        "summary": "The MCP server over HTTP",
+        "description": "Model Context Protocol, Streamable HTTP, stateless. Point an MCP client at this URL to use `check_licence_bundle`, `cheapest_compliant_bundle`, `what_if_brief`, `licence_end_dates`, `start_licence_purchase` and `get_purchase_status`, and the `buy_licences` prompt. Requests are JSON-RPC and must accept both `application/json` and `text/event-stream`. An agent can start a purchase but cannot approve or pay it: that needs the claim link a person opens.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "A JSON-RPC 2.0 message."
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The JSON-RPC response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not a valid MCP request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
                 }
               }
             }
