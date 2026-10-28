@@ -65,5 +65,7 @@ export async function startCheckout(
     requestId: paymentRequestId("order", JSON.stringify([digest, input.idempotencyScope ?? ""])),
     returnUrl: input.returnUrl,
     cancelUrl: input.cancelUrl,
+    items: bundle.offers.map((o) => ({ name: `Licence for ${o.assetId}`, description: `Offer ${o.id}`, amountCents: o.priceCents })),
+    customId: digest,
   });
 }

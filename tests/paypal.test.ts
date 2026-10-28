@@ -54,6 +54,30 @@ describe("createPayPalClient", () => {
     expect(JSON.parse(init.body).purchase_units[0].amount).toEqual({ currency_code: "USD", value: "25.00" });
   });
 
+  describe("itemised orders", () => {
+    const post = async (extra: Record<string, unknown>) => {
+      const fetchMock = vi.fn().mockResolvedValueOnce(json({ access_token: "tok", expires_in: 3600 })).mockResolvedValueOnce(json({ id: "O", status: "PAYER_ACTION_REQUIRED", links: [{ rel: "approve", href: "https://pp/a" }] }));
+      await createPayPalClient({ ...base, fetch: fetchMock as unknown as typeof fetch }).createOrder({ amountCents: 2500, currency: "USD", referenceId: "r", description: "d", requestId: "k", ...extra } as never);
+      return JSON.parse(fetchMock.mock.calls[1]![1].body).purchase_units[0];
+    };
+
+    it("sends one line per licence with a matching item total, and the bundle digest as the custom id", async () => {
+      const unit = await post({ items: [{ name: "Licence for song", description: "Offer o1", amountCents: 1500 }, { name: "Licence for image", amountCents: 1000 }], customId: "a".repeat(64) });
+      expect(unit.items).toEqual([
+        { name: "Licence for song", description: "Offer o1", quantity: "1", unit_amount: { currency_code: "USD", value: "15.00" } },
+        { name: "Licence for image", quantity: "1", unit_amount: { currency_code: "USD", value: "10.00" } },
+      ]);
+      expect(unit.amount).toEqual({ currency_code: "USD", value: "25.00", breakdown: { item_total: { currency_code: "USD", value: "25.00" } } });
+      expect(unit.custom_id).toBe("a".repeat(64));
+    });
+
+    it("sends a plain order when the lines do not add up to the amount, rather than a request PayPal would reject", async () => {
+      const unit = await post({ items: [{ name: "x", amountCents: 1000 }] });
+      expect(unit.items).toBeUndefined();
+      expect(unit.amount).toEqual({ currency_code: "USD", value: "25.00" });
+    });
+  });
+
   it("captures an order and reuses the cached token", async () => {
     const fetchMock = vi
       .fn()

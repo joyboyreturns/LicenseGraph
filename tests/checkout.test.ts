@@ -32,6 +32,14 @@ describe("startCheckout", () => {
     );
   });
 
+  it("itemises the order by licence and tags it with the approved bundle's digest", async () => {
+    const client = makeClient();
+    await startCheckout(client, input(good));
+    expect(client.createOrder).toHaveBeenCalledWith(
+      expect.objectContaining({ items: [{ name: "Licence for song", description: "Offer o1", amountCents: 20_000 }], customId: bundleDigest(good) }),
+    );
+  });
+
   it("scopes the idempotency key, so the same bundle can be bought again in a new session", async () => {
     const keys: string[] = [];
     const client = { createOrder: vi.fn(async (o: { requestId: string }) => (keys.push(o.requestId), created)) };

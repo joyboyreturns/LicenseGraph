@@ -37,9 +37,18 @@ describe.skipIf(!process.env.RUN_PAYPAL_SANDBOX)("PayPal Sandbox (live)", () => 
           terms: { commercialUse: true, territories: ["WORLD"], termMonths: "perpetual" },
           evidence: [{ documentId: "d1", quote: "Worldwide, perpetual, commercial." }],
         },
+        {
+          id: "o2",
+          assetId: "image",
+          priceCents: 750,
+          currency: "USD",
+          terms: { commercialUse: true, territories: ["WORLD"], termMonths: "perpetual" },
+          evidence: [{ documentId: "d2", quote: "Worldwide, perpetual, commercial." }],
+        },
       ],
     };
-    const order = await startCheckout(client, { project, requiredAssetIds: ["song"], bundle, approval: approve(bundle, "owner") });
+    // Two licences make an itemised order with a custom id: Sandbox must accept the line items and their total.
+    const order = await startCheckout(client, { project, requiredAssetIds: ["song", "image"], bundle, approval: approve(bundle, "owner") });
     expect(order.id).toBeTruthy();
   });
 });

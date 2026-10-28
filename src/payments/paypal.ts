@@ -125,15 +125,24 @@ export function createPayPalClient(config: PayPalConfig) {
       requestId: string;
       returnUrl?: string;
       cancelUrl?: string;
+      /** One line per licence, so the PayPal checkout page itemises what is being bought. Used only when the lines add up to the amount exactly. */
+      items?: { name: string; description?: string; amountCents: Cents }[];
+      /** Stored on the PayPal order, so a transaction found in PayPal can be matched to the approved bundle. */
+      customId?: string;
     }): Promise<CreatedOrder> {
       if (!supportsCentCurrency(input.currency)) throw new Error("Unsupported currency for settlement in cents");
+      const itemised = Boolean(input.items?.length) && input.items!.every((i) => Number.isSafeInteger(i.amountCents) && i.amountCents > 0) && input.items!.reduce((n, i) => n + i.amountCents, 0) === input.amountCents;
       const json = await call("/v2/checkout/orders", input.requestId, {
         intent: "CAPTURE",
         purchase_units: [
           {
             reference_id: input.referenceId,
             description: input.description,
-            amount: { currency_code: input.currency, value: centsToValue(input.amountCents) },
+            ...(input.customId ? { custom_id: input.customId.slice(0, 127) } : {}),
+            amount: { currency_code: input.currency, value: centsToValue(input.amountCents), ...(itemised ? { breakdown: { item_total: { currency_code: input.currency, value: centsToValue(input.amountCents) } } } : {}) },
+            ...(itemised
+              ? { items: input.items!.map((i) => ({ name: i.name.slice(0, 127), ...(i.description ? { description: i.description.slice(0, 127) } : {}), quantity: "1", unit_amount: { currency_code: input.currency, value: centsToValue(i.amountCents) } })) }
+              : {}),
           },
         ],
         payment_source: {
