@@ -6,9 +6,12 @@ type Row = Record<string, string | number | null>;
 const dollars = (cents: number) => cents / 100;
 const text = (id: string, name: string) => ({ id, name, format: "textFormat" as const });
 const money = (id: string, name: string) => ({ id, name, format: "currencyFormat" as const });
+const decimal = (id: string, name: string) => ({ id, name, format: "decimalFormat" as const });
 const whole = (id: string, name: string) => ({ id, name, format: "integerFormat" as const });
 
 const runLabel = (v: SessionView) => v.project.name;
+/** The currency a run settles in. Totals across runs are only added up for US dollars; nothing is converted. */
+const runCurrency = (v: SessionView) => v.bundle?.currency ?? v.project.currency ?? "USD";
 
 /**
  * Every run as linked tables for the portfolio dashboard: runs, offers, rule violations, creator
@@ -25,6 +28,9 @@ export function buildPortfolioData(views: SessionView[]) {
     const t = buildDashboardData(v);
     const naive = v.analysis?.naiveTotalCents ?? 0;
     const chosen = v.bundle?.totalCents ?? 0;
+    const currency = runCurrency(v);
+    // Dollar columns hold dollar runs only, so a EUR run is never added into a USD total. Its own amount is in "…Local".
+    const usd = (cents: number | null) => (cents === null ? null : currency === "USD" ? dollars(cents) : null);
     runs.push({
       runId: v.id,
       run: runLabel(v),
@@ -32,9 +38,11 @@ export function buildPortfolioData(views: SessionView[]) {
       source: v.meta?.runKind === "live" ? "Live model" : "Replayed demo",
       status: v.phase,
       rounds: v.rounds ?? null,
-      verifiedTotal: v.bundle ? dollars(chosen) : null,
-      priceOnlyTotal: v.analysis ? dollars(naive) : null,
-      compliancePremium: v.bundle && v.analysis ? dollars(Math.max(0, chosen - naive)) : null,
+      currency,
+      verifiedTotal: usd(v.bundle ? chosen : null),
+      priceOnlyTotal: usd(v.analysis ? naive : null),
+      compliancePremium: usd(v.bundle && v.analysis ? Math.max(0, chosen - naive) : null),
+      verifiedTotalLocal: v.bundle ? dollars(chosen) : null,
       blockedLicences: v.analysis?.blockedPurchases.length ?? 0,
       paid: v.capture ? "Paid" : "Not paid",
     });
@@ -42,20 +50,20 @@ export function buildPortfolioData(views: SessionView[]) {
     for (const x of t.violations) violations.push({ ...x, runId: v.id, run: runLabel(v) });
     for (const e of t.events) events.push({ ...e, runId: v.id, run: runLabel(v) });
     for (const l of v.payouts?.lines ?? []) {
-      payouts.push({ payoutId: `${v.id}:${l.offerId}`, runId: v.id, run: runLabel(v), licensor: l.licensorName, asset: l.assetId, amount: dollars(l.amountCents), status: l.status });
+      payouts.push({ payoutId: `${v.id}:${l.offerId}`, runId: v.id, run: runLabel(v), licensor: l.licensorName, asset: l.assetId, amount: l.currency === "USD" ? dollars(l.amountCents) : null, currency: l.currency, amountLocal: dollars(l.amountCents), status: l.status });
     }
   }
 
   return {
     description:
-      "LicenseGraph portfolio across projects. 'runs' has one row per licensing run (what the verified bundle cost, what a price-only purchase would have cost, how many licences the rules blocked, whether it was paid). 'offers' has every licence offer extracted from uploaded licences with its terms and whether it was chosen or rejected. 'violations' lists each rule the verifier found broken. 'payouts' lists the creators paid through PayPal Payouts. 'events' is the tamper-evident ledger. Prices are in US dollars.",
+      "LicenseGraph portfolio across projects. 'runs' has one row per licensing run (what the verified bundle cost, what a price-only purchase would have cost, how many licences the rules blocked, whether it was paid). 'offers' has every licence offer extracted from uploaded licences with its terms and whether it was chosen or rejected. 'violations' lists each rule the verifier found broken. 'payouts' lists the creators paid through PayPal Payouts. 'events' is the tamper-evident ledger. Dollar columns (Verified total, Price-only total, Compliance premium, Amount) include only runs settled in US dollars; a run in another currency shows its amount in the 'Local' column and its currency, and is never converted or added into a dollar total.",
     sources: [
       {
         id: "runs",
         name: "Runs",
         description: "One row per licensing run.",
         data: runs,
-        fields: [text("runId", "Run id"), text("run", "Project"), text("started", "Started"), text("source", "Source"), text("status", "Status"), whole("rounds", "Agent rounds"), money("verifiedTotal", "Verified total"), money("priceOnlyTotal", "Price-only total"), money("compliancePremium", "Compliance premium"), whole("blockedLicences", "Licences blocked"), text("paid", "Payment")],
+        fields: [text("runId", "Run id"), text("run", "Project"), text("started", "Started"), text("source", "Source"), text("status", "Status"), whole("rounds", "Agent rounds"), text("currency", "Currency"), money("verifiedTotal", "Verified total"), decimal("verifiedTotalLocal", "Verified total (own currency)"), money("priceOnlyTotal", "Price-only total"), money("compliancePremium", "Compliance premium"), whole("blockedLicences", "Licences blocked"), text("paid", "Payment")],
       },
       {
         id: "offers",
@@ -80,7 +88,7 @@ export function buildPortfolioData(views: SessionView[]) {
         name: "Creator payouts",
         description: "Creators paid through PayPal Payouts after a purchase.",
         data: payouts,
-        fields: [text("payoutId", "Payout"), text("runId", "Run id"), text("run", "Project"), text("licensor", "Creator"), text("asset", "Asset"), money("amount", "Amount"), text("status", "Status")],
+        fields: [text("payoutId", "Payout"), text("runId", "Run id"), text("run", "Project"), text("licensor", "Creator"), text("asset", "Asset"), money("amount", "Amount"), decimal("amountLocal", "Amount (own currency)"), text("currency", "Currency"), text("status", "Status")],
       },
       {
         id: "events",

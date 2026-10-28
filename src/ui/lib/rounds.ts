@@ -30,7 +30,7 @@ export interface Story {
 }
 
 const LOOP_KINDS = new Set(["proposed", "revised", "rejected", "verified", "proposal_error"]);
-const AFTER_KINDS = new Set(["approved", "order_created", "captured", "payout_created", "payout_failed", "payout_settled"]);
+const AFTER_KINDS = new Set(["approved", "order_created", "captured", "capture_mismatch", "payout_created", "payout_failed", "payout_settled"]);
 
 const asStrings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
 const asNumber = (v: unknown, fallback = 0) => (typeof v === "number" && Number.isFinite(v) ? v : fallback);

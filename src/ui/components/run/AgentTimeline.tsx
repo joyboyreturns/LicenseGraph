@@ -258,7 +258,7 @@ function AfterItem({ event, current, currency }: { event: LedgerEvent; current: 
   const p = event.payload;
   const icon =
     event.kind === "approved" ? <UserCheck aria-hidden /> : event.kind === "order_created" ? <CreditCard aria-hidden /> : event.kind === "captured" ? <Wallet aria-hidden /> : <Send aria-hidden />;
-  const tone = event.kind === "payout_failed" ? "bad" : event.kind === "approved" ? "human" : "pay";
+  const tone = event.kind === "payout_failed" || event.kind === "capture_mismatch" ? "bad" : event.kind === "approved" ? "human" : "pay";
   let detail: string | null = null;
   if (event.kind === "approved") detail = dateTimeText(event.at);
   if (event.kind === "order_created" || event.kind === "captured") {

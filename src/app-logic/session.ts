@@ -210,6 +210,8 @@ async function completePaymentOnce(session: Session, deps: Deps): Promise<Captur
   const bundle = session.loop?.bundle;
   const total = bundle?.offers.reduce((n, o) => n + o.priceCents, 0);
   if (!bundle || total === undefined || captured.id !== session.order.id || captured.status !== "COMPLETED" || !captured.captureId || captured.amount.currency !== bundle.offers[0]?.currency || captured.amount.value !== centsToValue(total)) {
+    // Money may already have moved at PayPal, so the refusal is written to the ledger: the buyer and the owner can see it.
+    session.ledger.append("capture_mismatch", { orderId: captured.id, captureId: captured.captureId ?? null, status: captured.status, amount: captured.amount ?? null, expectedCents: total ?? null, expectedCurrency: bundle?.offers[0]?.currency ?? null });
     throw new SessionError("Payment is not a completed capture for the approved order, currency and amount. No creator payouts were sent.");
   }
   session.capture = captured;
@@ -333,6 +335,7 @@ export function viewOf(session: Session): SessionView {
 }
 
 const ACTIVE: Phase[] = ["created", "extracting", "proposing"];
+const EVICTABLE: Phase[] = ["failed", "verified", "settled"];
 
 /** Sessions with a size cap, optionally saved to disk so they survive a restart. */
 export class SessionStore {
@@ -358,9 +361,11 @@ export class SessionStore {
 
   add(s: Session) {
     // Map keeps insertion order, so the first entries are the oldest. Never evict a run in progress.
+    // Only runs that nothing more can happen to are dropped; a run with money in flight (approved, order
+    // created, captured) stays in memory so the buyer's return from PayPal and any payout retry still work.
     for (const [id, old] of this.sessions) {
       if (this.sessions.size < this.maxSessions) break;
-      if (!ACTIVE.includes(old.phase)) this.sessions.delete(id);
+      if (EVICTABLE.includes(old.phase)) this.sessions.delete(id);
     }
     this.attach(s);
     s.onChange?.();

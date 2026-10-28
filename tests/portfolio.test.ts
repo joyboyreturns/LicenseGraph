@@ -73,3 +73,22 @@ describe("buildPortfolioData", () => {
     expect(Object.keys(page.widgetLayout).sort()).toEqual(Object.keys(page.widgets).sort());
   });
 });
+
+describe("currencies in the portfolio", () => {
+  it("never adds a non-dollar run into a dollar total", async () => {
+    const usd = await run("documentary", true);
+    const eur = structuredClone(usd);
+    eur.id = "eur-run";
+    eur.bundle = { ...eur.bundle!, currency: "EUR" };
+    eur.payouts = { ...eur.payouts!, lines: eur.payouts!.lines.map((l) => ({ ...l, currency: "EUR" })) };
+
+    const def = buildPortfolioData([usd, eur]);
+    const rows = def.sources.find((x) => x.id === "runs")!.data;
+    const [u, e] = [rows.find((r) => r.runId === usd.id)!, rows.find((r) => r.runId === "eur-run")!];
+    expect(u).toMatchObject({ currency: "USD", verifiedTotal: 329, verifiedTotalLocal: 329 });
+    expect(e).toMatchObject({ currency: "EUR", verifiedTotal: null, priceOnlyTotal: null, compliancePremium: null, verifiedTotalLocal: 329 });
+    const lines = def.sources.find((x) => x.id === "payouts")!.data.filter((r) => r.runId === "eur-run");
+    expect(lines.length).toBeGreaterThan(0);
+    for (const l of lines) expect(l).toMatchObject({ amount: null, currency: "EUR" });
+  });
+});
