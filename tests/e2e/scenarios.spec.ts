@@ -91,3 +91,27 @@ test("a purchase that came out of a negotiation carries the negotiation in its p
   await expect(page.getByRole("heading", { name: "Negotiation" })).toBeVisible();
   await expect(page.getByText(/Answers an earlier run that had no compliant bundle, where 3 licensors were asked to change terms; 3 revised licences added/)).toBeVisible();
 });
+
+test("with a live model the gap panel offers a paste box for each licensor's reply, and sends exactly that licence to be checked", async ({ page }) => {
+  const started = await page.request.post("/api/sessions", { data: { scenarioId: "exclusive-theme" } });
+  const { id } = await started.json();
+  await expect.poll(async () => (await (await page.request.get(`/api/sessions/${id}`)).json()).phase, { timeout: 30_000 }).toBe("failed");
+
+  // This server runs the offline demo, so pretend it has a model and catch what the page would send.
+  await page.route("**/api/config", async (route) => route.fulfill({ json: { ...(await (await route.fetch()).json()), mode: "live" } }));
+  let sent: { assetId?: string; text?: string; licensor?: { name?: string } } | undefined;
+  await page.route(`**/api/sessions/${id}/revise`, async (route) => {
+    sent = route.request().postDataJSON();
+    await route.fulfill({ status: 201, json: await (await page.request.get(`/api/sessions/${id}`)).json() });
+  });
+
+  await page.goto(`/run/${id}`);
+  await expect(page.getByTestId("negotiation-outlook")).toBeVisible({ timeout: 30_000 });
+  const song = page.locator("details", { hasText: "They replied" }).first();
+  await song.locator("summary").click();
+  const check = song.getByRole("button", { name: "Check revised terms" });
+  await expect(check).toBeDisabled(); // nothing pasted yet
+  await song.getByRole("textbox").fill("Price: USD 520.00. Exclusive to the Licensee.");
+  await check.click();
+  await expect.poll(() => sent).toMatchObject({ assetId: "song", text: "Price: USD 520.00. Exclusive to the Licensee.", licensor: { name: "Tapeloop" } });
+});
