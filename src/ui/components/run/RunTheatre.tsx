@@ -16,6 +16,7 @@ import { AgentTimeline } from "./AgentTimeline";
 import { ApprovalPanel } from "./ApprovalPanel";
 import { AskPanel } from "./AskPanel";
 import { ComplianceSummary } from "./ComplianceSummary";
+import { CompareWithEarlier } from "./CompareWithEarlier";
 import { SavingLevers } from "./SavingLevers";
 import { WhatIf } from "./WhatIf";
 import { EvidenceViewer } from "./EvidenceViewer";
@@ -333,6 +334,7 @@ function Theatre({ view, accept, refresh }: { view: SessionView; accept: (v: Ses
             <ComplianceSummary analysis={view.analysis} catalog={catalog} currency={currency} verified={Boolean(view.bundle)} project={view.project} />
           </section>
         )}
+        {!live && (view.meta?.rebriefedFrom ?? view.meta?.revisedFrom) && <CompareWithEarlier view={view} earlierId={(view.meta?.rebriefedFrom ?? view.meta?.revisedFrom)!} />}
         {levers.length > 0 && (
           <section className="card" aria-labelledby="levers-title">
             <div className="card-head">

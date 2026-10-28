@@ -176,3 +176,32 @@ test("a what-if can be made real: the same licences are checked against the chan
   expect(first.project.commercial).toBe(true);
   expect(first.bundle.totalCents).toBe(32_900);
 });
+
+test("a rebriefed run sits beside the run it came from: what each asset now costs and which licence was chosen", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  const { id } = await (await page.request.post("/api/sessions", { data: { scenarioId: "documentary" } })).json();
+  const done = async (runId: string) => expect.poll(async () => (await (await page.request.get(`/api/sessions/${runId}`)).json()).phase, { timeout: 30_000 }).toBe("verified");
+  await done(id);
+  const earlier = await (await page.request.get(`/api/sessions/${id}`)).json();
+
+  const rebrief = await page.request.post(`/api/sessions/${id}/rebrief`, { data: { change: { commercial: false } } });
+  expect(rebrief.status()).toBe(201);
+  const next = await rebrief.json();
+  await done(next.id);
+  const now = await (await page.request.get(`/api/sessions/${next.id}`)).json();
+  expect(now.bundle.totalCents).toBeLessThan(earlier.bundle.totalCents);
+
+  await page.goto(`/run/${next.id}`);
+  const panel = page.getByTestId("compare-earlier");
+  await expect(panel).toContainText(`That run's verified bundle cost ${formatMoney(earlier.bundle.totalCents, "USD")}.`, { timeout: 30_000 });
+  await expect(panel).toContainText(`${formatMoney(earlier.bundle.totalCents - now.bundle.totalCents, "USD")} less.`);
+  await expect(panel).toContainText("Cheaper licence");
+  await expect(panel.getByRole("link", { name: "Open that run" })).toHaveAttribute("href", `/run/${id}`);
+
+  // A run that did not come from another has no such panel.
+  await page.goto(`/run/${id}`);
+  await expect(page.getByRole("region", { name: "What if the project changed?" })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId("compare-earlier")).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
