@@ -53,6 +53,8 @@ Two further answers come from the same rules engine, with no model involved:
 
 Both are also tables in AG Studio (`requirements`, `gaps`), so the dashboard and its assistant can chart and filter them across runs.
 
+The dashboards also include a **custom Studio widget**, the *rule matrix* (`app/dashboard/rule-matrix.tsx`): a heat grid of which rule rejected which asset, across every run on the portfolio page. It is a real Studio widget type, not a chart in disguise. It appears in the widget menu, takes its fields through the edit panel, and follows the page's filters and cross-filtering. The grouping logic is plain code with unit tests (`src/dashboard/rule-matrix.ts`).
+
 ## Agents can shop, only people can spend (MCP)
 
 `scripts/mcp-server.ts` exposes LicenseGraph as a [Model Context Protocol](https://modelcontextprotocol.io) server over stdio, so any MCP-capable AI agent can use it:

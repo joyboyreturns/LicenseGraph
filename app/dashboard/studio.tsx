@@ -2,6 +2,7 @@
 
 import { AgStudioAiModule, createAiHarness, directLlmRunner, type AgAiHarnessSetup, type AgReportState } from "ag-studio";
 import { AgStudio, AgStudioProvider } from "ag-studio-react";
+import { widgets, type StudioRegistry } from "./rule-matrix";
 import { useEffect, useMemo, useState } from "react";
 import type { SessionView } from "@/src/app-logic/session";
 import { buildStudioData } from "@/src/dashboard/data";
@@ -11,7 +12,7 @@ import { licenseGraphTheme } from "@/src/dashboard/theme";
 import { describeSchema } from "@/src/dashboard/schema-text";
 import { AGGREGATIONS, buildChart, buildKpi, buildTable, catalogFrom, CHART_TYPES, placeWidget, type Aggregation, type Built, type ChartKind } from "@/src/dashboard/widget-tools";
 
-const initialState: AgReportState = {
+const initialState: AgReportState<StudioRegistry> = {
   selectedPageId: "overview",
   pages: [
     {
@@ -38,6 +39,11 @@ const initialState: AgReportState = {
           dataMapping: { categoryKey: [{ id: "requirements.requirement" }], valueKey: [{ id: "requirements.extraCost", aggregation: "sum" }] },
           format: { title: { enabled: true, text: "Cost of each requirement" } },
         },
+        ruleMatrix: {
+          type: "rule-matrix",
+          dataMapping: { rows: [{ id: "violations.asset" }], columns: [{ id: "violations.rule" }], value: [{ id: "violations.violationId", aggregation: "count" }] },
+          format: { title: { enabled: true, text: "Which rule rejected which asset" } },
+        },
         gapRequests: {
           type: "grid",
           dataMapping: { cols: ["gaps.asset", "gaps.offerId", "gaps.rule", "gaps.ask"].map((id) => ({ id })) },
@@ -62,8 +68,9 @@ const initialState: AgReportState = {
         violationsByRule: { xTrack: 8, yTrack: 0, xSpan: 4, ySpan: 5 },
         requirementCost: { xTrack: 0, yTrack: 5, xSpan: 6, ySpan: 5 },
         gapRequests: { xTrack: 6, yTrack: 5, xSpan: 6, ySpan: 5 },
-        rights: { xTrack: 0, yTrack: 10, xSpan: 12, ySpan: 6 },
-        ledger: { xTrack: 0, yTrack: 16, xSpan: 12, ySpan: 6 },
+        ruleMatrix: { xTrack: 0, yTrack: 10, xSpan: 12, ySpan: 4 },
+        rights: { xTrack: 0, yTrack: 14, xSpan: 12, ySpan: 6 },
+        ledger: { xTrack: 0, yTrack: 20, xSpan: 12, ySpan: 6 },
       },
     },
   ],
@@ -196,7 +203,7 @@ export default function Studio(props: StudioProps) {
         <button type="button" className={mode === "view" ? "primary" : ""} onClick={() => setMode("view")}>View</button>
         <button type="button" className={mode === "edit" ? "primary" : ""} onClick={() => setMode("edit")}>Edit dashboard</button>
       </div>
-      <AgStudio data={data as never} initialState={(isPortfolio ? PORTFOLIO_INITIAL_STATE : initialState) as AgReportState} mode={mode} ai={ai} theme={theme} style={{ height: "calc(100vh - 108px)" }} />
+      <AgStudio<StudioRegistry> data={data as never} widgets={widgets} initialState={(isPortfolio ? PORTFOLIO_INITIAL_STATE : initialState) as AgReportState<StudioRegistry>} mode={mode} ai={ai} theme={theme} style={{ height: "calc(100vh - 108px)" }} />
     </AgStudioProvider>
   );
 }

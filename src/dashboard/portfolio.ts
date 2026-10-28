@@ -144,6 +144,11 @@ export const PORTFOLIO_INITIAL_STATE = {
           dataMapping: { categoryKey: [{ id: "requirements.requirement" }], valueKey: [{ id: "requirements.extraCost", aggregation: "sum" }] },
           format: { title: { enabled: true, text: "Cost of each requirement" } },
         },
+        ruleMatrix: {
+          type: "rule-matrix",
+          dataMapping: { rows: [{ id: "violations.asset" }], columns: [{ id: "violations.rule" }], value: [{ id: "violations.violationId", aggregation: "count" }] },
+          format: { title: { enabled: true, text: "Which rule keeps rejecting which asset" } },
+        },
         offerStatus: {
           type: "donut-chart",
           dataMapping: { categoryKey: [{ id: "offers.status" }], valueKey: [{ id: "offers.offerId", aggregation: "count" }] },
@@ -175,6 +180,7 @@ export const PORTFOLIO_INITIAL_STATE = {
         requirementCost: { xTrack: 9, yTrack: 6, xSpan: 3, ySpan: 5 },
         runsGrid: { xTrack: 0, yTrack: 11, xSpan: 12, ySpan: 5 },
         payoutsGrid: { xTrack: 0, yTrack: 16, xSpan: 6, ySpan: 5 },
+        ruleMatrix: { xTrack: 6, yTrack: 16, xSpan: 6, ySpan: 5 },
         offersGrid: { xTrack: 0, yTrack: 21, xSpan: 12, ySpan: 6 },
       },
     },
