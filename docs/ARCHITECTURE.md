@@ -51,19 +51,21 @@ The visible propose, verify, reject, revise cycle is the product. The model neve
 | Path | Responsibility |
 |---|---|
 | `src/core/types.ts`, `rules.ts` | Domain types and the rules engine: `verifyBundle` (bundle verdict) and `evaluateOffer` (one offer against every rule: pass, fail or skip). Coverage, duplicates, commercial use, territory, term and fixed end date, media, attribution, sublicensing, exclusivity, offer expiry, currency, evidence, budget. |
+| `src/core/insights.ts`, `whatif.ts`, `negotiation.ts`, `renewals.ts` | What each requirement costs; gap requests (the closest offer and what to ask for); the exact what-if on a changed brief; the "if every licensor agreed" outlook with per-asset price ceilings (`concede` edits an offer's terms and the verifier judges the result); licence end dates and the iCalendar file. All pure, browser-safe, and checked against exhaustive search or the verifier in property tests. |
 | `src/core/analysis.ts`, `digest.ts` | The price-only comparison (what was blocked, what compliance costs) and the canonical bundle text hashed identically by server and browser. |
 | `src/extraction/` | `extract.ts`: licence text to `LicenseOffer` with located evidence. `model.ts`: gateway client with the free-models-only guard and rate-limit pacing. |
 | `src/agent/` | `loop.ts`: propose-verify-revise with round cap and stall detection. `llm.ts`: model proposer. `greedy.ts`: deterministic stand-in used for replayed scenarios. |
 | `src/ledger/` | `chain.ts`: browser-safe event shape and chain verification. `ledger.ts`: the Node hashing, append-only log, rebuild from stored events. |
 | `src/payments/` | `paypal.ts`: Orders v2 and Payouts client (Sandbox host only). `checkout.ts`: `startCheckout` gate (re-verify and approval digest match). `payouts.ts`: who is paid what. `simulator.ts`: an offline stand-in with PayPal's ordering rules. |
 | `src/passport/` | Passport builder and `verifyPassport`: nine checks that run in a browser (including that the payment was not reversed). |
-| `src/app-logic/` | `session.ts`: the flow and its order of steps (extract, propose, verify, approve, pay, capture, settle). `persistence.ts`: one JSON file per run, ledger chain re-checked on load. |
+| `src/app-logic/` | `session.ts`: the flow and its order of steps (extract, propose, verify, approve, pay, capture, settle). Licences are read three at a time and recorded in order; a run ends at once when the exact cost check proves no bundle can exist. `revision.ts`: a licensor's revised licence becomes a new run linked to the one it answers (the first ledger event, `answers_run`). `persistence.ts`: one JSON file per run, ledger chain re-checked on load. |
 | `src/server/` | Runtime wiring (demo or live; PayPal, simulator or none), owner cookies, the assistant's model proxy, rate limiters, passport signing. |
 | `src/intake/` | The plain-English brief reader and grounded run Q&A, each with an offline fallback. |
 | `src/demo/` | Built-in scenarios and the recorded model output they replay. |
 | `src/ui/`, `app/` | The Next.js front end: home, run theatre (rights graph, replay, matrix, evidence, settlement), passport, verify, simulator checkout. Pure UI logic is unit-tested in `tests/ui`. |
-| `src/dashboard/`, `app/dashboard/` | AG Studio dashboards: a single run, and the cross-run portfolio. Validated chart, table and KPI tools for the assistant. |
-| `app/api/` | HTTP routes: sessions, payments, passports, scenarios, intake, portfolio, assistant proxy, simulator, health. |
+| `src/dashboard/`, `app/dashboard/` | AG Studio dashboards: a single run, and the cross-run portfolio, with two custom widgets (rule matrix, licence timeline) whose layout code is pure and tested. Validated chart, table, KPI and timeline tools for the assistant. |
+| `src/mcp/`, `scripts/mcp-server.ts` | The MCP server: tools (`check_licence_bundle`, `cheapest_compliant_bundle`, `what_if_brief`, `licence_end_dates`, `start_licence_purchase`, `get_purchase_status`) and the `buy_licences` prompt, built once in `server.ts` and served over stdio and, statelessly, over HTTP at `/api/mcp`. |
+| `app/api/` | HTTP routes: sessions (including `revise`), payments, passports (and their badge), scenarios, intake, portfolio, assistant proxy, simulator, PayPal webhooks, MCP, health, and the generated OpenAPI document. |
 
 ## Data model
 
