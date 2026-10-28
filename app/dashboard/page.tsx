@@ -206,7 +206,7 @@ function Portfolio() {
       )}
       {runs && runs.length > 0 && (
         <div className={`card ${styles.tableCard}`}>
-          <div className="table-scroll">
+          <div className="table-scroll" tabIndex={0} role="region" aria-label="All runs, newest first">
             <table className={`table ${styles.table}`}>
               <caption className="visually-hidden">All runs, newest first</caption>
               <thead>

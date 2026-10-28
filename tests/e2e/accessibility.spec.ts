@@ -104,3 +104,33 @@ for (const scheme of ["light", "dark"] as const) {
     });
   });
 }
+
+test.describe("on a phone", () => {
+  test.use({ viewport: { width: 390, height: 844 }, reducedMotion: "reduce" });
+
+  test("the main pages and a finished run have no automated accessibility violations", async ({ page }) => {
+    for (const path of ["/", "/tour", "/rules", "/verify", "/agents"]) {
+      await page.goto(path);
+      await expect(page.locator("main")).toBeVisible();
+      expect(await violations(page), path).toEqual([]);
+    }
+    await page.goto(`/run/${await runOf(page, "documentary")}`);
+    await toResult(page);
+    await expect(page.getByRole("button", { name: "Review and approve" })).toBeVisible();
+    expect(await violations(page), "run").toEqual([]);
+
+    // A paid run: the settlement and ledger tables, the passport and a creator receipt.
+    const paid = await runOf(page, "podcast");
+    await page.request.post(`/api/sessions/${paid}/approve`, { data: { approvedBy: "Kiran" } });
+    const order = await (await page.request.post(`/api/sessions/${paid}/pay`)).json();
+    await page.request.post(`/api/simulator/orders/${order.order.id}`);
+    await page.request.post(`/api/sessions/${paid}/capture`);
+    for (const path of [`/run/${paid}`, `/passport/${paid}`, `/passport/${paid}/receipt/song`]) {
+      await page.goto(path);
+      await expect(page.locator("main")).toBeVisible();
+      await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible({ timeout: 30_000 });
+      await page.waitForLoadState("networkidle");
+      expect(await violations(page), path).toEqual([]);
+    }
+  });
+});

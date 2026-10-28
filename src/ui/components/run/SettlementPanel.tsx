@@ -170,7 +170,7 @@ export function SettlementPanel({ view, config, busy, actions }: { view: Session
                   {payouts.status}
                 </span>
               </p>
-              <div className="table-scroll">
+              <div className="table-scroll" tabIndex={0} role="region" aria-label="Creator payouts">
                 <table className={`table ${styles.payouts}`}>
                   <caption className="visually-hidden">Creator payouts</caption>
                   <thead>

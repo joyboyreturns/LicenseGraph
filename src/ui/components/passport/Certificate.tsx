@@ -82,7 +82,7 @@ export function Certificate({ passport: p, qrSrc, verifyUrl }: { passport: Passp
         <h2 id="cert-bundle" className={styles.h2}>
           Licensed bundle
         </h2>
-        <div className="table-scroll">
+        <div className="table-scroll" tabIndex={0} role="region" aria-label="The licensed bundle">
           <table className={styles.table}>
             <thead>
               <tr>

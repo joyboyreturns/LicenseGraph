@@ -107,7 +107,7 @@ export function AgentConsole() {
                 <p className={styles.result}>{s.result}</p>
                 <details>
                   <summary>Raw reply from the tool</summary>
-                  <pre className={styles.raw}>{JSON.stringify(s.raw, null, 2)}</pre>
+                  <pre className={styles.raw} tabIndex={0} aria-label="Raw tool result">{JSON.stringify(s.raw, null, 2)}</pre>
                 </details>
               </div>
             </li>

@@ -16,7 +16,7 @@ export function BundleTable({ view, catalog, onSelectOffer }: { view: SessionVie
   const bundle = view.bundle;
   if (!bundle) return null;
   return (
-    <div className="table-scroll">
+    <div className="table-scroll" tabIndex={0} role="region" aria-label="The verified licence bundle">
       <table className={`table ${styles.bundle}`}>
         <caption className="visually-hidden">The verified licence bundle</caption>
         <thead>

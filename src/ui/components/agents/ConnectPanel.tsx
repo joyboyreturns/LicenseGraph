@@ -30,14 +30,14 @@ export function ConnectPanel() {
         <p className="small ink-2" style={{ margin: 0 }}>
           Any MCP client can use this server. Over HTTP, nothing needs installing:
         </p>
-        <pre className={styles.snippet}>{http}</pre>
+        <pre className={styles.snippet} tabIndex={0} aria-label="MCP over HTTP: configuration to copy">{http}</pre>
         <CopyButton text={http} label="Copy HTTP configuration" announce="Configuration copied" className="btn btn-sm">
           Copy HTTP configuration
         </CopyButton>
         <p className="small ink-2" style={{ margin: "6px 0 0" }}>
           Or run it locally over stdio from a clone of the repository:
         </p>
-        <pre className={styles.snippet}>{stdio}</pre>
+        <pre className={styles.snippet} tabIndex={0} aria-label="MCP over stdio: configuration to copy">{stdio}</pre>
         <CopyButton text={stdio} label="Copy stdio configuration" announce="Configuration copied" className="btn btn-sm">
           Copy stdio configuration
         </CopyButton>

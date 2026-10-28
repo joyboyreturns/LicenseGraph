@@ -110,7 +110,7 @@ export function GapRequests({ view, catalog }: { view: SessionView; catalog: Cat
                   <li key={a.rule}>{a.ask}</li>
                 ))}
               </ul>
-              <pre className={styles.draft}>{text}</pre>
+              <pre className={styles.draft} tabIndex={0} aria-label="Message to the licensor">{text}</pre>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                 <CopyButton text={text} label={`Copy message to the ${assetLabel(gap.assetId)} licensor`} announce="Message copied" className="btn btn-sm">
                   Copy message

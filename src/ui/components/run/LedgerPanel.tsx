@@ -66,7 +66,7 @@ export function LedgerPanel({ events, chainValid, catalog, cursor }: { events: r
           <p className={styles.explain}>
             Every step is appended to the ledger with the SHA-256 hash of the event before it, so changing, removing or reordering any event breaks every hash after it. The browser check above recomputes them all from the raw events.
           </p>
-          <div className="table-scroll">
+          <div className="table-scroll" tabIndex={0} role="region" aria-label="Ledger events, oldest first">
             <table className={`table ${styles.table}`}>
               <caption className="visually-hidden">Ledger events, oldest first</caption>
               <thead>

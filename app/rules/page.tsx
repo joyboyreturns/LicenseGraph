@@ -36,7 +36,7 @@ export default function Page() {
           </h2>
           <span className="small muted">Each offer is checked against each rule, not only the proposed bundle</span>
         </div>
-        <div className="table-scroll">
+        <div className="table-scroll" tabIndex={0} role="region" aria-label="The rules every licence offer is checked against">
           <table className="table">
             <caption className="visually-hidden">The rules every licence offer is checked against</caption>
             <thead>
