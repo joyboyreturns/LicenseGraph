@@ -42,6 +42,7 @@ export const SessionView = z
     id: z.string().uuid(),
     phase,
     createdAt: z.string(),
+    runDate: z.string().optional().describe("The date offers were checked against when the run started (YYYY-MM-DD)."),
     failure: z.string().optional(),
     awaitingPerson: z.boolean().optional().describe("An agent started this run and no person has taken control yet, so it cannot be approved or paid."),
     project: Project,

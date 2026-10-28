@@ -1559,6 +1559,10 @@
           "createdAt": {
             "type": "string"
           },
+          "runDate": {
+            "description": "The date offers were checked against when the run started (YYYY-MM-DD).",
+            "type": "string"
+          },
           "failure": {
             "type": "string"
           },
@@ -1947,6 +1951,10 @@
             ]
           },
           "createdAt": {
+            "type": "string"
+          },
+          "runDate": {
+            "description": "The date offers were checked against when the run started (YYYY-MM-DD).",
             "type": "string"
           },
           "failure": {

@@ -13,7 +13,7 @@ export interface BriefResult {
   source: "local" | "model";
 }
 
-const EU = ["AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU", "IE", "IT", "LV", "LT", "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE"];
+export const EU_COUNTRIES = ["AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU", "IE", "IT", "LV", "LT", "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE"];
 const PLACES: [RegExp, string[]][] = [
   [/\b(worldwide|world-wide|global(?:ly)?|international(?:ly)?|anywhere|all countries)\b/i, ["WORLD"]],
   [/\b(united states|america(?:n)?)\b/i, ["US"]],
@@ -28,7 +28,7 @@ const PLACES: [RegExp, string[]][] = [
   [/\b(japan|japanese)\b/i, ["JP"]],
   [/\b(brazil|brazilian)\b/i, ["BR"]],
   [/\b(mexico|mexican)\b/i, ["MX"]],
-  [/\b(europe|european union|the eu|eu)\b/i, EU],
+  [/\b(europe|european union|the eu|eu)\b/i, EU_COUNTRIES],
 ];
 const MEDIA: [RegExp, string][] = [
   [/\b(web|website|online|internet|blog)\b/i, "web"],

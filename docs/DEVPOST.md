@@ -44,6 +44,7 @@ Indie game studios, podcast networks, small agencies, filmmakers and freelancers
 - A language model proposes the licence bundle and revises after the verifier's rejections.
 - A language model (with an offline fallback) turns a plain-English brief into project requirements; every assumption is shown.
 - The AG Studio dashboard assistant builds views from plain English through validated tools.
+- A "what if the project changed?" panel: flip the territory, term, media or a requirement and the exact cheapest compliant bundle updates instantly in the browser, with no model and no estimate.
 - A custom AG Studio widget type, the rule matrix, shows which rule keeps rejecting which asset across runs; it plugs into Studio's data, filters and edit panel like a built-in widget.
 - The model never verifies its own output, never creates orders, and never sees payment credentials.
 

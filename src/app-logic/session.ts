@@ -367,6 +367,8 @@ export interface SessionView {
   id: string;
   phase: Phase;
   createdAt: string;
+  /** The date offers were checked against when the run started (YYYY-MM-DD). */
+  runDate?: string;
   failure?: string;
   /** An agent started this run and no person has taken control yet, so it cannot be approved or paid. */
   awaitingPerson?: boolean;
@@ -400,6 +402,7 @@ export function viewOf(session: Session): SessionView {
     id: session.id,
     phase: session.phase,
     createdAt: session.createdAt,
+    runDate: session.runDate,
     failure: session.failure,
     awaitingPerson: session.claim ? true : undefined,
     project: session.input.project,

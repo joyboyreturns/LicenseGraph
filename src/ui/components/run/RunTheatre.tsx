@@ -15,6 +15,7 @@ import { AgentTimeline } from "./AgentTimeline";
 import { ApprovalPanel } from "./ApprovalPanel";
 import { AskPanel } from "./AskPanel";
 import { ComplianceSummary } from "./ComplianceSummary";
+import { WhatIf } from "./WhatIf";
 import { EvidenceViewer } from "./EvidenceViewer";
 import { FailurePanel } from "./FailurePanel";
 import { LedgerPanel } from "./LedgerPanel";
@@ -322,6 +323,17 @@ function Theatre({ view, accept, refresh }: { view: SessionView; accept: (v: Ses
               <span className="small muted">Every figure is a price from an uploaded licence</span>
             </div>
             <ComplianceSummary analysis={view.analysis} catalog={catalog} currency={currency} verified={Boolean(view.bundle)} project={view.project} />
+          </section>
+        )}
+        {!live && view.candidates.length > 0 && view.analysis && (
+          <section className="card" aria-labelledby="whatif-title">
+            <div className="card-head">
+              <h2 id="whatif-title" className="card-title">
+                What if the project changed?
+              </h2>
+              <span className="small muted">Exact figures, re-checked here. Nothing is bought or changed.</span>
+            </div>
+            <WhatIf project={view.project} requiredAssetIds={view.analysis.assets.map((a) => a.assetId)} candidates={view.candidates} currency={currency} runDate={view.runDate} catalog={catalog} />
           </section>
         )}
         {!live && (
