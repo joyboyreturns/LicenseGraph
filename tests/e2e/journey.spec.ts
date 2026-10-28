@@ -59,8 +59,19 @@ test("a scenario goes from licences to a verified, paid and independently checka
   await page.goto("/verify");
   await page.setInputFiles('input[type="file"]', file);
   await expect(page.getByText(/All 9 checks passed in this browser/)).toBeVisible({ timeout: 30_000 });
+
+  // Who issued it, checked in this browser against a public key: valid for the real file, not for the edited copy.
+  await page.getByRole("button", { name: "Use this server’s published key" }).click();
+  await expect(page.getByTestId("issuer-signature")).toContainText("Issued by the holder of this key");
+  await page.getByLabel(/Issuer’s public key/).fill("A".repeat(43));
+  await expect(page.getByTestId("issuer-signature")).toContainText("Not issued by that key");
+  await page.getByRole("button", { name: "Use this server’s published key" }).click();
+  await expect(page.getByTestId("issuer-signature")).toContainText("Issued by the holder of this key");
+  expect(await accessibilityViolations(page)).toEqual([]);
+
   await page.getByRole("button", { name: "Try a tampered copy" }).click();
   await expect(page.getByText(/Does not verify/)).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId("issuer-signature")).toContainText("Not issued by that key");
 
   expect(errors).toEqual([]);
 });

@@ -2,8 +2,9 @@
 
 import { ClipboardPaste, FileJson, FlaskConical, RotateCcw, ShieldCheck, Upload } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { verifyPassport, type Passport, type PassportCheck } from "@/src/passport/passport";
+import { verifySignature, type SignatureState } from "@/src/passport/signature";
 import { api, errorMessage } from "@/src/ui/lib/api";
 import { formatMoney } from "@/src/ui/lib/format";
 import { parsePassport, tamperPrice } from "@/src/ui/lib/passport-file";
@@ -11,6 +12,14 @@ import { Spinner } from "../bits";
 import type { RunSummary } from "../home/types";
 import { VerifyChecks } from "./VerifyChecks";
 import styles from "./VerifyClient.module.css";
+
+const ISSUER_TEXT: Record<SignatureState, { title: string; text: string; tone: string }> = {
+  valid: { title: "Issued by the holder of this key", text: "The signature matches the public key you gave, checked here with no server involved.", tone: "ok" },
+  invalid: { title: "Not issued by that key", text: "The signature does not match that key. Either the passport was changed after signing, or another issuer signed it.", tone: "bad" },
+  unsigned: { title: "Not signed", text: "This passport carries no signature, so it cannot be tied to an issuer. The content checks above still stand on their own.", tone: "neutral" },
+  unsupported: { title: "Signed in an older way", text: "This passport uses a shared-secret signature that only its server can check. Open it on that server to see the result.", tone: "neutral" },
+  unavailable: { title: "This browser cannot check it", text: "This browser has no Ed25519 in WebCrypto. Use a current Chrome, Firefox or Safari, or the command-line verifier.", tone: "neutral" },
+};
 
 interface Loaded {
   passport: Passport;
@@ -30,6 +39,31 @@ export function VerifyClient() {
   const [dragging, setDragging] = useState(false);
   const [fetching, setFetching] = useState(false);
   const resultRef = useRef<HTMLDivElement>(null);
+  const [issuerKey, setIssuerKey] = useState("");
+  const [issuer, setIssuer] = useState<SignatureState | null>(null);
+  const [keyNote, setKeyNote] = useState<string | null>(null);
+
+  // The issuer's signature is checked on its own, as soon as there is both a passport and a key to check it with.
+  useEffect(() => {
+    let current = true;
+    setIssuer(null);
+    if (!loaded || !issuerKey.trim()) return;
+    void verifySignature(loaded.passport, issuerKey).then((s) => current && setIssuer(s));
+    return () => {
+      current = false;
+    };
+  }, [loaded, issuerKey]);
+
+  const useServerKey = async () => {
+    setKeyNote(null);
+    try {
+      const { keys } = await api<{ keys: { publicKey: string; keyId: string }[] }>("/.well-known/licensegraph-keys.json");
+      setIssuerKey(keys[0]!.publicKey);
+      setKeyNote(`Key ${keys[0]!.keyId} from this server. For a real check, use a key you were given by the issuer instead.`);
+    } catch (e) {
+      setKeyNote(errorMessage(e, "This server does not publish a key."));
+    }
+  };
 
   const check = useCallback(async (p: Passport, source: string, tampered?: Loaded["tampered"]) => {
     setError(null);
@@ -140,6 +174,24 @@ export function VerifyClient() {
           </div>
         )}
 
+        <div className={styles.paste}>
+          <label className="label" htmlFor={`${ids}-key`}>
+            Issuer&rsquo;s public key (optional)
+          </label>
+          <input id={`${ids}-key`} className="input mono" value={issuerKey} onChange={(e) => setIssuerKey(e.target.value)} placeholder="Paste the key the issuer gave you" spellCheck={false} autoComplete="off" aria-describedby={`${ids}-key-help`} />
+          <p id={`${ids}-key-help`} className="small muted">
+            Adds a check of who issued the passport, offline in this browser. Without it, the checks above show the record is consistent and unchanged, not who made it.
+          </p>
+          <button type="button" className="btn btn-sm" onClick={useServerKey}>
+            Use this server&rsquo;s published key
+          </button>
+          {keyNote && (
+            <p className="small ink-2" role="status">
+              {keyNote}
+            </p>
+          )}
+        </div>
+
         {error && (
           <p className="callout tone-bad" role="alert">
             {error}
@@ -193,6 +245,11 @@ export function VerifyClient() {
               </p>
             )}
             <VerifyChecks checks={result?.checks ?? null} ok={result?.ok ?? null} runKey={runKey} stepMs={360} />
+            {issuer && (
+              <p className={`callout tone-${ISSUER_TEXT[issuer].tone}`} data-testid="issuer-signature">
+                <b>{ISSUER_TEXT[issuer].title}.</b> {ISSUER_TEXT[issuer].text}
+              </p>
+            )}
             <div className={styles.resultActions}>
               {original && !loaded.tampered && (
                 <button type="button" className="btn" onClick={tamper}>
