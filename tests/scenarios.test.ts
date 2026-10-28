@@ -3,6 +3,7 @@ import { greedyProposer } from "../src/agent/greedy";
 import { createSession, runPipeline, viewOf, type Deps } from "../src/app-logic/session";
 import { demoModel } from "../src/demo/mock-model";
 import { scenarioById, scenarios } from "../src/demo/scenarios";
+import { negotiationOutlook } from "../src/core/negotiation";
 import { parseBriefLocally } from "../src/intake/brief";
 
 const deps: Deps = { model: demoModel, proposer: greedyProposer, today: () => "2026-11-05" };
@@ -24,13 +25,28 @@ describe("scenarios", () => {
     }
   });
 
-  it.each(scenarios.map((s) => s.id))("%s reads every licence, and a compliant bundle is found after at least one rejection", async (id) => {
+  it.each(scenarios.filter((s) => !s.noBundle).map((s) => s.id))("%s reads every licence, and a compliant bundle is found after at least one rejection", async (id) => {
     const { sc, s, view } = await run(id);
     expect(s.candidates).toHaveLength(sc.documents.length);
     expect(view.loopStatus).toBe("verified");
     expect(view.rounds).toBeGreaterThanOrEqual(2);
     expect(view.events.map((e) => e.kind)).toContain("rejected");
     expect(view.analysis!.blockedPurchases.length).toBeGreaterThan(0);
+  });
+
+  it("the exclusive theme has no compliant bundle, says what to ask for, and prices a yes", async () => {
+    const { sc, s, view } = await run("exclusive-theme");
+    expect(sc.noBundle).toBe(true);
+    expect(s.candidates).toHaveLength(sc.documents.length);
+    expect(view.bundle).toBeUndefined();
+    expect(view.loopStatus).not.toBe("verified");
+    expect(view.analysis!.gaps.map((g) => g.assetId).sort()).toEqual(["image", "song", "voiceover"]);
+    for (const gap of view.analysis!.gaps) expect(gap.asks.map((a) => a.rule)).toEqual(["exclusivity"]);
+    const out = negotiationOutlook(view.project, sc.requiredAssetIds, s.candidates, "USD", { today: "2026-11-05" })!;
+    expect(out.totalCents).toBe(34_000 + 14_000 + 21_000);
+    expect(out.headroomCents).toBe(150_000 - 69_000);
+    // Only the exclusive-making change is hypothetical: the cheaper non-network offers still fail on other rules.
+    expect(out.assets.map((a) => a.offerId).sort()).toEqual(["offer-pod-art-network", "offer-pod-song-network", "offer-pod-voice-long"]);
   });
 
   it("the game trailer takes three rounds and trips five different rules", async () => {

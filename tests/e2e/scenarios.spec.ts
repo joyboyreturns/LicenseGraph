@@ -21,3 +21,29 @@ test("a run is replayed from recorded model output and says so", async ({ page }
   await startScenario(page, "Documentary promo");
   await expect(page.getByText("Replay of recorded model output")).toBeVisible();
 });
+
+test("Exclusive theme tune: no licence can be bought, and the run says what to ask for and what a yes would cost", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("/");
+  await page.locator("article", { hasText: "Exclusive theme tune" }).getByRole("button", { name: /Run this scenario/ }).click();
+  await page.waitForURL(/\/run\//);
+  await page.getByRole("button", { name: "Skip to result" }).first().click();
+  await expect(page.getByRole("heading", { name: "No compliant bundle" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Review and approve" })).toHaveCount(0);
+
+  // What a yes would cost: the three closest offers at their quoted prices, against the $1,500 budget.
+  const outlook = page.getByTestId("negotiation-outlook");
+  await expect(outlook).toContainText("If every licensor said yes");
+  await expect(outlook).toContainText("$690.00");
+  await expect(outlook).toContainText("$810.00 under your budget");
+  await expect(outlook).toContainText("A best case, not an offer");
+  await expect(outlook.locator("li")).toHaveCount(3);
+
+  // Each gap can be sent: copied, or opened in the email app with the subject and body filled in.
+  const mail = page.getByRole("link", { name: "Open in email" }).first();
+  const href = (await mail.getAttribute("href"))!;
+  expect(href).toMatch(/^mailto:\?subject=Licence%20terms%20for%20the%20/);
+  expect(decodeURIComponent(href)).toContain("Make the licence exclusive.");
+  expect(errors).toEqual([]);
+});

@@ -93,7 +93,7 @@ Prize targets: Best Overall, Best Use of Agentic Commerce, Best Use of AG Grid. 
 - [x] Offline payment simulator, labelled everywhere; `npm run demo` for a zero-setup run
 - [x] Persistence of runs; run ownership (anonymous cookie); portfolio across runs in AG Studio
 - [x] Plain-English brief reader and grounded run Q&A with offline fallbacks
-- [x] Three scenarios (documentary, game trailer, podcast network) replayed from recorded model output
+- [x] Four scenarios (documentary, game trailer, podcast network, and an exclusive theme tune that has no compliant bundle) replayed from recorded model output
 - [x] Front-end redesign: home, run theatre (rights graph, replay, matrix, evidence viewer), settlement, passport, verify, simulator checkout
 - [x] End-to-end browser tests (11) and API-level tests; model calls paced to the free model's rate limit
 - [x] README with local-run steps, `.env.example`, demo script and submission text drafts

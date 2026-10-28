@@ -77,7 +77,7 @@ describe("scenarios and config", () => {
   it("lists scenarios with licence text but without payee emails", async () => {
     install();
     const { scenarios } = await body(await getScenarios());
-    expect(scenarios.map((s: { id: string }) => s.id)).toEqual(["documentary", "game-trailer", "podcast"]);
+    expect(scenarios.map((s: { id: string }) => s.id)).toEqual(["documentary", "game-trailer", "podcast", "exclusive-theme"]);
     expect(scenarios[0].documents[0]).toMatchObject({ id: "song", licensorName: "SoundHarbor Music" });
     expect(JSON.stringify(scenarios)).not.toContain("@licensegraph-demo.example");
   });

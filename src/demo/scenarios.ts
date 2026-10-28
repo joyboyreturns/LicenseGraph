@@ -14,6 +14,8 @@ export interface Scenario {
   documents: SourceDocument[];
   /** Rules the first, price-only proposal is expected to trip. */
   showcases: string[];
+  /** True when no licence on offer can meet the brief, so the honest result is "no bundle" and what to ask for. */
+  noBundle?: boolean;
 }
 
 const docs = (list: typeof fixtures) => list.map((f) => ({ ...f.doc }));
@@ -48,6 +50,17 @@ export const scenarios: Scenario[] = [
     requiredAssetIds: ["song", "image", "voiceover"],
     documents: docs(podcastFixtures),
     showcases: ["attribution", "sublicensing", "territory", "term"],
+  },
+  {
+    id: "exclusive-theme",
+    title: "Exclusive theme tune",
+    tagline: "Nobody sells exclusivity, so the honest answer is no.",
+    brief: 'The theme tune for our show "Signal & Noise" must be exclusive to us: US and Canada, 3 years, audio and web, no credit lines, sublicensing to partners, budget $1,500, with theme music, cover art and an intro voiceover.',
+    project: { name: "Signal & Noise exclusive theme", commercial: true, territories: ["US", "CA"], termMonths: 36, budgetCents: 150_000, mediums: ["audio", "web"], canCredit: false, needsSublicensing: true, requiresExclusive: true },
+    requiredAssetIds: ["song", "image", "voiceover"],
+    documents: docs(podcastFixtures),
+    showcases: ["exclusivity"],
+    noBundle: true,
   },
 ];
 

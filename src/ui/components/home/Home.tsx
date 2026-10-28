@@ -105,7 +105,7 @@ export function Home() {
         <div className={styles.sectionHead}>
           <p className="eyebrow">Try it</p>
           <h2 id="scenarios-title" className="section-title">
-            Three projects, three ways the cheapest licence goes wrong
+            Four projects, four ways the cheapest licence goes wrong
           </h2>
           <p className={styles.sectionLead}>Each scenario replays recorded model output, so it is instant and repeatable. The rules engine, approval and payment steps run for real.</p>
         </div>

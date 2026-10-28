@@ -1,8 +1,10 @@
 "use client";
 
 import { Mail } from "lucide-react";
+import { useMemo } from "react";
 import type { SessionView } from "@/src/app-logic/session";
 import { draftLicensorMessage } from "@/src/core/insights";
+import { negotiationOutlook } from "@/src/core/negotiation";
 import type { Catalog } from "@/src/ui/lib/catalog";
 import { assetLabel, formatMoney, mailtoHref } from "@/src/ui/lib/format";
 import { AssetIcon, CopyButton } from "../bits";
@@ -14,6 +16,11 @@ import styles from "./Insights.module.css";
  */
 export function GapRequests({ view, catalog }: { view: SessionView; catalog: Catalog }) {
   const gaps = view.analysis?.gaps ?? [];
+  const currency = view.candidates[0]?.currency ?? "USD";
+  const outlook = useMemo(
+    () => (gaps.length ? negotiationOutlook(view.project, view.analysis?.assets.map((a) => a.assetId) ?? [], view.candidates, currency, { today: view.runDate }) : undefined),
+    [gaps.length, view.project, view.analysis, view.candidates, currency, view.runDate],
+  );
   if (!gaps.length) return null;
   return (
     <div>
@@ -23,6 +30,30 @@ export function GapRequests({ view, catalog }: { view: SessionView; catalog: Cat
       <p className="small ink-2" style={{ marginBottom: 10 }}>
         No offer for these assets passes the rules. This is the closest one for each, and the changes that would make it work. Revised terms are checked again before anything is bought.
       </p>
+      {outlook && (
+        <div className={styles.outlook} data-testid="negotiation-outlook">
+          <span className="eyebrow">If every licensor said yes, at the prices they quoted</span>
+          <span className={`${styles.outlookTotal} num`}>{formatMoney(outlook.totalCents, currency)}</span>
+          <span className="small ink-2">
+            {outlook.headroomCents === undefined
+              ? "The cheapest bundle that would then pass every rule. A best case, not an offer: nothing is bought until revised terms are checked."
+              : outlook.headroomCents >= 0
+                ? `The cheapest bundle that would then pass every rule, ${formatMoney(outlook.headroomCents, currency)} under your budget. A best case, not an offer: nothing is bought until revised terms are checked.`
+                : `Even then it is ${formatMoney(-outlook.headroomCents, currency)} over your budget, so a yes alone would not be enough.`}
+          </span>
+          {outlook.assets.some((a) => a.ceilingCents !== undefined) && (
+            <ul className={styles.ceilings}>
+              {outlook.assets
+                .filter((a) => a.ceilingCents !== undefined)
+                .map((a) => (
+                  <li key={a.assetId}>
+                    <b>{assetLabel(a.assetId)}:</b> {a.ceilingCents! >= a.priceCents ? `worth agreeing up to ${formatMoney(a.ceilingCents!, currency)} (quoted ${formatMoney(a.priceCents, currency)}); above that the budget breaks.` : `the quoted ${formatMoney(a.priceCents, currency)} already breaks the budget; it would have to fall to ${formatMoney(Math.max(0, a.ceilingCents!), currency)}.`}
+                  </li>
+                ))}
+            </ul>
+          )}
+        </div>
+      )}
       <div className={styles.gaps}>
         {gaps.map((gap) => {
           const message = draftLicensorMessage(view.project, gap, catalog.offer(gap.offerId)?.licensor);

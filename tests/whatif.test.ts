@@ -72,7 +72,7 @@ describe("applyChange", () => {
 });
 
 describe("whatIf", () => {
-  it.each(scenarios.map((s) => s.id))("with no change it reproduces the brief's own cheapest bundle: %s", (id) => {
+  it.each(scenarios.filter((s) => !s.noBundle).map((s) => s.id))("with no change it reproduces the brief's own cheapest bundle: %s", (id) => {
     const { project, required, candidates } = runs[id]!;
     const r = whatIf(project, {}, required, candidates, "USD", options);
     expect(r.baselineCents).toBeDefined();

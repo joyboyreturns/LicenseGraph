@@ -33,7 +33,7 @@ function bruteForce(project: Project, required: string[], candidates: LicenseOff
 }
 
 describe("requirementCosts", () => {
-  it.each(scenarios.map((s) => s.id))("matches an exhaustive search of every bundle: %s", async (id) => {
+  it.each(scenarios.filter((s) => !s.noBundle).map((s) => s.id))("matches an exhaustive search of every bundle: %s", async (id) => {
     const { project, required, candidates } = await candidatesOf(id);
     const result = requirementCosts(project, required, candidates, options)!;
     expect(result.baselineCents).toBe(bruteForce(project, required, candidates, undefined));

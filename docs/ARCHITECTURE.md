@@ -97,7 +97,7 @@ The visible propose, verify, reject, revise cycle is the product. The model neve
 - **Payments:** the approval gate refuses unverified, unapproved and mismatched bundles; payouts, their failure and retry; the Sandbox client with a mocked HTTP layer; flagged live tests against the real Sandbox (`npm run test:live`).
 - **Ledger and passport:** tamper tests for a changed price, terms, quote, capture id, payout total and edited ledger events; the browser-bound modules are checked never to import Node code.
 - **API:** the real route handlers run end to end (scenario, approval, payment, capture, payouts, passport, ownership, portfolio, Q&A, intake) with PayPal mocked or simulated.
-- **Browser:** Playwright journeys against the offline demo: the full purchase through to a verified passport and a tampered copy that fails, all three scenarios, run ownership, the payout failure and retry, the brief wizard, error pages, and no horizontal scroll on a phone (`npm run test:e2e`).
+- **Browser:** Playwright journeys against the offline demo: the full purchase through to a verified passport and a tampered copy that fails, all four scenarios (including the one with no bundle), run ownership, the payout failure and retry, the brief wizard, error pages, and no horizontal scroll on a phone (`npm run test:e2e`).
 - **Free-model checks:** flagged live tests send one request each, only after the free check (`npm run test:gateway`, `npm run test:proposer`).
 
 ## Out of scope
