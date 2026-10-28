@@ -430,6 +430,7 @@ describe("answering a gap request", () => {
     expect(next.meta.revisedFrom).toBe(id);
     // The link is the first entry of the new run's hash-chained ledger: what failed, what was asked, what was added.
     expect(next.events[0]).toMatchObject({ seq: 1, kind: "answers_run", payload: { fromRunId: id, earlierOutcome: "no compliant bundle", addedDocumentIds: ["pod-song-exclusive", "pod-art-exclusive", "pod-voice-exclusive"] } });
+    expect(next.events[0].payload.asked.map((a: { assetId: string; priceCents: number; currency: string }) => [a.assetId, a.priceCents, a.currency])).toEqual([["song", 34_000, "USD"], ["image", 14_000, "USD"], ["voiceover", 21_000, "USD"]]);
     expect(next.events[0].payload.asked.map((a: { assetId: string; rules: string[] }) => [a.assetId, a.rules])).toEqual([["song", ["exclusivity"]], ["image", ["exclusivity"]], ["voiceover", ["exclusivity"]]]);
     expect(next.bundle.totalCents).toBe(52_000 + 26_000 + 38_000);
     const listed = (await body(await listSessions(get()))).runs as { id: string; revisedFrom?: string }[];

@@ -43,7 +43,7 @@ export function recordRevision(session: Session, from: Session) {
   session.ledger.append("answers_run", {
     fromRunId: from.id,
     earlierOutcome: from.phase === "verified" ? "verified" : "no compliant bundle",
-    asked: (viewOf(from).analysis?.gaps ?? []).map((g) => ({ assetId: g.assetId, offerId: g.offerId, rules: g.asks.map((a) => a.rule) })),
+    asked: (viewOf(from).analysis?.gaps ?? []).map((g) => ({ assetId: g.assetId, offerId: g.offerId, priceCents: g.priceCents, currency: g.currency, rules: g.asks.map((a) => a.rule) })),
     addedDocumentIds: session.input.documents.filter((d) => !before.has(d.id)).map((d) => d.id),
   });
 }

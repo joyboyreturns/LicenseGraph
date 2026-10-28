@@ -4,6 +4,7 @@ import type { Passport } from "@/src/passport/passport";
 import { buildCatalog } from "@/src/ui/lib/catalog";
 import { boughtOn, passportLicenceDates } from "@/src/ui/lib/licence-dates";
 import { eventTitle } from "@/src/ui/lib/event-text";
+import { ruleName } from "@/src/ui/lib/rule-text";
 import { assetLabel, dateText, dateTimeText, formatMoney, isSimulatedId, projectRequirements, shortHash, termsSummary } from "@/src/ui/lib/format";
 import { LogoMark } from "../Logo";
 import { AssetIcon } from "../bits";
@@ -29,6 +30,12 @@ export function Certificate({ passport: p, qrSrc, verifyUrl }: { passport: Passp
   const dates = passportLicenceDates(p);
   const answers = p.ledger.events.find((e) => e.kind === "answers_run");
   const negotiation = answers ? `${eventTitle(answers)}.` : undefined;
+  const asked = (answers?.payload.asked as { assetId: string; priceCents?: number; currency?: string; rules: string[] }[] | undefined) ?? [];
+  // For each asset a licensor was asked to change: what was asked, what their closest offer cost then, and what was bought.
+  const outcomes = asked.flatMap((a) => {
+    const bought = p.bundle.offers.find((o) => o.assetId === a.assetId);
+    return bought && typeof a.priceCents === "number" ? [{ assetId: a.assetId, asked: a.rules.map(ruleName).join(", "), before: a.priceCents, after: bought.priceCents, currency: bought.currency }] : [];
+  });
   const mandate = p.ledger.events.find((e) => e.kind === "mandate_checked");
   return (
     <article className={styles.cert} aria-labelledby="cert-title">
@@ -227,6 +234,16 @@ export function Certificate({ passport: p, qrSrc, verifyUrl }: { passport: Passp
           <p className={styles.compare}>
             This purchase followed a negotiation. {negotiation} The earlier run is recorded in the first entry of this passport&rsquo;s ledger, so it cannot be removed without breaking the hash chain.
           </p>
+          {outcomes.length > 0 && (
+            <ul className={styles.compare} data-testid="negotiation-outcomes">
+              {outcomes.map((o) => (
+                <li key={o.assetId}>
+                  <b>{assetLabel(o.assetId)}</b>: asked to change {o.asked}. The closest offer cost {formatMoney(o.before, o.currency)}; the licence bought costs {formatMoney(o.after, o.currency)}
+                  {o.after === o.before ? " (the same price)" : o.after > o.before ? ` (${formatMoney(o.after - o.before, o.currency)} more)` : ` (${formatMoney(o.before - o.after, o.currency)} less)`}.
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
       )}
 

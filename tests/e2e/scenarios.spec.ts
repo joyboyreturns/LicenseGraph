@@ -96,6 +96,12 @@ test("a purchase that came out of a negotiation carries the negotiation in its p
   // The first entry of the chained ledger says what this run answers, and the certificate says so.
   await expect(page.getByRole("heading", { name: "Negotiation" })).toBeVisible();
   await expect(page.getByText(/Answers an earlier run that had no compliant bundle, where 3 licensors were asked to change terms; 3 revised licences added/)).toBeVisible();
+  // And what each ask did to the price: the closest offer's price when it was asked, against the licence bought.
+  const outcomes = page.getByTestId("negotiation-outcomes");
+  await expect(outcomes.locator("li")).toHaveCount(3);
+  await expect(outcomes).toContainText("The closest offer cost $340.00; the licence bought costs $520.00 ($180.00 more)");
+  await expect(outcomes).toContainText("The closest offer cost $140.00; the licence bought costs $260.00 ($120.00 more)");
+  await expect(outcomes).toContainText("The closest offer cost $210.00; the licence bought costs $380.00 ($170.00 more)");
 });
 
 test("with a live model the gap panel offers a paste box for each licensor's reply, and sends exactly that licence to be checked", async ({ page }) => {
