@@ -121,6 +121,17 @@ describe("an agent's spending mandate", () => {
     expect(v.chainValid).toBe(true);
   });
 
+  it("survives a restart, with the ledger entry that recorded the check", async () => {
+    const repo = new FileSessionRepository(mkdtempSync(join(tmpdir(), "lg-mandate-")));
+    const rt = install(new SessionStore(10, repo));
+    const { id } = await json(await postSession(req("http://app/api/sessions", { scenarioId: "documentary", handoff: true, mandate: { maxTotalCents: 30_000, currency: "USD" } })));
+    for (let i = 0; i < 100 && rt.store.get(id)?.phase !== "verified"; i++) await new Promise((r) => setTimeout(r, 20));
+    const restored = new SessionStore(10, repo).get(id)!;
+    expect(restored.input.meta?.mandate).toEqual({ maxTotalCents: 30_000, currency: "USD" });
+    expect(restored.ledger.events().find((e) => e.kind === "mandate_checked")?.payload).toMatchObject({ status: "over", overByCents: 2_900 });
+    expect(restored.ledger.verify()).toBe(true);
+  });
+
   it("is refused when malformed, and absent when not stated", async () => {
     for (const mandate of [{ maxTotalCents: -5, currency: "USD" }, { maxTotalCents: 100, currency: "ZZZ" }, { maxTotalCents: 1.5, currency: "USD" }]) {
       expect((await postSession(req("http://app/api/sessions", { scenarioId: "documentary", handoff: true, mandate }))).status).toBe(400);
