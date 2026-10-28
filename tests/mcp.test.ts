@@ -7,7 +7,7 @@ import { greedyProposer } from "../src/agent/greedy";
 import { SessionStore } from "../src/app-logic/session";
 import { demoModel } from "../src/demo/mock-model";
 import { scenarioById } from "../src/demo/scenarios";
-import { checkBundle, cheapestBundle, licenceEndDates, purchaseStatus, startPurchase, whatIfBrief, whatIfInput, type AppClient } from "../src/mcp/tools";
+import { checkBundle, cheapestBundle, licenceEndDates, purchasePlaybook, purchaseStatus, startPurchase, whatIfBrief, whatIfInput, type AppClient } from "../src/mcp/tools";
 import type { Runtime } from "../src/server/runtime";
 import { runExample } from "./mcp-fixtures";
 
@@ -161,5 +161,19 @@ describe("licence_end_dates", () => {
   it("can be limited to the offers that were bought", () => {
     const only = offers[0]!.id;
     expect(licenceEndDates({ offers, offerIds: [only], boughtOn: "2026-11-05" }).ends.map((e) => e.offerId)).toEqual([only]);
+  });
+});
+
+describe("buy_licences prompt", () => {
+  it("names every tool in the order they are used, and keeps approval and payment with the person", () => {
+    const text = purchasePlaybook("A podcast theme, US only, 12 months");
+    const order = ["cheapest_compliant_bundle", "what_if_brief", "licence_end_dates", "start_licence_purchase", "get_purchase_status"].map((t) => text.indexOf(t));
+    expect(order.every((i) => i >= 0)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    expect(text).toContain("A podcast theme, US only, 12 months");
+    expect(text).toMatch(/Only they can approve and pay/);
+  });
+  it("asks for the brief when none is given", () => {
+    expect(purchasePlaybook()).toMatch(/Start by getting the brief/);
   });
 });

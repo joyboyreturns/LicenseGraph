@@ -69,6 +69,8 @@ The dashboards also include a **custom Studio widget**, the *rule matrix* (`app/
 | `cheapest_compliant_bundle` | Exact minimum cost, what each requirement adds, what to ask for where nothing passes, and the best-case total and per-asset price ceiling if every licensor agreed |
 | `what_if_brief` | The exact cost if the brief changed (territory, term, media, a requirement added or dropped), what shifts, and what to ask a licensor where nothing fits |
 | `licence_end_dates` | When each licence stops covering the project, from the day of purchase, with an iCalendar file holding a reminder 30 days before each end |
+
+It also offers a `buy_licences` prompt: the order an agent should work in (read the licences into offers, price them, negotiate when nothing passes, hand the person the claim link), which keeps every figure coming from the tools and approval and payment with the person.
 | `start_licence_purchase` | Reads raw licence texts, proposes and verifies a bundle, and returns a claim link for a person |
 | `get_purchase_status` | Verified bundle, approval, PayPal capture, creator payouts and the Licence Passport link |
 

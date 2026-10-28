@@ -7,9 +7,10 @@
  * Add it to an MCP client as a stdio server, for example:
  *   { "command": "npx", "args": ["tsx", "scripts/mcp-server.ts"], "env": { "LICENSEGRAPH_URL": "http://localhost:3000" } }
  */
+import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { checkBundle, checkBundleInput, cheapestBundle, cheapestBundleInput, licenceEndDates, licenceEndDatesInput, purchaseStatus, startPurchase, startPurchaseInput, whatIfBrief, whatIfInput } from "../src/mcp/tools";
+import { checkBundle, checkBundleInput, cheapestBundle, cheapestBundleInput, licenceEndDates, licenceEndDatesInput, purchasePlaybook, purchaseStatus, startPurchase, startPurchaseInput, whatIfBrief, whatIfInput } from "../src/mcp/tools";
 
 const app = { baseUrl: process.env.LICENSEGRAPH_URL ?? "http://localhost:3000" };
 const text = (value: unknown) => ({ content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }] });
@@ -50,6 +51,12 @@ server.registerTool(
   "get_purchase_status",
   { description: "Progress of a purchase you started: phase, verified bundle, who approved, PayPal capture, creator payouts and the Licence Passport link once paid.", inputSchema: { runId: startPurchaseInput.shape.requiredAssetIds.element.describe("The runId returned by start_licence_purchase.") } },
   async ({ runId }) => text(await purchaseStatus(app, runId)),
+);
+
+server.registerPrompt(
+  "buy_licences",
+  { title: "Buy licences for a project", description: "The order to work in when buying creative licences for a person: check, price, negotiate, hand over.", argsSchema: { brief: z.string().max(2000).optional().describe("What the project needs, in plain words.") } },
+  ({ brief }) => ({ messages: [{ role: "user" as const, content: { type: "text" as const, text: purchasePlaybook(brief) } }] }),
 );
 
 await server.connect(new StdioServerTransport());
