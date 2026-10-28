@@ -71,3 +71,32 @@ test("the term slider and the place chips change the figure, and the last place 
     await expect(chip).toHaveAttribute("aria-pressed", "true");
   }
 });
+
+test("a typed sentence changes the panel the same way the controls do, and says what it understood", async ({ page }) => {
+  const started = await page.request.post("/api/sessions", { data: { scenarioId: "documentary" } });
+  const { id } = await started.json();
+  await expect.poll(async () => (await (await page.request.get(`/api/sessions/${id}`)).json()).phase, { timeout: 30_000 }).toBe("verified");
+  const view = await (await page.request.get(`/api/sessions/${id}`)).json();
+  const required: string[] = view.analysis.assets.map((a: { assetId: string }) => a.assetId);
+
+  await page.goto(`/run/${id}`);
+  const panel = page.getByRole("region", { name: "What if the project changed?" });
+  await expect(panel).toBeVisible({ timeout: 30_000 });
+  const result = panel.getByRole("status");
+
+  const say = panel.getByLabel("Or say it in a sentence");
+  await say.fill("not commercial, for 6 months");
+  await panel.getByRole("button", { name: "Apply" }).click();
+  await expect(panel.getByTestId("what-if-heard")).toContainText("Applied: 6 months · Non-commercial.");
+  await expect(panel.getByLabel("Commercial use")).not.toBeChecked();
+  await expect(panel.getByLabel("How long you need it")).toHaveValue("6");
+  const expected = whatIf(view.project, { commercial: false, termMonths: 6 }, required, view.candidates, "USD", { today: view.runDate });
+  if (expected.totalCents !== undefined) await expect(result).toContainText(formatMoney(expected.totalCents, "USD"));
+  else await expect(result).toContainText("No licence covers this brief");
+
+  // Gibberish changes nothing and says so.
+  await say.fill("make it nicer");
+  await panel.getByRole("button", { name: "Apply" }).click();
+  await expect(panel.getByTestId("what-if-heard")).toContainText("Nothing to change was recognised");
+  await expect(panel.getByLabel("How long you need it")).toHaveValue("6");
+});

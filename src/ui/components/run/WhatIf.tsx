@@ -1,10 +1,11 @@
 "use client";
 
 import { RotateCcw } from "lucide-react";
-import { useId, useMemo, useState } from "react";
+import { useId, useMemo, useState, type FormEvent } from "react";
 import type { LicenseOffer, Project } from "@/src/core/types";
 import { whatIf, type ProjectChange } from "@/src/core/whatif";
 import { EU_COUNTRIES } from "@/src/intake/brief";
+import { readChange } from "@/src/intake/change";
 import type { Catalog } from "@/src/ui/lib/catalog";
 import { assetLabel, formatMoney, mediumName, termText } from "@/src/ui/lib/format";
 import styles from "./WhatIf.module.css";
@@ -51,6 +52,8 @@ export function WhatIf({ project, requiredAssetIds, candidates, currency, runDat
   const id = useId();
   const brief = useMemo(() => stateOf(project), [project]);
   const [state, setState] = useState<State>(brief);
+  const [typed, setTyped] = useState("");
+  const [heard, setHeard] = useState<string[] | null>(null);
   const result = useMemo(() => whatIf(project, toChange(state), requiredAssetIds, candidates, currency, { today: runDate }), [project, state, requiredAssetIds, candidates, currency, runDate]);
 
   const places = [...PLACES, ...project.territories.filter((t) => !PLACES.some((p) => p.codes.includes(t))).map((t) => ({ code: t, label: t, codes: [t] }))];
@@ -66,6 +69,24 @@ export function WhatIf({ project, requiredAssetIds, candidates, currency, runDat
     });
   const toggleMedium = (m: string) => setState((s) => ({ ...s, mediums: s.mediums.includes(m) ? s.mediums.filter((x) => x !== m) : [...s.mediums, m] }));
   const changed = state.commercial !== brief.commercial || placeChanged || state.termMonths !== brief.termMonths || !sameSet(state.mediums, brief.mediums) || state.cannotCredit !== brief.cannotCredit || state.sublicensing !== brief.sublicensing || state.exclusive !== brief.exclusive;
+
+  // A sentence is read on this device by the same rules as the brief box, and applied on top of what is chosen now.
+  const apply = (e: FormEvent) => {
+    e.preventDefault();
+    const { change, described } = readChange(typed, { territories: state.territories, mediums: state.mediums });
+    setHeard(described);
+    if (!described.length) return;
+    setState((s) => ({
+      commercial: change.commercial ?? s.commercial,
+      territories: change.territories?.length ? change.territories : s.territories,
+      termMonths: change.termMonths ?? s.termMonths,
+      mediums: change.mediums ?? s.mediums,
+      cannotCredit: change.canCredit === undefined ? s.cannotCredit : !change.canCredit,
+      sublicensing: change.needsSublicensing ?? s.sublicensing,
+      exclusive: change.requiresExclusive ?? s.exclusive,
+    }));
+    setTyped("");
+  };
 
   const money = (c: number) => formatMoney(c, currency);
   // An offer's name already carries its price, so the licensor is the clearer label next to one.
@@ -84,6 +105,19 @@ export function WhatIf({ project, requiredAssetIds, candidates, currency, runDat
 
   return (
     <div className={styles.wrap}>
+      <form className={styles.group} onSubmit={apply}>
+        <label className={styles.legend} htmlFor={`${id}-say`}>
+          Or say it in a sentence
+        </label>
+        <div className={styles.sayRow}>
+          <input id={`${id}-say`} className="input" value={typed} maxLength={300} placeholder="e.g. only in Canada for 6 months, no exclusivity" onChange={(e) => setTyped(e.target.value)} />
+          <button type="submit" className="btn btn-sm" disabled={!typed.trim()}>
+            Apply
+          </button>
+        </div>
+        {heard && <p className={`small ${styles.heard}`} aria-live="polite" data-testid="what-if-heard">{heard.length ? `Applied: ${heard.join(" · ")}.` : "Nothing to change was recognised. Name a place, a length of time, a medium, or say whether you need exclusivity, sublicensing, credit or commercial use."}</p>}
+      </form>
+
       <fieldset className={styles.group}>
         <legend className={styles.legend}>Where it is shown</legend>
         <div className={styles.chips}>
@@ -166,7 +200,7 @@ export function WhatIf({ project, requiredAssetIds, candidates, currency, runDat
       </div>
 
       {changed && (
-        <button type="button" className={`btn btn-sm btn-ghost ${styles.reset}`} onClick={() => setState(brief)}>
+        <button type="button" className={`btn btn-sm btn-ghost ${styles.reset}`} onClick={() => { setState(brief); setHeard(null); }}>
           <RotateCcw aria-hidden /> Back to my brief
         </button>
       )}

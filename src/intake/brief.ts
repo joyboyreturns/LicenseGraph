@@ -39,6 +39,22 @@ const MEDIA: [RegExp, string][] = [
   [/\b(podcast|audio|streaming)\b/i, "audio"],
   [/\b(app|mobile|game|games)\b/i, "app"],
 ];
+/** Country and region codes a text mentions; "worldwide" wins over any country. */
+export function placesIn(text: string): string[] {
+  const found = [...new Set(PLACES.flatMap(([re, codes]) => (re.test(text) ? codes : [])))];
+  return found.includes("WORLD") ? ["WORLD"] : found;
+}
+
+/** Media a text mentions. */
+export function mediaIn(text: string): string[] {
+  return [...new Set(MEDIA.filter(([re]) => re.test(text)).map(([, m]) => m))];
+}
+
+/** "non-exclusive", "not exclusive" and "don't need exclusivity" say the opposite of requiring it; this removes them. */
+export function withoutNegatedExclusivity(text: string): string {
+  return text.replace(/\b(?:non[- ]?exclusiv\w*|not\s+(?:\w+\s+)?exclusiv\w*|no\s+exclusiv\w*|(?:don'?t|do not|doesn'?t|does not|needn'?t|need not|no need)\s+(?:\w+\s+){0,4}?exclusiv\w*)/gi, " ");
+}
+
 const ASSETS: [RegExp, string][] = [
   [/\b(song|songs|music|track|tracks|soundtrack|beat|jingle|theme tune)\b/i, "song"],
   [/\b(image|images|photo|photos|picture|pictures|illustration|artwork|key art|cover art|graphic)\b/i, "image"],
@@ -49,7 +65,8 @@ const ASSETS: [RegExp, string][] = [
 ];
 const WORDS: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12 };
 
-function months(text: string): number | undefined {
+/** The term a text states, in months (1200 for perpetual), or undefined. */
+export function months(text: string): number | undefined {
   if (/\b(perpetual|forever|lifetime|permanent(?:ly)?|in perpetuity)\b/i.test(text)) return 1200;
   // Decimals are read whole ("1.5 years" is 18 months, not "5 years").
   const m = /(?<![\d.])\b(\d+(?:\.\d+)?|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|a|an)[\s-]*(month|months|mo|year|years|yr|yrs)\b/i.exec(text);
@@ -96,9 +113,7 @@ export function parseBriefLocally(text: string): BriefResult {
   else if (commercialCue) found.push("Commercial use");
   else assumed.push("Commercial use (to be safe)");
 
-  const territories = [...new Set(PLACES.flatMap(([re, codes]) => (re.test(text) ? codes : [])))];
-  const hasWorld = territories.includes("WORLD");
-  const finalTerritories = hasWorld ? ["WORLD"] : territories;
+  const finalTerritories = placesIn(text);
   if (finalTerritories.length) found.push(`Territory: ${finalTerritories.length > 6 ? "EU" : finalTerritories.join(", ")}`);
   else assumed.push("Territory: worldwide");
 
@@ -109,15 +124,14 @@ export function parseBriefLocally(text: string): BriefResult {
   const budget = budgetCents(text);
   if (budget !== undefined) found.push(`Budget: $${(budget / 100).toLocaleString("en-US")}`);
 
-  const mediums = [...new Set(MEDIA.filter(([re]) => re.test(text)).map(([, m]) => m))];
+  const mediums = mediaIn(text);
   if (mediums.length) found.push(`Media: ${mediums.join(", ")}`);
 
   const canCredit = /\b(?:no|without|can'?t|cannot|unable to|don'?t want to|not able to)\s+(?:\w+\s+)?(?:credit|credits|attribution)\b/i.test(text) ? false : undefined;
   if (canCredit === false) found.push("Cannot credit creators");
   const needsSublicensing = /\b(sublicens\w*|resell\w*|white[- ]?label|for (?:our |my )?clients|agency|redistribut\w*)\b/i.test(text) ? true : undefined;
   if (needsSublicensing) found.push("Needs sublicensing");
-  // "non-exclusive", "not exclusive" and "don't need exclusivity" say the opposite of requiring it.
-  const withoutNegated = text.replace(/\b(?:non[- ]?exclusiv\w*|not\s+(?:\w+\s+)?exclusiv\w*|no\s+exclusiv\w*|(?:don'?t|do not|doesn'?t|does not|needn'?t|need not|no need)\s+(?:\w+\s+){0,4}?exclusiv\w*)/gi, " ");
+  const withoutNegated = withoutNegatedExclusivity(text);
   const requiresExclusive = /\b(exclusive|exclusivity|no one else|nobody else)\b/i.test(withoutNegated) ? true : undefined;
   if (requiresExclusive) found.push("Needs an exclusive licence");
 
