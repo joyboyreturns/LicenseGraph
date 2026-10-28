@@ -94,6 +94,42 @@ for (const scheme of ["light", "dark"] as const) {
       expect(await violations(page), "not found").toEqual([]);
     });
 
+    test("a run with the evidence open, a question answered and the approval panel open has none", async ({ page }) => {
+      await page.goto(`/run/${await runOf(page, "game-trailer")}`);
+      await toResult(page);
+      await expect(page.getByRole("button", { name: "Review and approve" })).toBeVisible();
+
+      for (const state of ["chosen", "rejected"]) {
+        await page.locator(`button[data-state="${state}"]`).first().click();
+        await expect(page.getByText(/is backed by|Source licence|quote/i).first()).toBeVisible();
+        expect(await violations(page), `evidence of a ${state} offer`).toEqual([]);
+        await page.keyboard.press("Escape");
+      }
+
+      await page.getByRole("button", { name: "Why were licences rejected?" }).click();
+      await expect(page.getByText(/was rejected/).first()).toBeVisible({ timeout: 20_000 });
+      expect(await violations(page), "an answer").toEqual([]);
+
+      await page.getByRole("button", { name: "Review and approve" }).click();
+      await expect(page.getByTestId("payout-preview")).toBeVisible();
+      expect(await violations(page), "approval").toEqual([]);
+    });
+
+    test("the what-if panel with a cheaper brief and with an impossible one has none", async ({ page }) => {
+      await page.goto(`/run/${await runOf(page, "documentary")}`);
+      await toResult(page);
+      const panel = page.getByRole("region", { name: "What if the project changed?" });
+      await expect(panel).toBeVisible({ timeout: 30_000 });
+      await panel.getByLabel("Commercial use").uncheck({ force: true });
+      await expect(panel.getByRole("status")).toContainText("less than your brief");
+      expect(await violations(page), "cheaper").toEqual([]);
+      await panel.getByLabel("Commercial use").check({ force: true });
+      await panel.getByLabel("We must sublicense").check({ force: true });
+      await panel.getByLabel("We need exclusivity").check({ force: true });
+      await expect(panel.getByRole("status")).toContainText("No licence covers this brief");
+      expect(await violations(page), "impossible").toEqual([]);
+    });
+
     test("a rebriefed run, with its comparison beside the run it came from, has none", async ({ page }) => {
       const first = await runOf(page, "documentary");
       const next = await (await page.request.post(`/api/sessions/${first}/rebrief`, { data: { change: { commercial: false } } })).json();
