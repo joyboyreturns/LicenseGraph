@@ -28,6 +28,8 @@ export interface Runtime {
   deps: Deps;
   store: SessionStore;
   passportSecret?: string;
+  /** The id of the webhook registered with PayPal for /api/webhooks/paypal; without it deliveries are refused. */
+  webhookId?: string;
   appUrl: string;
 }
 
@@ -83,6 +85,7 @@ function build(): Runtime {
     llmProxy,
     intakeModel,
     passportSecret: process.env.LICENSEGRAPH_PASSPORT_SECRET || undefined,
+    webhookId: process.env.PAYPAL_WEBHOOK_ID || undefined,
     appUrl: appUrl(),
     store: new SessionStore(500, new FileSessionRepository(join(dataDir, "sessions"))),
     deps: { model, proposer, ...common },

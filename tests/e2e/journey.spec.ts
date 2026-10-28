@@ -28,7 +28,7 @@ test("a scenario goes from licences to a verified, paid and independently checka
   // The passport re-checks itself in the browser.
   await page.getByRole("link", { name: "View Licence Passport" }).first().click();
   await page.waitForURL(/\/passport\//);
-  await expect(page.getByText(/All 8 checks passed in this browser/)).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(/All 9 checks passed in this browser/)).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText("SIMULATED").first()).toBeVisible();
 
   // The downloaded file verifies on its own; a tampered copy does not.
@@ -40,7 +40,7 @@ test("a scenario goes from licences to a verified, paid and independently checka
 
   await page.goto("/verify");
   await page.setInputFiles('input[type="file"]', file);
-  await expect(page.getByText(/All 8 checks passed in this browser/)).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(/All 9 checks passed in this browser/)).toBeVisible({ timeout: 30_000 });
   await page.getByRole("button", { name: "Try a tampered copy" }).click();
   await expect(page.getByText(/Does not verify/)).toBeVisible({ timeout: 30_000 });
 

@@ -22,6 +22,9 @@ services:
         sync: false
       - key: PAYPAL_CLIENT_SECRET
         sync: false
+      # Optional. Register <your Render URL>/api/webhooks/paypal in the Sandbox app, then paste the webhook id here.
+      - key: PAYPAL_WEBHOOK_ID
+        sync: false
       - key: PAYPAL_BASE_URL
         value: https://api-m.sandbox.paypal.com
       # Comma-separated Sandbox personal account emails that receive the creator payouts.

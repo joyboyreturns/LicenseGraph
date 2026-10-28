@@ -992,6 +992,106 @@
         }
       }
     },
+    "/api/webhooks/paypal": {
+      "post": {
+        "operationId": "paypalWebhook",
+        "tags": [
+          "Service"
+        ],
+        "summary": "PayPal webhook deliveries",
+        "description": "Called by PayPal, not by clients. Each delivery is acted on only after PayPal confirms its signature for the configured webhook id (`PAYPAL_WEBHOOK_ID`). `CHECKOUT.ORDER.APPROVED` captures the run's approved order, so closing the tab after approving still completes the purchase; `PAYMENT.PAYOUTSBATCH.*` refreshes payout status; `PAYMENT.CAPTURE.REFUNDED` and `PAYMENT.CAPTURE.REVERSED` for a refund the app did not make are written to the ledger, and the Licence Passport then fails its payment-standing check. Other events are acknowledged and ignored.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Verified and handled, or verified and not relevant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "received": {
+                      "const": true
+                    },
+                    "handled": {
+                      "type": "string"
+                    },
+                    "ignored": {
+                      "type": "string"
+                    },
+                    "runId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "received"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing signature headers, or the body is not a JSON event.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "PayPal did not confirm the signature.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Body too large.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "PayPal could not be reached to verify; it will deliver again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Webhooks are not configured on this server.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/openapi.json": {
       "get": {
         "operationId": "getOpenApi",
@@ -1398,6 +1498,7 @@
               "captured",
               "capture_mismatch",
               "refunded",
+              "payment_reversed",
               "payout_created",
               "payout_failed",
               "payout_settled"
@@ -2666,6 +2767,10 @@
           "passportSigned": {
             "type": "boolean"
           },
+          "webhooks": {
+            "type": "boolean",
+            "description": "PayPal webhook deliveries are accepted at /api/webhooks/paypal."
+          },
           "appUrl": {
             "type": "string"
           }
@@ -2677,6 +2782,7 @@
           "assistant",
           "intakeModel",
           "passportSigned",
+          "webhooks",
           "appUrl"
         ],
         "additionalProperties": false

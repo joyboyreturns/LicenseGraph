@@ -130,6 +130,9 @@ export async function verifyPassport(p: Passport): Promise<{ ok: boolean; checks
     `Capture ${p.paypal.captureId} for ${p.paypal.amount.value} ${p.paypal.amount.currency}${p.paypal.environment === "simulator" ? " (payment simulator, no money moved)" : " (PayPal Sandbox)"}`,
   );
 
+  const reversal = events.find((e) => e.kind === "payment_reversed");
+  add("payment-standing", "Payment has not been reversed", !reversal, reversal ? `PayPal reversed this payment on ${reversal.at.slice(0, 10)}; the licences are no longer covered` : "No reversal or outside refund is recorded in the ledger");
+
   if (p.payouts) {
     const lineSum = p.payouts.lines.reduce((n, l) => n + l.amountCents, 0);
     const recorded = events.find((e) => e.kind === "payout_created" && e.payload.batchId === p.payouts!.batchId);

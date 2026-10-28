@@ -75,7 +75,7 @@ describe("verifyPassport", () => {
   });
   it("passes an untouched passport on every check", async () => {
     const result = await verifyPassport(issuePassport(await paidSession()));
-    expect(result.checks.map((c) => c.id)).toEqual(["ledger-chain", "bundle-digest", "approval-recorded", "terms-in-ledger", "evidence", "rules", "payment", "payouts"]);
+    expect(result.checks.map((c) => c.id)).toEqual(["ledger-chain", "bundle-digest", "approval-recorded", "terms-in-ledger", "evidence", "rules", "payment", "payment-standing", "payouts"]);
     expect(result.checks.filter((c) => !c.ok)).toEqual([]);
     expect(result.ok).toBe(true);
   });

@@ -43,6 +43,15 @@ export interface PayoutStatus {
   items: { itemId: string; status: string; receiver: string; error?: string }[];
 }
 
+/** The transmission headers PayPal signs each webhook delivery with. */
+export interface WebhookHeaders {
+  authAlgo: string;
+  certUrl: string;
+  transmissionId: string;
+  transmissionSig: string;
+  transmissionTime: string;
+}
+
 const SANDBOX_HOST = "api-m.sandbox.paypal.com";
 
 class PayPalRequestError extends Error {
@@ -189,6 +198,24 @@ export function createPayPalClient(config: PayPalConfig) {
       const json = await call(`/v2/payments/captures/${encodeURIComponent(captureId)}/refund`, requestId, { note_to_payer: "Your LicenseGraph licence purchase was not completed, so it has been refunded." });
       if (json.status !== "COMPLETED") throw new Error(`PayPal refund is not completed (status ${String(json.status)})`);
       return { id: json.id, status: json.status, ...(json.amount?.value ? { amount: { currency: json.amount.currency_code, value: json.amount.value } } : {}) };
+    },
+
+    /**
+     * Ask PayPal whether a webhook delivery is genuine. PayPal checks the signature against its own
+     * certificate; this server only forwards the transmission headers and the exact event it received.
+     */
+    async verifyWebhookSignature(input: { headers: WebhookHeaders; webhookId: string; event: unknown }): Promise<boolean> {
+      const { headers } = input;
+      const json = await request("POST", "/v1/notifications/verify-webhook-signature", undefined, {
+        auth_algo: headers.authAlgo,
+        cert_url: headers.certUrl,
+        transmission_id: headers.transmissionId,
+        transmission_sig: headers.transmissionSig,
+        transmission_time: headers.transmissionTime,
+        webhook_id: input.webhookId,
+        webhook_event: input.event,
+      });
+      return json.verification_status === "SUCCESS";
     },
 
     async captureOrder(orderId: string, requestId: string): Promise<CapturedOrder> {

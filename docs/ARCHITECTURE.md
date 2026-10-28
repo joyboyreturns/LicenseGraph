@@ -56,7 +56,7 @@ The visible propose, verify, reject, revise cycle is the product. The model neve
 | `src/agent/` | `loop.ts`: propose-verify-revise with round cap and stall detection. `llm.ts`: model proposer. `greedy.ts`: deterministic stand-in used for replayed scenarios. |
 | `src/ledger/` | `chain.ts`: browser-safe event shape and chain verification. `ledger.ts`: the Node hashing, append-only log, rebuild from stored events. |
 | `src/payments/` | `paypal.ts`: Orders v2 and Payouts client (Sandbox host only). `checkout.ts`: `startCheckout` gate (re-verify and approval digest match). `payouts.ts`: who is paid what. `simulator.ts`: an offline stand-in with PayPal's ordering rules. |
-| `src/passport/` | Passport builder and `verifyPassport`: eight checks that run in a browser. |
+| `src/passport/` | Passport builder and `verifyPassport`: nine checks that run in a browser (including that the payment was not reversed). |
 | `src/app-logic/` | `session.ts`: the flow and its order of steps (extract, propose, verify, approve, pay, capture, settle). `persistence.ts`: one JSON file per run, ledger chain re-checked on load. |
 | `src/server/` | Runtime wiring (demo or live; PayPal, simulator or none), owner cookies, the assistant's model proxy, rate limiters, passport signing. |
 | `src/intake/` | The plain-English brief reader and grounded run Q&A, each with an offline fallback. |

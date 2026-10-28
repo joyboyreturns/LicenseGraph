@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { LEDGER_KINDS } from "../ledger/chain";
 import { offerSchema, projectSchema } from "../mcp/tools";
 
 /**
@@ -8,7 +9,7 @@ import { offerSchema, projectSchema } from "../mcp/tools";
 
 const money = z.object({ currency: z.string().length(3), value: z.string().describe('Decimal amount as PayPal writes it, e.g. "329.00".') });
 const phase = z.enum(["created", "extracting", "proposing", "verified", "failed", "approved", "order_created", "captured", "settled", "refunded"]);
-const ledgerKind = z.enum(["extracted", "extraction_failed", "proposed", "rejected", "revised", "verified", "proposal_error", "handed_over", "approved", "order_created", "captured", "capture_mismatch", "refunded", "payout_created", "payout_failed", "payout_settled"]);
+const ledgerKind = z.enum(LEDGER_KINDS);
 
 export const Project = projectSchema.meta({ id: "Project" });
 export const Offer = offerSchema.meta({ id: "Offer", description: "One licence offer read from a licence document, with the quotes that back each term." });
@@ -124,7 +125,7 @@ export const Answer = z.object({ answer: z.string(), source: z.enum(["model", "l
 export const Health = z.object({ ok: z.literal(true), mode: z.enum(["demo", "live"]), paymentsMode: z.string(), runs: z.number().int() }).meta({ id: "Health" });
 
 export const Config = z
-  .object({ mode: z.enum(["demo", "live"]), model: z.string().optional(), paymentsEnabled: z.boolean(), paymentsMode: z.string(), assistant: z.boolean(), intakeModel: z.boolean(), passportSigned: z.boolean(), appUrl: z.string() })
+  .object({ mode: z.enum(["demo", "live"]), model: z.string().optional(), paymentsEnabled: z.boolean(), paymentsMode: z.string(), assistant: z.boolean(), intakeModel: z.boolean(), passportSigned: z.boolean(), webhooks: z.boolean().describe("PayPal webhook deliveries are accepted at /api/webhooks/paypal."), appUrl: z.string() })
   .meta({ id: "Config" });
 
 export const Scenario = z

@@ -128,6 +128,20 @@ export function buildOpenApi(serverUrl = "http://localhost:3000"): Json {
       "/api/portfolio": {
         get: { operationId: "getPortfolio", tags: ["Runs"], summary: "Every run in full", description: "Your runs with licence text removed, newest first. Feeds the dashboard.", security: owner, responses: ok("The runs.", { type: "object", properties: { views: { type: "array", items: ref("Run") } }, required: ["views"] }) },
       },
+      "/api/webhooks/paypal": {
+        post: {
+          operationId: "paypalWebhook",
+          tags: ["Service"],
+          summary: "PayPal webhook deliveries",
+          description:
+            "Called by PayPal, not by clients. Each delivery is acted on only after PayPal confirms its signature for the configured webhook id (`PAYPAL_WEBHOOK_ID`). `CHECKOUT.ORDER.APPROVED` captures the run's approved order, so closing the tab after approving still completes the purchase; `PAYMENT.PAYOUTSBATCH.*` refreshes payout status; `PAYMENT.CAPTURE.REFUNDED` and `PAYMENT.CAPTURE.REVERSED` for a refund the app did not make are written to the ledger, and the Licence Passport then fails its payment-standing check. Other events are acknowledged and ignored.",
+          requestBody: { required: true, content: { "application/json": { schema: { type: "object", additionalProperties: true } } } },
+          responses: {
+            "200": { description: "Verified and handled, or verified and not relevant.", content: { "application/json": { schema: { type: "object", properties: { received: { const: true }, handled: { type: "string" }, ignored: { type: "string" }, runId: { type: "string" } }, required: ["received"] } } } },
+            ...err(["400", "Missing signature headers, or the body is not a JSON event."], ["401", "PayPal did not confirm the signature."], ["413", "Body too large."], ["502", "PayPal could not be reached to verify; it will deliver again."], ["503", "Webhooks are not configured on this server."]),
+          },
+        },
+      },
       "/api/openapi.json": { get: { operationId: "getOpenApi", tags: ["Service"], summary: "This document", responses: { "200": { description: "The OpenAPI 3.1 description of this API.", content: { "application/json": { schema: { type: "object", additionalProperties: true } } } } } } },
       "/api/config": { get: { operationId: "getConfig", tags: ["Service"], summary: "What this server can do", responses: ok("The configuration. Contains no secrets.", ref("Config")) } },
       "/api/health": { get: { operationId: "getHealth", tags: ["Service"], summary: "Health check", responses: ok("The server is up.", ref("Health")) } },

@@ -58,7 +58,7 @@ export interface Deps {
   model: ModelClient;
   proposer: Proposer;
   /** Absent when PayPal credentials are not configured. */
-  payments?: Pick<PayPalClient, "createOrder" | "captureOrder"> & Partial<Pick<PayPalClient, "createPayout" | "getPayout" | "refundCapture">>;
+  payments?: Pick<PayPalClient, "createOrder" | "captureOrder"> & Partial<Pick<PayPalClient, "createPayout" | "getPayout" | "refundCapture" | "verifyWebhookSignature">>;
   /** Replace licensor emails in order, so a demo can pay real Sandbox accounts. */
   payeeOverrides?: string[];
   /** Which payment backend `payments` is. */
@@ -317,6 +317,11 @@ export function refundBlockedReason(session: Session): string | undefined {
   if ((p.status === "DENIED" || p.status === "CANCELED") && p.lines.every((l) => l.status !== "SUCCESS")) return undefined;
   if (p.status === "FAILED" && p.notSent === true) return undefined;
   return "The creator payouts may already have been sent. Reconcile the batch with PayPal first; refunding now could pay out twice.";
+}
+
+/** Resolves once any refund this server has started for the run has been recorded. */
+export async function refundSettled(session: Session): Promise<void> {
+  await refundsInFlight.get(session)?.catch(() => undefined);
 }
 
 /** Return the buyer's money for a run whose creators could not be paid. Idempotent at PayPal; recorded in the ledger. */

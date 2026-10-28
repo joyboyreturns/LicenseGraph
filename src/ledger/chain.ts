@@ -2,23 +2,27 @@
  * The browser-safe half of the ledger: event shape, canonical text and chain verification using a
  * caller-supplied SHA-256. No Node imports, so the Licence Passport can be verified in a browser.
  */
-export type LedgerKind =
-  | "extracted"
-  | "extraction_failed"
-  | "proposed"
-  | "rejected"
-  | "revised"
-  | "verified"
-  | "proposal_error"
-  | "handed_over"
-  | "approved"
-  | "order_created"
-  | "captured"
-  | "capture_mismatch"
-  | "refunded"
-  | "payout_created"
-  | "payout_failed"
-  | "payout_settled";
+/** Every kind of event the ledger records. The one list the type, the API schema and the UI labels are checked against. */
+export const LEDGER_KINDS = [
+  "extracted",
+  "extraction_failed",
+  "proposed",
+  "rejected",
+  "revised",
+  "verified",
+  "proposal_error",
+  "handed_over",
+  "approved",
+  "order_created",
+  "captured",
+  "capture_mismatch",
+  "refunded",
+  "payment_reversed",
+  "payout_created",
+  "payout_failed",
+  "payout_settled",
+] as const;
+export type LedgerKind = (typeof LEDGER_KINDS)[number];
 
 export interface LedgerEvent {
   seq: number;
