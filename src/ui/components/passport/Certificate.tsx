@@ -149,6 +149,14 @@ export function Certificate({ passport: p, qrSrc, verifyUrl }: { passport: Passp
                 <code className={styles.code}>{shortHash(p.bundle.digest, 24)}</code>
               </dd>
             </div>
+            {p.signature?.keyId && (
+              <div className={styles.kv}>
+                <dt>Signed with key</dt>
+                <dd>
+                  <code className={styles.code}>{p.signature.keyId}</code> (Ed25519)
+                </dd>
+              </div>
+            )}
           </dl>
         </section>
         <section className={styles.section} aria-labelledby="cert-payment">

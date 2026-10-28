@@ -31,6 +31,10 @@ test("a scenario goes from licences to a verified, paid and independently checka
   await page.waitForURL(/\/passport\//);
   await expect(page.getByText(/All 9 checks passed in this browser/)).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText("SIMULATED").first()).toBeVisible();
+  // The certificate names the key that signed it, matching the one the server publishes.
+  const { keys } = await (await page.request.get("/.well-known/licensegraph-keys.json")).json();
+  await expect(page.getByText("Signed with key")).toBeVisible();
+  await expect(page.getByText(keys[0].keyId)).toBeVisible();
   expect(await accessibilityViolations(page)).toEqual([]);
 
   // A badge for a README, built from the passport's own re-verification.
