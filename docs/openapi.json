@@ -1004,6 +1004,45 @@
         }
       }
     },
+    "/api/passports/{id}/badge": {
+      "get": {
+        "operationId": "getPassportBadge",
+        "tags": [
+          "Passports"
+        ],
+        "summary": "A status badge for the passport",
+        "description": "A small SVG for a README or a site, built from the passport's own re-verification: it says how many licences were verified, or that the check failed or the payment was reversed.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The run id."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "An SVG badge.",
+            "content": {
+              "image/svg+xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such run."
+          },
+          "409": {
+            "description": "The run has no passport yet (it has not been paid), or was refunded."
+          }
+        }
+      }
+    },
     "/api/intake": {
       "post": {
         "operationId": "readBrief",

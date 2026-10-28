@@ -1,11 +1,12 @@
 "use client";
 
-import { ArrowLeft, CalendarPlus, Download, FileClock, Link2, Printer, RotateCcw, ServerCrash, ShieldCheck, ShieldQuestion } from "lucide-react";
+import { ArrowLeft, BadgeCheck, CalendarPlus, Download, FileClock, Link2, Printer, RotateCcw, ServerCrash, ShieldCheck, ShieldQuestion } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { verifyPassport, type Passport, type PassportCheck } from "@/src/passport/passport";
 import { api, ApiError, errorMessage } from "@/src/ui/lib/api";
 import { passportCalendar } from "@/src/ui/lib/licence-dates";
+import { CopyButton } from "../bits";
 import { useToast } from "../Providers";
 import { Certificate } from "./Certificate";
 import { VerifyChecks } from "./VerifyChecks";
@@ -122,6 +123,9 @@ export function PassportPage({ id }: { id: string }) {
         <a href={`/api/passports/${encodeURIComponent(p.id)}?download=1`} className="btn" download>
           <Download aria-hidden /> Download JSON
         </a>
+        <CopyButton text={`[![Licence Passport](${window.location.origin}/api/passports/${encodeURIComponent(p.id)}/badge)](${window.location.origin}/passport/${encodeURIComponent(p.id)})`} label="Copy badge for a README" announce="Badge copied" className="btn">
+          <BadgeCheck aria-hidden /> Copy badge for a README
+        </CopyButton>
         {hasDates && (
           <button type="button" className="btn" onClick={downloadCalendar}>
             <CalendarPlus aria-hidden /> Add licence end dates to my calendar

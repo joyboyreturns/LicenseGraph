@@ -4,6 +4,7 @@ import { GET as getConfig } from "../app/api/config/route";
 import { GET as getPortfolio } from "../app/api/portfolio/route";
 import { POST as postIntake } from "../app/api/intake/route";
 import { GET as getPassport } from "../app/api/passports/[id]/route";
+import { GET as getBadge } from "../app/api/passports/[id]/badge/route";
 import { GET as getQr } from "../app/api/passports/[id]/qr/route";
 import { GET as verifyPassportRoute } from "../app/api/passports/[id]/verify/route";
 import { GET as getScenarios } from "../app/api/scenarios/route";
@@ -134,6 +135,9 @@ describe("a scenario run from start to passport", () => {
     const qr = await getQr(new Request("http://app"), ctx(id));
     expect(qr.headers.get("Content-Type")).toBe("image/svg+xml");
     expect(await qr.text()).toContain("<svg");
+    const badge = await getBadge(new Request("http://app"), ctx(id));
+    expect(badge.headers.get("Content-Type")).toContain("image/svg+xml");
+    expect(await badge.text()).toContain("LicenseGraph passport: 3 licences verified");
   });
 
   it("refuses a passport before payment, and for unknown runs", async () => {
@@ -143,6 +147,9 @@ describe("a scenario run from start to passport", () => {
     expect((await getPassport(new Request("http://app"), ctx(id))).status).toBe(409);
     expect((await getPassport(new Request("http://app"), ctx("nope"))).status).toBe(404);
     expect((await getQr(new Request("http://app"), ctx("nope"))).status).toBe(404);
+    // No badge before there is a passport, and none for a run that does not exist.
+    expect((await getBadge(new Request("http://app"), ctx(id))).status).toBe(409);
+    expect((await getBadge(new Request("http://app"), ctx("nope"))).status).toBe(404);
   });
 
   it("keeps the order of steps: no payment before approval", async () => {

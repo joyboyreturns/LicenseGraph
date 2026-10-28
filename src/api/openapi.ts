@@ -132,6 +132,9 @@ export function buildOpenApi(serverUrl = "http://localhost:3000"): Json {
       "/api/passports/{id}/qr": {
         get: { operationId: "getPassportQr", tags: ["Passports"], summary: "QR code for the passport page", parameters: [idParam], responses: { "200": { description: "An SVG QR code.", content: { "image/svg+xml": { schema: { type: "string" } } } }, "404": { description: "No such run." } } },
       },
+      "/api/passports/{id}/badge": {
+        get: { operationId: "getPassportBadge", tags: ["Passports"], summary: "A status badge for the passport", description: "A small SVG for a README or a site, built from the passport's own re-verification: it says how many licences were verified, or that the check failed or the payment was reversed.", parameters: [idParam], responses: { "200": { description: "An SVG badge.", content: { "image/svg+xml": { schema: { type: "string" } } } }, "404": { description: "No such run." }, "409": { description: "The run has no passport yet (it has not been paid), or was refunded." } } },
+      },
       "/api/intake": {
         post: { operationId: "readBrief", tags: ["Intake"], summary: "Turn a plain-English brief into a project", description: "Uses the model when one is configured and always falls back to a local reader. Assumptions are listed separately from what the text said.", requestBody: body("IntakeInput"), responses: { ...ok("What was read.", ref("BriefReading")), ...err(["400", "Describe your project in a sentence or two."], ["413", "Too long."]) } },
       },

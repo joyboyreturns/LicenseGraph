@@ -39,7 +39,7 @@ test("the main pages load without errors, and unknown pages and runs are handled
 
 test("the page has no horizontal scroll on a phone", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  for (const path of ["/", "/verify"]) {
+  for (const path of ["/", "/verify", "/agents", "/dashboard"]) {
     await page.goto(path);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     expect(overflow, path).toBeLessThanOrEqual(0);

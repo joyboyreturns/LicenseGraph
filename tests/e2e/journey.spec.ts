@@ -33,6 +33,13 @@ test("a scenario goes from licences to a verified, paid and independently checka
   await expect(page.getByText("SIMULATED").first()).toBeVisible();
   expect(await accessibilityViolations(page)).toEqual([]);
 
+  // A badge for a README, built from the passport's own re-verification.
+  const passportId = new URL(page.url()).pathname.split("/").pop()!;
+  const badge = await page.request.get(`/api/passports/${passportId}/badge`);
+  expect(badge.headers()["content-type"]).toContain("image/svg+xml");
+  expect(await badge.text()).toContain("LicenseGraph passport: 3 licences verified");
+  await expect(page.getByRole("button", { name: "Copy badge for a README" })).toBeVisible();
+
   // Each licence's end date, counted from the day of purchase, and a calendar file with a reminder before each.
   await expect(page.getByRole("heading", { name: "When each licence ends" })).toBeVisible();
   const [calendar] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Add licence end dates to my calendar" }).click()]);
