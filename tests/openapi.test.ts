@@ -22,8 +22,9 @@ type Json = Record<string, any>;
 const spec = buildOpenApi() as Json;
 const METHODS = ["get", "post", "put", "patch", "delete"];
 
-// Every route.ts under app/api, as the OpenAPI path and the HTTP methods it exports.
-function routeFiles(dir = join(process.cwd(), "app/api")): { path: string; methods: string[] }[] {
+// Every route.ts under app/api and the public discovery routes, as the OpenAPI path and the HTTP methods it exports.
+function routeFiles(dir?: string): { path: string; methods: string[] }[] {
+  if (!dir) return ["app/api", "app/.well-known", "app/llms.txt"].flatMap((d) => routeFiles(join(process.cwd(), d)));
   const out: { path: string; methods: string[] }[] = [];
   for (const name of readdirSync(dir)) {
     const full = join(dir, name);
