@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import type { Passport } from "@/src/passport/passport";
 import { buildCatalog } from "@/src/ui/lib/catalog";
 import { boughtOn, passportLicenceDates } from "@/src/ui/lib/licence-dates";
@@ -105,6 +106,9 @@ export function Certificate({ passport: p, qrSrc, verifyUrl }: { passport: Passp
                     <td>
                       <div className={styles.strong}>{info?.licensor}</div>
                       <div className={styles.muted}>{info?.title}</div>
+                      <Link className={styles.receiptLink} href={`/passport/${encodeURIComponent(p.id)}/receipt/${encodeURIComponent(o.assetId)}`}>
+                        <span className="visually-hidden">{assetLabel(o.assetId)}: </span>Creator receipt
+                      </Link>
                     </td>
                     <td className={styles.terms}>{termsSummary(o.terms)}</td>
                     <td className={`${styles.right} ${styles.price}`}>{formatMoney(o.priceCents, o.currency)}</td>

@@ -131,3 +131,28 @@ test("pages and API answers carry the security headers, and the app still works 
   await expect(page.getByRole("table", { name: /How many times each rule rejected each asset/ })).toBeVisible({ timeout: 30_000 });
   expect(errors).toEqual([]);
 });
+
+test("each licence has a creator receipt: the price, the payout, the terms and the sentences they came from", async ({ page, request }) => {
+  const { id } = await (await request.post("/api/sessions", { data: { scenarioId: "podcast" } })).json();
+  await expect.poll(async () => (await (await request.get(`/api/sessions/${id}`)).json()).phase, { timeout: 30_000 }).toBe("verified");
+  await request.post(`/api/sessions/${id}/approve`, { data: { approvedBy: "Kiran" } });
+  const paid = await (await request.post(`/api/sessions/${id}/pay`)).json();
+  await request.post(`/api/simulator/orders/${paid.order.id}`);
+  await request.post(`/api/sessions/${id}/capture`);
+
+  // From the passport, through the link on the licence's row.
+  await page.goto(`/passport/${id}`);
+  await page.getByRole("link", { name: /Song: Creator receipt/ }).click();
+  await page.waitForURL(/\/receipt\/song$/);
+  await expect(page.getByRole("heading", { name: /Tapeloop: song licence/ })).toBeVisible();
+  await expect(page.getByText("$340.00").first()).toBeVisible();
+  await expect(page.getByTestId("receipt-payout")).toContainText("$340.00");
+  await expect(page.getByTestId("receipt-payout")).toContainText("through PayPal Payouts (payment simulator, no money moved)");
+  await expect(page.getByText("Approved by Kiran")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "The sentences these terms come from" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Verify the passport" })).toHaveAttribute("href", `/passport/${id}`);
+
+  // A licence this purchase does not have says so plainly instead of drawing an empty receipt.
+  await page.goto(`/passport/${id}/receipt/no-such-asset`);
+  await expect(page.getByText(/no licence for "no-such-asset"/)).toBeVisible();
+});

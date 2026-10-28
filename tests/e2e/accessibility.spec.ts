@@ -58,6 +58,13 @@ for (const scheme of ["light", "dark"] as const) {
       await expect(page.getByRole("img", { name: /^Where the/ })).toBeVisible({ timeout: 30_000 });
       await expect(page.getByRole("list", { name: "Licence end dates" })).toBeVisible();
       expect(await violations(page)).toEqual([]);
+
+      await page.goto(`/passport/${id}/receipt/song`);
+      await expect(page.getByRole("heading", { name: /song licence/ })).toBeVisible();
+      expect(await violations(page)).toEqual([]);
+      await page.goto(`/passport/${id}`);
+      await expect(page.getByRole("link", { name: /Song: Creator receipt/ })).toBeVisible();
+      expect(await violations(page)).toEqual([]);
     });
   });
 }
