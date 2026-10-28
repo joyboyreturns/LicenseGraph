@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { GET as getCard } from "../app/.well-known/mcp.json/route";
+import { GET as getKeys } from "../app/.well-known/licensegraph-keys.json/route";
 import { GET as getLlms } from "../app/llms.txt/route";
 import { RULE_CATALOG } from "../src/core/rules";
 import { listedTools, llmsTxt, mcpServerCard } from "../src/mcp/discovery";
 import { rulesGuide } from "../src/mcp/tools";
+import { passportKey } from "../src/server/passport-signing";
 
 describe("agent discovery", () => {
   it("lists exactly the tools the MCP server registers", async () => {
@@ -37,5 +39,22 @@ describe("agent discovery", () => {
     expect(guide.match(/If the licence is silent:/g)).toHaveLength(RULE_CATALOG.length);
     expect(guide).not.toContain("See the rules page");
     expect(mcpServerCard("https://lg.example", []).resources).toEqual(["licensegraph://rules"]);
+  });
+
+  it("publishes the passport public key only when the server signs, and never the secret", async () => {
+    const g = globalThis as unknown as { __licensegraph?: Record<string, unknown> };
+    const before = g.__licensegraph;
+    try {
+      g.__licensegraph = { passportSecret: undefined, appUrl: "http://app" };
+      expect((await getKeys()).status).toBe(404);
+      g.__licensegraph = { passportSecret: "a very private secret", appUrl: "http://app" };
+      const res = await getKeys();
+      const text = await res.text();
+      expect(res.status).toBe(200);
+      expect(text).not.toContain("a very private secret");
+      expect(JSON.parse(text).keys[0]).toMatchObject({ algorithm: "Ed25519", publicKey: passportKey("a very private secret").publicKey, keyId: passportKey("a very private secret").keyId });
+    } finally {
+      g.__licensegraph = before;
+    }
   });
 });
