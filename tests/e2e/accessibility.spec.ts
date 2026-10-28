@@ -54,6 +54,26 @@ for (const scheme of ["light", "dark"] as const) {
       expect(await violations(page)).toEqual([]);
     });
 
+    test("the other scenarios, a creator receipt and a single run's dashboard have none", async ({ page }) => {
+      for (const scenario of ["game-trailer", "podcast"]) {
+        await page.goto(`/run/${await runOf(page, scenario)}`);
+        await toResult(page);
+        await expect(page.getByRole("button", { name: "Review and approve" })).toBeVisible();
+        expect(await violations(page), scenario).toEqual([]);
+      }
+      const paid = await runOf(page, "podcast");
+      await page.request.post(`/api/sessions/${paid}/approve`, { data: { approvedBy: "Kiran" } });
+      const order = await (await page.request.post(`/api/sessions/${paid}/pay`)).json();
+      await page.request.post(`/api/simulator/orders/${order.order.id}`);
+      await page.request.post(`/api/sessions/${paid}/capture`);
+      await page.goto(`/passport/${paid}/receipt/song`);
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+      expect(await violations(page), "receipt").toEqual([]);
+      await page.goto(`/dashboard?session=${paid}`);
+      await expect(page.getByRole("table", { name: /How many times each rule rejected each asset/ })).toBeVisible({ timeout: 30_000 });
+      expect(await violations(page), "run dashboard").toEqual([]);
+    });
+
     test("a rebriefed run, with its comparison beside the run it came from, has none", async ({ page }) => {
       const first = await runOf(page, "documentary");
       const next = await (await page.request.post(`/api/sessions/${first}/rebrief`, { data: { change: { commercial: false } } })).json();
