@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { gapRequests, requirementCosts } from "../core/insights";
 import { negotiationOutlook } from "../core/negotiation";
+import { buildIcs, licenceEnds } from "../core/renewals";
 import { isIsoDate } from "../core/dates";
 import { minimumCompliantCost } from "../core/optimizer";
 import { verifyBundle } from "../core/rules";
@@ -112,6 +113,26 @@ export const whatIfInput = cheapestBundleInput.extend({
 export function whatIfBrief(input: z.infer<typeof whatIfInput>) {
   const project = input.project as Project;
   return whatIf(project, input.change, input.requiredAssetIds, input.offers as LicenseOffer[], input.currency ?? project.currency ?? "USD", { today: today() });
+}
+
+export const licenceEndDatesInput = z.object({
+  offers: z.array(offerSchema).min(1),
+  offerIds: z.array(textId).min(1).optional().describe("Only these offers (the ones bought). All offers if omitted."),
+  boughtOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("The day of purchase, YYYY-MM-DD. Today if omitted."),
+  projectName: z.string().trim().min(1).max(120).optional(),
+});
+
+/**
+ * When each licence stops covering the project, counted from the day of purchase, soonest first, with an
+ * iCalendar file holding a reminder 30 days before each one. Plain date arithmetic on the offers' own terms.
+ */
+export function licenceEndDates(input: z.infer<typeof licenceEndDatesInput>) {
+  const all = input.offers as LicenseOffer[];
+  const chosen = input.offerIds ? all.filter((o) => input.offerIds!.includes(o.id)) : all;
+  const boughtOn = input.boughtOn ?? today();
+  const ends = licenceEnds(chosen, boughtOn);
+  const items = ends.flatMap((e) => (e.endsOn ? [{ uid: `${e.offerId}-${boughtOn}`, label: `${e.assetId} (${e.offerId})`, endsOn: e.endsOn }] : []));
+  return { boughtOn, ends, calendar: buildIcs(input.projectName ?? "Licence project", items, `${boughtOn.replace(/-/g, "")}T000000Z`) };
 }
 
 export const startPurchaseInput = z.object({ project: projectSchema, requiredAssetIds: z.array(textId).min(1).max(12), documents: z.array(documentSchema).min(1).max(12) });

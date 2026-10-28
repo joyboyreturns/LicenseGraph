@@ -9,7 +9,7 @@
  */
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { checkBundle, checkBundleInput, cheapestBundle, cheapestBundleInput, purchaseStatus, startPurchase, startPurchaseInput, whatIfBrief, whatIfInput } from "../src/mcp/tools";
+import { checkBundle, checkBundleInput, cheapestBundle, cheapestBundleInput, licenceEndDates, licenceEndDatesInput, purchaseStatus, startPurchase, startPurchaseInput, whatIfBrief, whatIfInput } from "../src/mcp/tools";
 
 const app = { baseUrl: process.env.LICENSEGRAPH_URL ?? "http://localhost:3000" };
 const text = (value: unknown) => ({ content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }] });
@@ -32,6 +32,12 @@ server.registerTool(
   "what_if_brief",
   { description: "Ask what the purchase would cost if the brief changed: a different territory, term, media, or a requirement dropped or added. Returns the exact cheapest compliant total for the changed brief, the difference from the brief as written, which asset's licence would change, and for any asset nothing covers, what to ask the licensor to change. Use it to negotiate scope with exact figures before buying.", inputSchema: whatIfInput.shape },
   async (input) => text(whatIfBrief(input)),
+);
+
+server.registerTool(
+  "licence_end_dates",
+  { description: "When each licence stops covering the project, counted from the day of purchase, soonest first (a perpetual licence has no end). Also returns an iCalendar file with a reminder 30 days before each end, so licences are renewed before the project is exposed.", inputSchema: licenceEndDatesInput.shape },
+  async (input) => text(licenceEndDates(input)),
 );
 
 server.registerTool(

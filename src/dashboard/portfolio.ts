@@ -195,6 +195,11 @@ export const PORTFOLIO_INITIAL_STATE = {
           dataMapping: { cols: ["runs.run", "runs.source", "runs.status", "runs.rounds", "runs.verifiedTotal", "runs.priceOnlyTotal", "runs.blockedLicences", "runs.paid"].map((id) => ({ id })) },
           format: { title: { enabled: true, text: "Runs" } },
         },
+        licencesGrid: {
+          type: "grid",
+          dataMapping: { cols: ["licences.run", "licences.licensor", "licences.asset", "licences.price", "licences.boughtOn", "licences.endsOn", "licences.cover"].map((id) => ({ id })) },
+          format: { title: { enabled: true, text: "When each bought licence ends" } },
+        },
         offersGrid: {
           type: "grid",
           dataMapping: { cols: ["offers.run", "offers.asset", "offers.document", "offers.price", "offers.use", "offers.territories", "offers.term", "offers.mediums", "offers.attribution", "offers.sublicensing", "offers.status"].map((id) => ({ id })) },
@@ -213,6 +218,7 @@ export const PORTFOLIO_INITIAL_STATE = {
         payoutsGrid: { xTrack: 0, yTrack: 16, xSpan: 6, ySpan: 5 },
         ruleMatrix: { xTrack: 6, yTrack: 16, xSpan: 6, ySpan: 5 },
         offersGrid: { xTrack: 0, yTrack: 21, xSpan: 12, ySpan: 6 },
+        licencesGrid: { xTrack: 0, yTrack: 27, xSpan: 12, ySpan: 5 },
       },
     },
   ],

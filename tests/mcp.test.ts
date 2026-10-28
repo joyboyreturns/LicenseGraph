@@ -7,7 +7,7 @@ import { greedyProposer } from "../src/agent/greedy";
 import { SessionStore } from "../src/app-logic/session";
 import { demoModel } from "../src/demo/mock-model";
 import { scenarioById } from "../src/demo/scenarios";
-import { checkBundle, cheapestBundle, purchaseStatus, startPurchase, whatIfBrief, whatIfInput, type AppClient } from "../src/mcp/tools";
+import { checkBundle, cheapestBundle, licenceEndDates, purchaseStatus, startPurchase, whatIfBrief, whatIfInput, type AppClient } from "../src/mcp/tools";
 import type { Runtime } from "../src/server/runtime";
 import { runExample } from "./mcp-fixtures";
 
@@ -144,5 +144,22 @@ describe("start_licence_purchase", () => {
     expect(res).toMatchObject({ ok: false });
     expect(res.ok === false && res.error).toMatch(/No licence document for: missing/);
     expect(await purchaseStatus(app, "no-such-run")).toMatchObject({ ok: false });
+  });
+});
+
+describe("licence_end_dates", () => {
+  it("counts each licence from the purchase day, soonest first, and returns a calendar with a reminder per end", () => {
+    const r = licenceEndDates({ offers, boughtOn: "2026-11-05", projectName: "Docs" });
+    expect(r.boughtOn).toBe("2026-11-05");
+    expect(r.ends.length).toBe(offers.length);
+    for (let i = 1; i < r.ends.length; i++) expect((r.ends[i - 1]!.endsOn ?? "9999") <= (r.ends[i]!.endsOn ?? "9999")).toBe(true);
+    const dated = r.ends.filter((e) => e.endsOn).length;
+    expect(r.calendar.match(/BEGIN:VEVENT/g)?.length ?? 0).toBe(dated);
+    expect(r.calendar).toContain("TRIGGER:-P30D");
+  });
+
+  it("can be limited to the offers that were bought", () => {
+    const only = offers[0]!.id;
+    expect(licenceEndDates({ offers, offerIds: [only], boughtOn: "2026-11-05" }).ends.map((e) => e.offerId)).toEqual([only]);
   });
 });
