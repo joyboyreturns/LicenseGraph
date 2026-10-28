@@ -71,6 +71,18 @@ describe("createPayPalClient", () => {
       expect(unit.custom_id).toBe("a".repeat(64));
     });
 
+    it("sends a plain order when LICENSEGRAPH_ITEMISED_ORDERS=0, with the custom id kept", async () => {
+      vi.stubEnv("LICENSEGRAPH_ITEMISED_ORDERS", "0");
+      try {
+        const unit = await post({ items: [{ name: "x", amountCents: 2500 }], customId: "d".repeat(64) });
+        expect(unit.items).toBeUndefined();
+        expect(unit.amount).toEqual({ currency_code: "USD", value: "25.00" });
+        expect(unit.custom_id).toBe("d".repeat(64));
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
+
     it("sends a plain order when the lines do not add up to the amount, rather than a request PayPal would reject", async () => {
       const unit = await post({ items: [{ name: "x", amountCents: 1000 }] });
       expect(unit.items).toBeUndefined();

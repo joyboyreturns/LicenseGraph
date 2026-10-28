@@ -87,6 +87,7 @@ The repository ships a [`render.yaml`](../render.yaml) blueprint.
 1. In Render choose **New, Blueprint** and pick this repository.
 2. Enter the values it asks for: `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET` (Sandbox), and optionally `LICENSEGRAPH_CREATOR_EMAILS` and `PAYPAL_WEBHOOK_ID` (register `https://<your service>.onrender.com/api/webhooks/paypal` under the Sandbox app's Webhooks first; see the README). Leave the gateway values empty to serve the replayed scenarios only; add `AI_GATEWAY_API_KEY`, a free `LICENSEGRAPH_MODEL` and set `LICENSEGRAPH_MODE=live` to let visitors read their own licences (calls are paced to the free model's rate limit).
 3. After the first deploy, open the URL. `APP_URL` is not needed: the app uses Render's `RENDER_EXTERNAL_URL` for PayPal's return link and the passport QR codes.
+   PayPal orders are itemised (one line per licence). If the Sandbox checkout page ever objects to the line items, set `LICENSEGRAPH_ITEMISED_ORDERS=0` and restart: orders are then sent plain, still tagged with the approved bundle's digest.
 4. Put a PayPal Sandbox buyer login in the Devpost testing instructions, or leave PayPal credentials out and set `LICENSEGRAPH_SIMULATOR=1` so judges can complete a purchase with no account.
 
 The free plan sleeps when idle and takes up to a minute to wake: open the URL once before judging starts. Keep the service available through the judging period (until 15 December 2026).

@@ -131,7 +131,8 @@ export function createPayPalClient(config: PayPalConfig) {
       customId?: string;
     }): Promise<CreatedOrder> {
       if (!supportsCentCurrency(input.currency)) throw new Error("Unsupported currency for settlement in cents");
-      const itemised = Boolean(input.items?.length) && input.items!.every((i) => Number.isSafeInteger(i.amountCents) && i.amountCents > 0) && input.items!.reduce((n, i) => n + i.amountCents, 0) === input.amountCents;
+      // LICENSEGRAPH_ITEMISED_ORDERS=0 sends plain orders, should the checkout page ever object to line items.
+      const itemised = process.env.LICENSEGRAPH_ITEMISED_ORDERS !== "0" && Boolean(input.items?.length) && input.items!.every((i) => Number.isSafeInteger(i.amountCents) && i.amountCents > 0) && input.items!.reduce((n, i) => n + i.amountCents, 0) === input.amountCents;
       const json = await call("/v2/checkout/orders", input.requestId, {
         intent: "CAPTURE",
         purchase_units: [
