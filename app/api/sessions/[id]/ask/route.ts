@@ -19,6 +19,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (question.length > 400) return json({ error: "Keep the question under 400 characters." }, 413);
 
   const view = viewOf(session);
+  // A run that came from another can be asked how it differs from it.
+  const from = session.input.meta?.rebriefedFrom ?? session.input.meta?.revisedFrom;
+  const earlierSession = from ? sessionOr404(from) : undefined;
+  const earlier = earlierSession ? viewOf(earlierSession) : undefined;
   const { intakeModel } = getRuntime();
-  return json(intakeModel && modelBudget.take() ? await answerQuestion(view, question, intakeModel) : answerLocally(view, question));
+  return json(intakeModel && modelBudget.take() ? await answerQuestion(view, question, intakeModel, earlier) : answerLocally(view, question, earlier));
 }

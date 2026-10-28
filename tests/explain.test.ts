@@ -164,3 +164,33 @@ describe("createRateLimiter", () => {
     expect(l.take()).toBe(true);
   });
 });
+
+describe("a run that came from another", () => {
+  async function pair() {
+    const earlier = await view();
+    const now = structuredClone(earlier);
+    // The image licence is swapped for a cheaper one, as after a licensor's reply or a changed brief.
+    const swapped = { ...now.bundle!.offers.find((o) => o.assetId === "image")!, id: "offer-photo-b", priceCents: 1_000 };
+    const cut = earlier.bundle!.offers.find((o) => o.assetId === "image")!.priceCents - swapped.priceCents;
+    now.bundle = { ...now.bundle!, offers: now.bundle!.offers.map((o) => (o.assetId === "image" ? swapped : o)), totalCents: now.bundle!.totalCents - cut };
+    return { earlier, now, cut };
+  }
+
+  it("says what is different from it, asset by asset, with figures from both verified bundles", async () => {
+    const { earlier, now, cut } = await pair();
+    const a = answerLocally(now, "How is this different from the first run?", earlier);
+    expect(a.answer).toContain(`cost $${(earlier.bundle!.totalCents / 100).toFixed(2)}`);
+    expect(a.answer).toContain(`$${(cut / 100).toFixed(2)} less`);
+    expect(a.answer).toContain("The image now costs less");
+    expect(a.answer).toContain("The music is the same licence".replace("music", earlier.bundle!.offers.find((o) => o.assetId !== "image")!.assetId));
+    expect(a.citations).toEqual(expect.arrayContaining(["offer-photo-b"]));
+    expect(a.source).toBe("local");
+  });
+
+  it("is only offered when the run came from another, and the model is given the same comparison", async () => {
+    const { earlier, now } = await pair();
+    expect(answerLocally(now, "How is this different from the first run?").answer).not.toContain("The run this came from");
+    expect(runFacts(now, earlier)).toContain("Compared with the run it came from: The run this came from cost");
+    expect(runFacts(now)).not.toContain("Compared with the run it came from");
+  });
+});

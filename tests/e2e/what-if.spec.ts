@@ -199,6 +199,10 @@ test("a rebriefed run sits beside the run it came from: what each asset now cost
   await expect(panel).toContainText("Cheaper licence");
   await expect(panel.getByRole("link", { name: "Open that run" })).toHaveAttribute("href", `/run/${id}`);
 
+  // The same comparison answers a question, in words, from the same two verified bundles.
+  await page.getByRole("button", { name: "How is this different from the run it came from?" }).click();
+  await expect(page.getByText(/now costs less/).first()).toBeVisible();
+
   // A run that did not come from another has no such panel.
   await page.goto(`/run/${id}`);
   await expect(page.getByRole("region", { name: "What if the project changed?" })).toBeVisible({ timeout: 30_000 });

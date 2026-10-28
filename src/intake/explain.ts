@@ -1,4 +1,5 @@
 import type { SessionView } from "../app-logic/session";
+import { compareRuns, type AssetChange } from "../core/compare";
 import { negotiationOutlook, savingLevers } from "../core/negotiation";
 import type { ModelClient } from "../extraction/model";
 
@@ -21,8 +22,20 @@ const outlookOf = (v: SessionView) => (v.bundle || !v.analysis?.gaps.length ? un
 /** For a verified bundle: cheaper offers whose licensor would only have to change terms, with the saving if they agreed at their quoted price. */
 const leversOf = (v: SessionView) => (v.bundle && v.analysis ? savingLevers(v.project, v.analysis.assets.map((a) => a.assetId), v.candidates, v.bundle.offers.map((o) => o.id), { today: v.runDate }) : []);
 
+const CHANGE_WORDS: Record<AssetChange, string> = { same: "is the same licence", cheaper: "now costs less", dearer: "now costs more", "other-licence": "is now a different licence at the same price", gained: "is covered only now", lost: "is no longer covered" };
+
+/** This run beside the run it came from, asset by asset, from the two verified bundles. Absent when there is nothing to compare. */
+function comparisonOf(v: SessionView, earlier: SessionView | undefined): { text: string; offerIds: string[] } | undefined {
+  if (!earlier) return undefined;
+  const { assets, deltaCents, currency } = compareRuns(earlier.bundle, v.bundle);
+  if (!assets.length) return { text: earlier.bundle || v.bundle ? "Neither run has anything to compare." : "Neither this run nor the one it came from found a compliant bundle, so there is nothing to compare.", offerIds: [] };
+  const head = `${earlier.bundle ? `The run this came from cost ${usd(earlier.bundle.totalCents, earlier.bundle.currency)}` : "The run this came from found no compliant bundle"}; ${v.bundle ? `this one costs ${usd(v.bundle.totalCents, v.bundle.currency)}` : "this one found no compliant bundle"}${deltaCents === null ? "" : deltaCents === 0 ? ", the same" : `, ${usd(Math.abs(deltaCents), currency!)} ${deltaCents < 0 ? "less" : "more"}`}.`;
+  const lines = assets.map((a) => `The ${a.assetId} ${CHANGE_WORDS[a.change]}${a.before ? ` (was ${a.before.offerId} at ${usd(a.before.priceCents, earlier.bundle!.currency)}` : " ("}${a.after ? `${a.before ? ", now" : "now"} ${a.after.offerId} at ${usd(a.after.priceCents, v.bundle!.currency)}` : ""}).`);
+  return { text: [head, ...lines].join("\n"), offerIds: assets.flatMap((a) => [a.before?.offerId, a.after?.offerId]).filter((id): id is string => Boolean(id)) };
+}
+
 /** The facts of a run as compact text: the only thing the model is allowed to answer from. */
-export function runFacts(v: SessionView): string {
+export function runFacts(v: SessionView, earlier?: SessionView): string {
   const failedBy = new Map<string, string[]>();
   for (const e of v.events.filter((e) => e.kind === "rejected")) {
     for (const viol of e.payload.violations as { offerId?: string; message: string; rule: string }[]) {
@@ -39,6 +52,8 @@ export function runFacts(v: SessionView): string {
   const outlook = outlookOf(v);
   if (outlook) lines.push(`If every licensor agreed to those changes at their quoted prices, the cheapest compliant bundle would cost ${usd(outlook.totalCents, outlook.currency)}${outlook.headroomCents !== undefined ? (outlook.headroomCents >= 0 ? `, ${usd(outlook.headroomCents, outlook.currency)} under budget` : `, ${usd(-outlook.headroomCents, outlook.currency)} over budget`) : ""}. This is a best case, not an offer.`);
   for (const l of leversOf(v)) lines.push(`Saving lever for ${l.assetId}: ${l.offerId} costs ${usd(l.priceCents, l.currency)} instead of ${usd(l.chosenPriceCents, l.currency)} (saves ${usd(l.savingCents, l.currency)}) if its licensor would: ${l.asks.map((a) => a.ask).join(" ")} A best case, not an offer.`);
+  const compared = comparisonOf(v, earlier);
+  if (compared) lines.push(`Compared with the run it came from: ${compared.text.replace(/\n/g, " ")}`);
   if (v.bundle) lines.push(`Verified bundle total ${usd(v.bundle.totalCents, v.bundle.currency)}.`);
   if (v.analysis) lines.push(`A price-only buyer would pay ${usd(v.analysis.naiveTotalCents, runCurrency(v))}; compliance premium ${usd(v.analysis.compliancePremiumCents, runCurrency(v))}; blocked purchases: ${v.analysis.blockedPurchases.map((b) => `${b.offerId} (${b.reasons.join(", ")})`).join("; ") || "none"}.`);
   if (v.payouts) lines.push(`Creators paid: ${v.payouts.lines.map((l) => `${l.licensorName} ${usd(l.amountCents, l.currency)} for ${l.assetId} (${l.status})`).join("; ")}.`);
@@ -47,7 +62,7 @@ export function runFacts(v: SessionView): string {
 }
 
 /** Plain, deterministic answers for the common questions. Always available, never invents anything. */
-export function answerLocally(v: SessionView, question: string): Answer {
+export function answerLocally(v: SessionView, question: string, earlier?: SessionView): Answer {
   const q = question.toLowerCase();
   const failed = new Map<string, string[]>();
   for (const e of v.events.filter((e) => e.kind === "rejected")) {
@@ -55,6 +70,10 @@ export function answerLocally(v: SessionView, question: string): Answer {
   }
   const mentioned = v.candidates.filter((o) => q.includes(o.id.toLowerCase()) || q.includes(o.id.replace(/^offer-/, "").toLowerCase()));
   const cite = (ids: string[]) => ({ citations: [...new Set(ids)], source: "local" as const });
+
+  // A run that came from another: what is different from it.
+  const compared = comparisonOf(v, earlier);
+  if (compared && /(differ|compar|what changed|has changed|changed (from|since)|(earlier|previous|first|original|last) (run|one|time|version)|before the (change|reply|rebrief)|(since|from) the (change|reply))/.test(q)) return { answer: compared.text, ...cite(compared.offerIds) };
 
   // A verified run: where it could cost less, from the exact checks.
   const levers = leversOf(v);
@@ -113,11 +132,11 @@ const SYSTEM = `You answer questions about one licensing run. Use ONLY the facts
  * Ask the model, grounded in the run's facts. Any offer id it cites must exist in the run;
  * otherwise the deterministic answer is used instead. Failures fall back the same way.
  */
-export async function answerQuestion(v: SessionView, question: string, model?: ModelClient): Promise<Answer> {
-  const local = answerLocally(v, question);
+export async function answerQuestion(v: SessionView, question: string, model?: ModelClient, earlier?: SessionView): Promise<Answer> {
+  const local = answerLocally(v, question, earlier);
   if (!model) return local;
   try {
-    const raw = (await model.complete({ system: SYSTEM, user: `Facts:\n${runFacts(v)}\n\nQuestion: ${question}` })).trim();
+    const raw = (await model.complete({ system: SYSTEM, user: `Facts:\n${runFacts(v, earlier)}\n\nQuestion: ${question}` })).trim();
     if (!raw) return local;
     const known = new Set(v.candidates.map((c) => c.id));
     const cited = [...new Set([...raw.matchAll(/\boffer-[a-z0-9-]+/gi)].map((m) => m[0]))];
