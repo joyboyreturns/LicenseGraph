@@ -114,6 +114,22 @@ describe("answerLocally when no licence can be bought", () => {
   });
 });
 
+describe("answerLocally on a verified run: where it could cost less", () => {
+  it("lists each lever with the exact saving, the ask, and a total that is a best case", async () => {
+    const a = answerLocally(await view(), "Where could we save money?");
+    expect(a.answer).toContain("offer-photo costs $45.00 instead of $80.00, saving $35.00");
+    expect(a.answer).toContain("Allow commercial use");
+    expect(a.answer).toContain("$35.00 less");
+    expect(a.answer).toMatch(/best case, not an offer/);
+    expect(a.citations).toEqual(["offer-photo"]);
+  });
+
+  it("is in the facts given to a model, and stays out of a run with nothing to save", async () => {
+    expect(runFacts(await view())).toContain("Saving lever for image: offer-photo");
+    expect(runFacts(await view("exclusive-theme"))).not.toContain("Saving lever");
+  });
+});
+
 describe("answerQuestion with a model", () => {
   const reply = (text: string) => ({ complete: vi.fn().mockResolvedValue(text) });
 

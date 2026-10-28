@@ -22,6 +22,10 @@ test("a verified run shows where it could cost less, with what to ask each licen
   await expect(levers).toContainText("Allow commercial use");
   const mail = levers.getByRole("link", { name: /Open in email/ });
   expect(decodeURIComponent((await mail.getAttribute("href"))!)).toContain("Allow commercial use");
+
+  // The same figures answer the question in words, from the same checks.
+  await page.getByRole("button", { name: "Where could we pay less?" }).click();
+  await expect(page.getByText(/costs \$45\.00 instead of \$80\.00, saving \$35\.00/)).toBeVisible();
 });
 
 test("an agent can start a purchase, but only a person who takes control can approve it", async ({ page, browser }) => {

@@ -1,5 +1,5 @@
 import type { SessionView } from "../app-logic/session";
-import { negotiationOutlook } from "../core/negotiation";
+import { negotiationOutlook, savingLevers } from "../core/negotiation";
 import type { ModelClient } from "../extraction/model";
 
 export interface Answer {
@@ -18,6 +18,9 @@ const termText = (t: SessionView["candidates"][number]["terms"]) =>
 /** For a run with no compliant bundle: the best case if every licensor agreed to every ask, at the prices already quoted. */
 const outlookOf = (v: SessionView) => (v.bundle || !v.analysis?.gaps.length ? undefined : negotiationOutlook(v.project, v.analysis.assets.map((a) => a.assetId), v.candidates, runCurrency(v), { today: v.runDate }));
 
+/** For a verified bundle: cheaper offers whose licensor would only have to change terms, with the saving if they agreed at their quoted price. */
+const leversOf = (v: SessionView) => (v.bundle && v.analysis ? savingLevers(v.project, v.analysis.assets.map((a) => a.assetId), v.candidates, v.bundle.offers.map((o) => o.id), { today: v.runDate }) : []);
+
 /** The facts of a run as compact text: the only thing the model is allowed to answer from. */
 export function runFacts(v: SessionView): string {
   const failedBy = new Map<string, string[]>();
@@ -35,6 +38,7 @@ export function runFacts(v: SessionView): string {
   for (const g of v.analysis?.gaps ?? []) lines.push(`Gap for ${g.assetId}: no compliant offer. Closest is ${g.offerId} at ${usd(g.priceCents, g.currency)}. Ask the licensor to: ${g.asks.map((a) => a.ask).join(" ")}`);
   const outlook = outlookOf(v);
   if (outlook) lines.push(`If every licensor agreed to those changes at their quoted prices, the cheapest compliant bundle would cost ${usd(outlook.totalCents, outlook.currency)}${outlook.headroomCents !== undefined ? (outlook.headroomCents >= 0 ? `, ${usd(outlook.headroomCents, outlook.currency)} under budget` : `, ${usd(-outlook.headroomCents, outlook.currency)} over budget`) : ""}. This is a best case, not an offer.`);
+  for (const l of leversOf(v)) lines.push(`Saving lever for ${l.assetId}: ${l.offerId} costs ${usd(l.priceCents, l.currency)} instead of ${usd(l.chosenPriceCents, l.currency)} (saves ${usd(l.savingCents, l.currency)}) if its licensor would: ${l.asks.map((a) => a.ask).join(" ")} A best case, not an offer.`);
   if (v.bundle) lines.push(`Verified bundle total ${usd(v.bundle.totalCents, v.bundle.currency)}.`);
   if (v.analysis) lines.push(`A price-only buyer would pay ${usd(v.analysis.naiveTotalCents, runCurrency(v))}; compliance premium ${usd(v.analysis.compliancePremiumCents, runCurrency(v))}; blocked purchases: ${v.analysis.blockedPurchases.map((b) => `${b.offerId} (${b.reasons.join(", ")})`).join("; ") || "none"}.`);
   if (v.payouts) lines.push(`Creators paid: ${v.payouts.lines.map((l) => `${l.licensorName} ${usd(l.amountCents, l.currency)} for ${l.assetId} (${l.status})`).join("; ")}.`);
@@ -51,6 +55,13 @@ export function answerLocally(v: SessionView, question: string): Answer {
   }
   const mentioned = v.candidates.filter((o) => q.includes(o.id.toLowerCase()) || q.includes(o.id.replace(/^offer-/, "").toLowerCase()));
   const cite = (ids: string[]) => ({ citations: [...new Set(ids)], source: "local" as const });
+
+  // A verified run: where it could cost less, from the exact checks.
+  const levers = leversOf(v);
+  if (levers.length && /((could|can|would|might|where).*(save|saving|cheaper|pay less|lower|reduce)|negotiat|discount|pay less)/.test(q)) {
+    const total = levers.reduce((n, l) => n + l.savingCents, 0);
+    return { answer: `${levers.map((l) => `For the ${l.assetId}: ${l.offerId} costs ${usd(l.priceCents, l.currency)} instead of ${usd(l.chosenPriceCents, l.currency)}, saving ${usd(l.savingCents, l.currency)}, if its licensor would ${l.asks.map((a) => a.ask.replace(/\.$/, "")).join("; ")}.`).join("\n")}\nIf every licensor agreed at the price they quoted you would pay ${usd(total, levers[0]!.currency)} less. A best case, not an offer: ask first, then have the revised licence checked before buying.`, ...cite(levers.map((l) => l.offerId)) };
+  }
 
   // A run with nothing to buy: what blocks each asset, what to ask, and what a yes would cost, from the exact checks.
   const gaps = v.bundle ? [] : (v.analysis?.gaps ?? []);

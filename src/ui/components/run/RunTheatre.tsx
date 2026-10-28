@@ -362,7 +362,7 @@ function Theatre({ view, accept, refresh }: { view: SessionView; accept: (v: Ses
               </h2>
               <span className="small muted">Answers come only from this run&rsquo;s recorded facts</span>
             </div>
-            <AskPanel runId={view.id} catalog={catalog} onSelectOffer={setSelected} suggestions={!view.bundle && view.analysis?.gaps.length ? ["Why could nothing be bought?", "What should I ask the licensors?", "How much would it cost if they agree?"] : ["Why were licences rejected?", "What did staying compliant cost?", "Who gets paid?"]} />
+            <AskPanel runId={view.id} catalog={catalog} onSelectOffer={setSelected} suggestions={!view.bundle && view.analysis?.gaps.length ? ["Why could nothing be bought?", "What should I ask the licensors?", "How much would it cost if they agree?"] : ["Why were licences rejected?", "What did staying compliant cost?", "Who gets paid?", ...(levers.length ? ["Where could we pay less?"] : [])]} />
           </section>
         )}
         </div>
