@@ -37,7 +37,7 @@ AG Grid's brief emphasizes dashboard polish, custom widgets/theming/layout and a
 ### In order, from 5 November
 
 1. **One real Sandbox purchase** (before anything else). The PayPal order is now itemised, one line per licence, and carries the approved bundle's digest as its `custom_id`. Sandbox accepts creating it, but a buyer approving it on PayPal's own page has not been re-run since. If the page objects to the line items, set `LICENSEGRAPH_ITEMISED_ORDERS=0` and restart.
-2. **Deploy** (`docs/DEPLOY.md`, Render). Register `https://<service>/api/webhooks/paypal` on the Sandbox app, then set `PAYPAL_WEBHOOK_ID`. Set `APP_URL` to the public address.
+2. **Deploy** (`docs/DEPLOY.md`, Render). Register `https://<service>/api/webhooks/paypal` on the Sandbox app, then set `PAYPAL_WEBHOOK_ID`. Set `APP_URL` to the public address, and `LICENSEGRAPH_PASSPORT_SECRET` to a long random value that you keep: passports are signed with a key derived from it, and the public half is published at `/.well-known/licensegraph-keys.json`. Changing the secret later changes the key, so earlier passports would no longer match it.
 3. **AG Studio key.** Set `NEXT_PUBLIC_AG_STUDIO_LICENSE_KEY` *before the build*: it is read at build time, so a restart alone is not enough.
 4. **Live model for the demo.** `minimax/minimax-m3.1-flash` is paid, so the free-model guard (`assertModelIsFree`) will refuse it until a narrow opt-in for that exact id is added. That opt-in has not been built; ask first, then add it as an explicit setting that is off by default.
 5. **Fill the placeholders** in `docs/DEVPOST.md`: hosted URL, video link, model id, Sandbox buyer login (or note that the simulator needs none).
