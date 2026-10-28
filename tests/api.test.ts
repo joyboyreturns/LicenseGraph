@@ -238,6 +238,17 @@ describe("custom runs and the portfolio", () => {
     expect((await body(response)).error).toMatch(/Invalid run input/);
   });
 
+  it("accepts a licensor with only a name, and refuses a malformed payout email or a missing name", async () => {
+    const docWith = (licensor: unknown) => ({ ...custom, documents: [{ ...custom.documents[0], licensor }] });
+    install({ mode: "live", deps: { model: { complete: () => new Promise(() => {}) }, proposer: greedyProposer, ...common } });
+    expect((await postSession(post("http://app/api/sessions", docWith({ name: "Just A Name" })))).status).toBe(201);
+    expect((await postSession(post("http://app/api/sessions", docWith({ name: "Has Email", email: "a@example.test" })))).status).toBe(201);
+    for (const bad of [{ name: "Bad", email: "not-an-email" }, { email: "a@example.test" }, { name: "" }]) {
+      const res = await postSession(post("http://app/api/sessions", docWith(bad)));
+      expect(res.status, JSON.stringify(bad)).toBe(400);
+    }
+  });
+
   it("limits concurrent custom runs", async () => {
     const rt = install({ mode: "live", deps: { model: { complete: () => new Promise(() => {}) }, proposer: greedyProposer, ...common } });
     for (let i = 0; i < 3; i++) expect((await postSession(post("http://app/api/sessions", { ...custom, documents: [{ ...custom.documents[0], id: `d${i}` }] }))).status).toBe(201);

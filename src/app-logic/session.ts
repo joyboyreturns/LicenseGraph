@@ -42,6 +42,8 @@ export interface Session {
   order?: CreatedOrder;
   capture?: CapturedOrder;
   payouts?: PayoutSummary;
+  /** Assets whose creator could not be paid (no payout email), known once a bundle is verified. Not persisted: payment re-checks. */
+  payoutBlockedAssets?: string[];
   /** The buyer's money was returned because the creators could not be paid. */
   refund?: { id: string; status: string; amount: { currency: string; value: string }; at: string };
   /** Present until a person takes over an agent-started run: only a hash of the one-time claim token is kept. */
@@ -183,6 +185,7 @@ export async function runPipeline(session: Session, deps: Deps): Promise<void> {
 
   if (session.loop.status === "verified") {
     session.phase = "verified";
+    session.payoutBlockedAssets = payoutBlockers(session, deps);
   } else {
     session.phase = "failed";
     const frontier = minimumCompliantCost(session.input.project, session.input.requiredAssetIds, session.candidates, { today: session.runDate });
@@ -193,6 +196,16 @@ export async function runPipeline(session: Session, deps: Deps): Promise<void> {
         : "The agent ran out of attempts before finding a compliant bundle.";
   }
   touch(session);
+}
+
+/**
+ * Assets in the verified bundle whose creator cannot be paid. Only meaningful where payouts happen at
+ * all; checked before an order is created, so a buyer is never charged for a purchase that cannot settle.
+ */
+export function payoutBlockers(session: Session, deps: Deps): string[] {
+  const bundle = session.loop?.bundle;
+  if (!bundle || !deps.payments?.createPayout) return [];
+  return [...new Set(planPayouts(bundle.offers, session.input.documents, deps.payeeOverrides).unpaid.map((u) => u.assetId))];
 }
 
 /** A human signs off on exactly the verified bundle. */
@@ -214,6 +227,8 @@ export function startPayment(session: Session, deps: Deps): Promise<CreatedOrder
 async function startPaymentOnce(session: Session, deps: Deps): Promise<CreatedOrder> {
   if (!deps.payments) throw new SessionError("PayPal is not configured. Set PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET.");
   if (session.phase !== "approved" || !session.loop?.bundle) throw new SessionError("Approve the verified bundle before paying.");
+  const blocked = payoutBlockers(session, deps);
+  if (blocked.length) throw new SessionError(`These creators cannot be paid because they have no payout email: ${blocked.join(", ")}. Nothing was charged. Start a new run and give each licensor a payout email.`);
   const order = await startCheckout(deps.payments, {
     project: session.input.project,
     requiredAssetIds: session.input.requiredAssetIds,
@@ -388,6 +403,8 @@ export interface SessionView {
   refund?: Session["refund"];
   /** The captured payment can be returned to the buyer: creators were certainly not paid. */
   canRefund?: boolean;
+  /** Assets whose creator has no payout email, so this purchase cannot be paid until a new run supplies one. */
+  payoutBlockedAssets?: string[];
   payouts?: Omit<PayoutSummary, "lines"> & { lines: (Omit<PayoutSummary["lines"][number], "email"> & { emailMasked: string })[] };
   events: LedgerEvent[];
   chainValid: boolean;
@@ -418,6 +435,7 @@ export function viewOf(session: Session): SessionView {
     capture: session.capture,
     refund: session.refund,
     canRefund: session.capture ? refundBlockedReason(session) === undefined : undefined,
+    payoutBlockedAssets: session.payoutBlockedAssets?.length ? session.payoutBlockedAssets : undefined,
     payouts: session.payouts && { ...session.payouts, lines: session.payouts.lines.map(({ email, ...rest }) => ({ ...rest, emailMasked: maskEmail(email) })) },
     events: session.ledger.events(),
     chainValid: session.ledger.verify(),

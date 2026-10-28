@@ -33,22 +33,29 @@ export const isFinalPayout = (status: string) => FINAL.has(status);
 /**
  * Work out who is paid what from the verified bundle: each licence's price goes to its licensor.
  * `payeeOverrides` (demo accounts) replace licensor emails in order, so a demo can pay real
- * Sandbox accounts. Offers whose document names no licensor are left out and reported.
+ * Sandbox accounts. Offers whose document names no licensor, or a licensor with no payout email (and no override), are left out and reported.
  */
 export function planPayouts(offers: LicenseOffer[], documents: SourceDocument[], payeeOverrides: string[] = []): { lines: Omit<PayoutLine, "status">[]; unpaid: { assetId: string; offerId: string }[] } {
   const lines: Omit<PayoutLine, "status">[] = [];
   const unpaid: { assetId: string; offerId: string }[] = [];
-  const emails = new Map<string, string>();
+  // One payee per licensor, so two licences from the same licensor go to the same account.
+  const receivers = new Map<string, string>();
 
   for (const offer of offers) {
     const documentId = offer.evidence[0]?.documentId ?? "";
     const licensor = documents.find((d) => d.id === documentId)?.licensor;
-    if (!licensor) {
+    // A licensor with no payout email can only be paid through a demo override; otherwise nobody can be paid.
+    const key = licensor?.email ?? (licensor ? `name:${licensor.name.toLowerCase()}` : "");
+    if (licensor && !receivers.has(key)) {
+      const receiver = payeeOverrides.length ? payeeOverrides[receivers.size % payeeOverrides.length] : licensor.email;
+      if (receiver) receivers.set(key, receiver);
+    }
+    const email = receivers.get(key);
+    if (!licensor || !email) {
       unpaid.push({ assetId: offer.assetId, offerId: offer.id });
       continue;
     }
-    if (!emails.has(licensor.email)) emails.set(licensor.email, payeeOverrides.length ? payeeOverrides[emails.size % payeeOverrides.length]! : licensor.email);
-    lines.push({ assetId: offer.assetId, offerId: offer.id, documentId, licensorName: licensor.name, email: emails.get(licensor.email)!, amountCents: offer.priceCents, currency: offer.currency });
+    lines.push({ assetId: offer.assetId, offerId: offer.id, documentId, licensorName: licensor.name, email, amountCents: offer.priceCents, currency: offer.currency });
   }
   return { lines, unpaid };
 }

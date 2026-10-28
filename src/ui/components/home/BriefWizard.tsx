@@ -154,6 +154,13 @@ export function BriefWizard({ scenarios, onStartScenario, starting }: { scenario
     setDocs((d) => d.map((x) => (x.key === key ? { ...x, text: full.slice(0, MAX_DOC), fileName: file.name } : x)));
   };
 
+  /** A licensor is kept by name even with no payout email, so the run shows who the creator is; without an email they just cannot be paid. */
+  const licensorOf = (d: { licensorName: string; licensorEmail: string }) => {
+    const name = d.licensorName.trim();
+    const email = d.licensorEmail.trim();
+    return name || email ? { name: name || email, ...(email ? { email } : {}) } : undefined;
+  };
+
   const submit = async () => {
     if (!draft) return;
     const issues: string[] = [];
@@ -184,7 +191,7 @@ export function BriefWizard({ scenarios, onStartScenario, starting }: { scenario
       };
       const documents = docs
         .filter((d) => assets.includes(d.assetId) && d.text.trim())
-        .map((d, i) => ({ id: `doc-${i + 1}-${d.assetId}`, assetId: d.assetId, text: d.text, licensor: d.licensorName.trim() && d.licensorEmail.trim() ? { name: d.licensorName.trim(), email: d.licensorEmail.trim() } : undefined }));
+        .map((d, i) => ({ id: `doc-${i + 1}-${d.assetId}`, assetId: d.assetId, text: d.text, licensor: licensorOf(d) }));
       const view = await api<SessionView>("/api/sessions", { method: "POST", json: { project, requiredAssetIds: assets, documents, brief: text || undefined } });
       router.push(`/run/${view.id}`);
     } catch (e) {
@@ -441,7 +448,7 @@ export function BriefWizard({ scenarios, onStartScenario, starting }: { scenario
                     />
                     <div className={styles.payee}>
                       <input className="input" aria-label="Licensor name" placeholder="Licensor name" value={d.licensorName} maxLength={80} onChange={(e) => setDocs(docs.map((x) => (x.key === d.key ? { ...x, licensorName: e.target.value } : x)))} />
-                      <input className="input" aria-label="Licensor payout email (optional)" placeholder="Payout email (optional, Sandbox)" type="email" value={d.licensorEmail} onChange={(e) => setDocs(docs.map((x) => (x.key === d.key ? { ...x, licensorEmail: e.target.value } : x)))} />
+                      <input className="input" aria-label="Licensor payout email (optional)" placeholder="Payout email (needed to pay this creator)" type="email" value={d.licensorEmail} onChange={(e) => setDocs(docs.map((x) => (x.key === d.key ? { ...x, licensorEmail: e.target.value } : x)))} />
                     </div>
                   </div>
                 ))}

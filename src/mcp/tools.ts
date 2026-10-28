@@ -52,7 +52,7 @@ export const documentSchema = z.object({
   id: textId,
   assetId: textId,
   text: z.string().min(1).max(20_000).describe("The licence text, verbatim."),
-  licensor: z.object({ name: z.string().trim().min(1).max(80), email: z.string().email().max(127) }).optional().describe("Who is paid for this licence."),
+  licensor: z.object({ name: z.string().trim().min(1).max(80), email: z.string().email().max(127).optional().describe("Where to pay this creator. Without it the purchase cannot be paid.") }).optional().describe("Who is paid for this licence."),
 });
 
 const today = () => new Date().toISOString().slice(0, 10);

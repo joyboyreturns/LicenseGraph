@@ -58,6 +58,7 @@ export const SessionView = z
     capture: z.object({ id: z.string(), status: z.string(), captureId: z.string(), amount: money }).optional(),
     refund: z.object({ id: z.string(), status: z.string(), amount: money, at: z.string() }).optional(),
     canRefund: z.boolean().optional().describe("The payment can be returned to the buyer: it is certain no creator was paid."),
+    payoutBlockedAssets: z.array(z.string()).optional().describe("Assets whose creator has no payout email. Creating the order is refused until a new run supplies one."),
     payouts: z
       .object({ batchId: z.string(), status: z.string(), totalCents: z.number().int(), currency: z.string(), lines: z.array(payoutLine), createdAt: z.string(), error: z.string().optional(), notSent: z.boolean().optional() })
       .optional(),

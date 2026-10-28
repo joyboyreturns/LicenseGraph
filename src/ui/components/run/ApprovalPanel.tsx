@@ -93,6 +93,11 @@ export function ApprovalPanel({ view, catalog, onApprove, busy, onSelectOffer }:
         </div>
       </div>
       <BundleTable view={view} catalog={catalog} onSelectOffer={onSelectOffer} />
+      {view.payoutBlockedAssets && (
+        <p className={styles.lockNote} role="note" data-tone="warn">
+          <Lock aria-hidden /> No payout email for {view.payoutBlockedAssets.map(assetLabel).join(", ")}, so those creators cannot be paid and the payment will not be created. Start a new run with a payout email for each licensor to complete a purchase.
+        </p>
+      )}
       <form
         className={styles.approveForm}
         onSubmit={(e) => {

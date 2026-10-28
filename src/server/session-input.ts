@@ -25,7 +25,7 @@ export const sessionInputSchema = z.object({
   documents: z.array(z.object({
     id: textId, assetId: textId,
     text: z.string().min(1).max(MAX_TEXT),
-    licensor: z.object({ name: z.string().trim().min(1).max(80), email: z.string().max(127).regex(EMAIL) }).optional(),
+    licensor: z.object({ name: z.string().trim().min(1).max(80), email: z.string().max(127).regex(EMAIL).optional() }).optional(),
   })).min(1).max(MAX_DOCS),
   brief: z.string().max(2000).optional(),
 });

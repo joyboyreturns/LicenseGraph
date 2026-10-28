@@ -9,7 +9,7 @@ export interface SourceDocument {
   assetId: string;
   text: string;
   /** Who gets paid for this licence. */
-  licensor?: { name: string; email: string };
+  licensor?: { name: string; /** Where the creator is paid. Without it the creator is named but cannot be paid. */ email?: string };
 }
 
 /** Terms every licence must state; each needs evidence. */

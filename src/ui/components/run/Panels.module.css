@@ -152,6 +152,13 @@
   font-size: 13px;
   color: var(--muted);
 }
+.lockNote[data-tone="warn"] {
+  color: var(--bad);
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--bad-line);
+  background: var(--bad-soft);
+}
 .lockNote svg {
   width: 14px;
   height: 14px;

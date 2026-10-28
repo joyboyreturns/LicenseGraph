@@ -1818,6 +1818,13 @@
             "description": "The payment can be returned to the buyer: it is certain no creator was paid.",
             "type": "boolean"
           },
+          "payoutBlockedAssets": {
+            "description": "Assets whose creator has no payout email. Creating the order is refused until a new run supplies one.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "payouts": {
             "type": "object",
             "properties": {
@@ -2211,6 +2218,13 @@
           "canRefund": {
             "description": "The payment can be returned to the buyer: it is certain no creator was paid.",
             "type": "boolean"
+          },
+          "payoutBlockedAssets": {
+            "description": "Assets whose creator has no payout email. Creating the order is refused until a new run supplies one.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           },
           "payouts": {
             "type": "object",
@@ -2975,8 +2989,7 @@
                     }
                   },
                   "required": [
-                    "name",
-                    "email"
+                    "name"
                   ]
                 }
               },

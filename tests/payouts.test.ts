@@ -54,6 +54,23 @@ describe("planPayouts", () => {
     expect(unpaid).toEqual([{ assetId: "font", offerId: "offer-font" }]);
   });
 
+  describe("a licensor with a name but no payout email", () => {
+    const noEmail = (names: Record<string, string>) => s.input.documents.map((d) => (names[d.id] ? { ...d, licensor: { name: names[d.id]! } } : d));
+
+    it("cannot be paid, and is reported rather than skipped silently", () => {
+      const { lines, unpaid } = planPayouts(offers(["song", "font"]), noEmail({ font: "Typeforge" }));
+      expect(lines.map((l) => l.licensorName)).toEqual(["SoundHarbor Music"]);
+      expect(unpaid).toEqual([{ assetId: "font", offerId: "offer-font" }]);
+    });
+
+    it("can be paid through a demo override, and two licences from one name share one account", () => {
+      const docs = noEmail({ song: "Pixel Hymns", archive: "Pixel Hymns", font: "Typeforge" });
+      const { lines, unpaid } = planPayouts(offers(["song", "archive", "font"]), docs, ["a@x.test", "b@x.test"]);
+      expect(unpaid).toEqual([]);
+      expect(lines.map((l) => l.email)).toEqual(["a@x.test", "a@x.test", "b@x.test"]);
+    });
+  });
+
   it("folds a fresh PayPal status into the summary", () => {
     const summary = { batchId: "B", status: "PENDING", totalCents: 100, currency: "USD", createdAt: "x", lines: [{ assetId: "song", offerId: "offer-song", documentId: "song", licensorName: "n", email: "e", amountCents: 100, currency: "USD", status: "PENDING" }] };
     const next = applyPayoutStatus(summary, { batchId: "B", status: "SUCCESS", items: [{ itemId: "offer-song", status: "SUCCESS", receiver: "e" }] });
@@ -147,13 +164,13 @@ describe("settling creators after capture", () => {
     expect(s.payouts!.lines.every((l) => l.status === "SUCCESS")).toBe(true);
   });
 
-  it("refuses to send a partial payout plan when a creator has no recipient", async () => {
+  it("still refuses to send a partial payout plan if a creator's recipient is lost after the order was created", async () => {
     const { deps, payments } = makeDeps();
     const s = createSession(input());
-    s.input.documents.find((d) => d.id === "font")!.licensor = undefined;
     await runPipeline(s, deps);
     approveSession(s, "Kiran");
     await startPayment(s, deps);
+    s.input.documents.find((d) => d.id === "font")!.licensor = undefined;
     await completePayment(s, deps);
     expect(s.payouts).toMatchObject({ status: "FAILED", error: expect.stringContaining("font") });
     expect(payments.createPayout).not.toHaveBeenCalled();
@@ -253,5 +270,56 @@ describe("createPayPalClient payouts", () => {
 
     expect(await client.getPayout("PB1")).toEqual({ batchId: "PB1", status: "SUCCESS", items: [{ itemId: "i1", status: "SUCCESS", receiver: "r@x.test", error: undefined }] });
     expect(fetchMock.mock.calls[2]![1].method).toBe("GET");
+  });
+});
+
+describe("refusing to charge for a purchase that cannot be paid out", () => {
+  const withoutEmail = (): ReturnType<typeof input> => {
+    const i = input();
+    i.documents = i.documents.map((d) => (d.id === "font" ? { ...d, licensor: { name: d.licensor!.name } } : d));
+    return i;
+  };
+
+  it("says which assets are blocked as soon as the bundle is verified, and shows names without emails", async () => {
+    const { deps } = makeDeps();
+    const s = createSession(withoutEmail());
+    await runPipeline(s, deps);
+    expect(s.phase).toBe("verified");
+    expect(viewOf(s).payoutBlockedAssets).toEqual(["font"]);
+    expect(viewOf(s).documents.find((d) => d.id === "font")?.licensorName).toBe("TypeForge Studio");
+  });
+
+  it("creates no PayPal order, so nothing is charged", async () => {
+    const { deps, payments } = makeDeps();
+    const s = createSession(withoutEmail());
+    await runPipeline(s, deps);
+    approveSession(s, "Kiran");
+    await expect(startPayment(s, deps)).rejects.toThrow(/no payout email: font\. Nothing was charged/);
+    expect(payments.createOrder).not.toHaveBeenCalled();
+    expect(s.phase).toBe("approved");
+    expect(s.order).toBeUndefined();
+  });
+
+  it("is not blocked when every creator has an email, or when an override account pays them", async () => {
+    const { deps } = makeDeps();
+    const ok = createSession(input());
+    await runPipeline(ok, deps);
+    expect(viewOf(ok).payoutBlockedAssets).toBeUndefined();
+
+    const { deps: overridden, payments } = makeDeps({ payeeOverrides: ["sandbox@example.test"] });
+    const s = createSession(withoutEmail());
+    await runPipeline(s, overridden);
+    expect(viewOf(s).payoutBlockedAssets).toBeUndefined();
+    approveSession(s, "Kiran");
+    await startPayment(s, overridden);
+    expect(payments.createOrder).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not apply where payouts are not made at all", async () => {
+    const { deps } = makeDeps();
+    const noPayouts: Deps = { ...deps, payments: { createOrder: deps.payments!.createOrder, captureOrder: deps.payments!.captureOrder } };
+    const s = createSession(withoutEmail());
+    await runPipeline(s, noPayouts);
+    expect(viewOf(s).payoutBlockedAssets).toBeUndefined();
   });
 });
