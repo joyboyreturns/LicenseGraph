@@ -227,7 +227,7 @@ describe("SessionStore", () => {
     const oldRunning = store.add(createSession(input()));
     oldRunning.phase = "extracting";
     const finished = store.add(createSession(input()));
-    finished.phase = "captured";
+    finished.phase = "failed";
 
     const fresh = store.add(createSession(input()));
     expect(store.get(oldRunning.id)).toBeDefined();
