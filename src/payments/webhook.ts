@@ -58,6 +58,9 @@ export async function handleWebhookEvent(event: WebhookEvent, ctx: { store: Sess
     const session = sessions.find((s) => s.order?.id === orderId);
     if (!session) return { ignored: "no run has this order" };
     if (session.phase !== "order_created") return { ignored: "this run's order is not waiting to be captured" };
+    // The order carries the digest of the bundle a person approved. If PayPal reports a different one, this is not the order that approval created.
+    const customId = text(resource.purchase_units?.[0]?.custom_id);
+    if (customId && session.approval && customId !== session.approval.bundleDigest) return { ignored: "the order's bundle digest does not match the approved bundle" };
     try {
       await completePayment(session, deps);
     } catch (e) {

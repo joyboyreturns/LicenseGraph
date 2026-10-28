@@ -100,6 +100,22 @@ describe("the webhook endpoint refuses what PayPal has not vouched for", () => {
 });
 
 describe("verified events", () => {
+  it("captures only when the order's custom id is the approved bundle's digest, and leaves a mismatched order alone", async () => {
+    const t = await setup();
+    const { s, order } = await t.approved();
+    t.sim.approveOrder(order.id);
+    const withDigest = (digest: string) => ({ ...approvedEvent(order.id), resource: { id: order.id, purchase_units: [{ custom_id: digest }] } });
+
+    const wrong = await body(await deliver(withDigest("f".repeat(64))));
+    expect(wrong).toMatchObject({ received: true, ignored: expect.stringContaining("does not match the approved bundle") });
+    expect(s.capture).toBeUndefined();
+    expect(s.phase).toBe("order_created");
+
+    const right = await body(await deliver(withDigest(s.approval!.bundleDigest)));
+    expect(right).toMatchObject({ handled: expect.stringContaining("captured"), runId: s.id });
+    expect(s.capture?.captureId).toBeTruthy();
+  });
+
   it("captures the approved order even though the buyer's browser never came back, and pays the creators once", async () => {
     const t = await setup();
     const { s, order } = await t.approved();
