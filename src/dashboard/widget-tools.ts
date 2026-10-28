@@ -128,6 +128,22 @@ export function buildKpi(c: FieldCatalog, a: KpiArgs): Built<Record<string, unkn
   };
 }
 
+export interface TimelineArgs {
+  title: string;
+}
+
+/** The licence timeline: one bar per bought licence, from the licences table. Only offered where that table exists. */
+export function buildLicenceTimeline(c: FieldCatalog, a: TimelineArgs): Built<Record<string, unknown>> {
+  const errors: string[] = [];
+  for (const id of ["licences.label", "licences.boughtOn", "licences.endsOn"]) if (!c.byId[id]) errors.push(`This dashboard has no "${id}" field, so it cannot draw a licence timeline.`);
+  if (errors.length) return { ok: false, errors };
+  return {
+    ok: true,
+    size: { xSpan: 12, ySpan: 5 },
+    widget: { type: "licence-timeline", dataMapping: { label: [{ id: "licences.label" }], start: [{ id: "licences.boughtOn" }], end: [{ id: "licences.endsOn" }] }, format: { title: { enabled: true, text: a.title } } },
+  };
+}
+
 type Layout = { xTrack: number; yTrack: number; xSpan: number; ySpan: number };
 export interface PageLike {
   id: string;

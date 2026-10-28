@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildChart, buildKpi, buildTable, catalogFrom, placeWidget, type StateLike } from "../src/dashboard/widget-tools";
+import { buildChart, buildKpi, buildLicenceTimeline, buildTable, catalogFrom, placeWidget, type StateLike } from "../src/dashboard/widget-tools";
 
 const catalog = catalogFrom({
   sources: [
@@ -98,5 +98,24 @@ describe("placeWidget", () => {
     const { state: next, widgetId } = placeWidget(empty, "!!!", { z: 1 }, { xSpan: 3, ySpan: 3 });
     expect(widgetId).toBe("widget");
     expect(next.pages[0]!.widgetLayout!["widget"]).toMatchObject({ yTrack: 0 });
+  });
+});
+
+describe("buildLicenceTimeline", () => {
+  const portfolio = catalogFrom({ sources: [{ id: "licences", fields: [{ id: "label", format: "textFormat" }, { id: "boughtOn", format: "textFormat" }, { id: "endsOn", format: "textFormat" }] }] });
+
+  it("maps the licences table's name, start and end onto the timeline widget", () => {
+    expect(buildLicenceTimeline(portfolio, { title: "Ends" })).toMatchObject({
+      ok: true,
+      size: { xSpan: 12 },
+      widget: { type: "licence-timeline", dataMapping: { label: [{ id: "licences.label" }], start: [{ id: "licences.boughtOn" }], end: [{ id: "licences.endsOn" }] }, format: { title: { text: "Ends" } } },
+    });
+  });
+
+  it("says plainly that a dashboard without a licences table cannot draw one", () => {
+    const run = catalogFrom({ sources: [{ id: "offers", fields: [{ id: "price", format: "currencyFormat" }] }] });
+    const result = buildLicenceTimeline(run, { title: "Ends" });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors.join(" ")).toContain('"licences.endsOn"');
   });
 });

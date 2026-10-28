@@ -103,7 +103,7 @@ Money-moving calls (`approve`, `pay`, `capture`, `payouts`, `refund`) need the `
 - A language model **proposes** the bundle and **revises** after the verifier's rejections.
 - A language model (with an offline fallback) turns a plain-English **brief** into project requirements; every assumption is shown separately from what the text said.
 - **Ask about this run** answers questions only from the run's recorded facts; cited offers are checked by code.
-- The AG Studio **dashboard assistant** builds charts and tables through a few validated tools.
+- The AG Studio **dashboard assistant** builds charts, tables, headline numbers and the licence timeline through a few validated tools.
 - The model **never** verifies its own output, never creates orders, and never sees payment credentials. It is also never trusted: it can only choose real offers by id, and its structured output and quote locations are checked. Quote matching does not prove the interpretation is correct; the approver must review the source terms.
 
 Models run through the Vercel AI Gateway, and the client **refuses any model the gateway does not list as free**, so credits cannot be spent.
