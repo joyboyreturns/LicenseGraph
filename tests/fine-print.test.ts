@@ -20,6 +20,11 @@ Territory: Worldwide.`;
     for (const i of items) expect(text).toContain(i.sentence);
   });
 
+  it("does not mistake an ordinary word for a clause", () => {
+    expect(finePrint("An alternative file format is available on request and the licence fee is USD 20.00 in total.")).toEqual([]);
+    expect(finePrint("The Licensee may not alter the Work in a way that harms the artist.").map((i) => i.topic)).toEqual(["moral"]);
+  });
+
   it("says nothing about terms the engine already checks", () => {
     expect(finePrint("Territory: Worldwide.\nTerm: 24 months from the date of purchase.\nLicence fee: USD 200.00.\nThe Licensee may use the Track in commercial productions.")).toEqual([]);
   });

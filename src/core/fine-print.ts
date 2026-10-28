@@ -17,7 +17,7 @@ const TOPICS: { topic: FinePrintTopic; label: string; pattern: RegExp }[] = [
   { topic: "resale", label: "Resale and sharing", pattern: /\b(resell\w*|resale|redistribut\w*|transfer\w*|assign\w*|stock library|standalone)\b/i },
   { topic: "liability", label: "Liability and claims", pattern: /\b(indemn\w*|warrant\w*|liabilit\w*|damages|disclaim\w*)\b/i },
   { topic: "reporting", label: "Reporting or audit duties", pattern: /\b(audit\w*|report(ing)? (to|the)|royalt\w*|cue sheet|notify|notification)\b/i },
-  { topic: "moral", label: "Changes to the work", pattern: /\b(moral rights|modif\w*|alter\w*|derivative|edit(ing)? the (track|image|work|font|clip))\b/i },
+  { topic: "moral", label: "Changes to the work", pattern: /\b(moral rights|modif\w*|alter(?:s|ed|ing|ation|ations)?|derivative|edit(ing)? the (track|image|work|font|clip))\b/i },
 ];
 
 /** At most `limit` sentences, one per topic first so a long licence cannot crowd out the other kinds of clause. */
