@@ -5,7 +5,7 @@ import { demoModel } from "../src/demo/mock-model";
 import { sampleDocuments, sampleProject, sampleRequiredAssets } from "../src/demo/sample";
 import { issuePassport } from "../src/passport/issue";
 import { PassportError, verifyPassport, type Passport } from "../src/passport/passport";
-import { checkSignature, signPassport } from "../src/server/passport-signing";
+import { checkSignature, passportKey, signPassport, signWithHmac, verifyWithPublicKey } from "../src/server/passport-signing";
 import { bundleCanonical, sha256Hex } from "../src/core/digest";
 import { eventCanonical, GENESIS_HASH } from "../src/ledger/chain";
 
@@ -174,8 +174,33 @@ describe("passport signing", () => {
   });
   it("signs with a secret and recognises its own signature", async () => {
     const signed = signPassport(issuePassport(await paidSession()), "s3cret");
-    expect(signed.signature).toMatchObject({ algorithm: "HMAC-SHA256" });
+    expect(signed.signature).toMatchObject({ algorithm: "Ed25519" });
     expect(checkSignature(signed, "s3cret")).toBe("valid");
+  });
+
+  it("can be checked with the public key alone, and the key does not reveal the secret", async () => {
+    const signed = signPassport(issuePassport(await paidSession()), "s3cret");
+    const { publicKey, keyId } = passportKey("s3cret");
+    expect(signed.signature?.keyId).toBe(keyId);
+    expect(publicKey).not.toContain("s3cret");
+    expect(verifyWithPublicKey(signed, publicKey)).toBe("valid");
+    // Someone else's key, or a changed passport, does not pass.
+    expect(verifyWithPublicKey(signed, passportKey("another secret").publicKey)).toBe("invalid");
+    const tampered = clone(signed);
+    tampered.bundle.totalCents += 1;
+    expect(verifyWithPublicKey(tampered, publicKey)).toBe("invalid");
+    expect(verifyWithPublicKey(signed, "not a key")).toBe("invalid");
+    expect(verifyWithPublicKey(issuePassport(await paidSession()), publicKey)).toBe("unsigned");
+    // The same secret always gives the same key, so a restart does not orphan earlier passports.
+    expect(passportKey("s3cret").publicKey).toBe(publicKey);
+  });
+
+  it("still recognises a passport signed with the earlier shared-secret signature, which only the server can check", async () => {
+    const old = signWithHmac(issuePassport(await paidSession()), "s3cret");
+    expect(old.signature?.algorithm).toBe("HMAC-SHA256");
+    expect(checkSignature(old, "s3cret")).toBe("valid");
+    expect(checkSignature(old, "other")).toBe("invalid");
+    expect(verifyWithPublicKey(old, passportKey("s3cret").publicKey)).toBe("unsupported");
   });
 
   it("rejects a changed passport or a wrong secret", async () => {

@@ -38,7 +38,7 @@ export function mcpServerCard(appUrl: string, tools: ToolSummary[]) {
     tools,
     prompts: ["buy_licences"],
     humanInTheLoop: "An agent can start a purchase and receives a claim link. Only the person who opens it can approve, and PayPal moves the money.",
-    docs: { openapi: `${appUrl}/api/openapi.json`, agents: `${appUrl}/agents`, rules: `${appUrl}/rules` },
+    docs: { passportKeys: `${appUrl}/.well-known/licensegraph-keys.json`, openapi: `${appUrl}/api/openapi.json`, agents: `${appUrl}/agents`, rules: `${appUrl}/rules` },
   };
 }
 
@@ -57,6 +57,7 @@ export function llmsTxt(appUrl: string, tools: ToolSummary[]): string {
     `- Server card: ${appUrl}/.well-known/mcp.json`,
     `- REST API (OpenAPI 3.1): ${appUrl}/api/openapi.json`,
     `- Watch an agent work, and connect your own: ${appUrl}/agents`,
+    `- Public key that checks Licence Passport signatures offline (Ed25519): ${appUrl}/.well-known/licensegraph-keys.json`,
     "",
     "## Tools",
     "",

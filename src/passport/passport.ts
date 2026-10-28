@@ -23,12 +23,12 @@ export interface Passport {
   comparison: { naiveTotalCents: number; compliancePremiumCents: number; blockedPurchases: { assetId: string; offerId: string; priceCents: number; reasons: string[] }[] };
   ledger: { events: LedgerEvent[]; head: string };
   /** Present when the server holds a signing secret. Checked by the server, not in the browser. */
-  signature?: { algorithm: "HMAC-SHA256"; value: string };
+  signature?: { algorithm: "Ed25519" | "HMAC-SHA256"; value: string; /** Which public key checks it (Ed25519 only). */ keyId?: string };
 }
 
 export class PassportError extends Error {}
 
-/** What the signature covers. The server signs this with its secret; the browser cannot check it. */
+/** What the signature covers. The server signs this with a key derived from its secret. */
 export const signedMessage = (p: Passport) => {
   const { signature: _signature, ...contents } = p;
   return canonicalJson(contents);

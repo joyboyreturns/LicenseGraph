@@ -10,6 +10,7 @@ import { sampleDocuments, sampleProject, sampleRequiredAssets } from "../src/dem
 import { issuePassport } from "../src/passport/issue";
 import { verifyPassport } from "../src/passport/passport";
 import { formatReport } from "../src/passport/report";
+import { passportKey, signPassport } from "../src/server/passport-signing";
 
 const payments = {
   createOrder: vi.fn().mockResolvedValue({ id: "ORD1", status: "PAYER_ACTION_REQUIRED", approveUrl: "https://www.sandbox.paypal.com/checkoutnow?token=ORD1" }),
@@ -28,7 +29,7 @@ async function passport() {
   return issuePassport(s);
 }
 
-const run = (file: string) => spawnSync("node", ["--import", "tsx", "scripts/verify-passport.ts", file], { encoding: "utf8" });
+const run = (file: string, ...more: string[]) => spawnSync("node", ["--import", "tsx", "scripts/verify-passport.ts", file, ...more], { encoding: "utf8" });
 
 describe("formatReport", () => {
   it("has one line per check and a summary", async () => {
@@ -66,5 +67,20 @@ describe("npm run verify:passport", () => {
     const r = run(file);
     expect(r.status).toBe(2);
     expect(r.stderr).toContain("does not look like a Licence Passport");
+  }, 30_000);
+
+  it("checks who issued the passport, offline, when given the issuer's public key", async () => {
+    const signed = signPassport(await passport(), "issuer secret");
+    const file = join(dir, "signed.json");
+    writeFileSync(file, JSON.stringify(signed));
+    const right = run(file, "--key", passportKey("issuer secret").publicKey);
+    expect(right.status).toBe(0);
+    expect(right.stdout).toContain("Issuer signature: valid");
+    // Another issuer's key does not vouch for it, even though every content check passes.
+    const wrong = run(file, "--key", passportKey("someone else").publicKey);
+    expect(wrong.status).toBe(1);
+    expect(wrong.stdout).toContain("Issuer signature: invalid");
+    // A key given before the file is read the same way.
+    expect(run("--key", passportKey("issuer secret").publicKey, file).status).toBe(0);
   }, 30_000);
 });

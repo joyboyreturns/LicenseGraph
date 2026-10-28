@@ -2927,9 +2927,15 @@
             "properties": {
               "algorithm": {
                 "type": "string",
-                "const": "HMAC-SHA256"
+                "enum": [
+                  "Ed25519",
+                  "HMAC-SHA256"
+                ]
               },
               "value": {
+                "type": "string"
+              },
+              "keyId": {
                 "type": "string"
               }
             },
@@ -2994,7 +3000,7 @@
               "unsigned",
               "unavailable"
             ],
-            "description": "Whether this server signed the passport. Only the server can check this."
+            "description": "Whether this server signed the passport. Anyone can check an Ed25519 signature offline with the public key at /.well-known/licensegraph-keys.json."
           }
         },
         "required": [

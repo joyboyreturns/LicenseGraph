@@ -116,7 +116,7 @@ describe("a scenario run from start to passport", () => {
     expect(JSON.stringify(done)).not.toMatch(/boomline[a-z]*@|pixelhymns@|vectororchard@/);
 
     const passport = await body(await getPassport(new Request("http://app/api/passports/x"), ctx(id)));
-    expect(passport).toMatchObject({ version: 1, paypal: { captureId: "CAP1" }, signature: { algorithm: "HMAC-SHA256" } });
+    expect(passport).toMatchObject({ version: 1, paypal: { captureId: "CAP1" }, signature: { algorithm: "Ed25519" } });
 
     const check = await body(await verifyPassportRoute(new Request("http://app"), ctx(id)));
     expect(check).toMatchObject({ ok: true, signature: "valid" });

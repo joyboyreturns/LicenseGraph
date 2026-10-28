@@ -16,8 +16,8 @@ type Load = { status: "loading" } | { status: "ready"; passport: Passport } | { 
 type Signature = "valid" | "invalid" | "unsigned" | "unavailable";
 
 const SIGNATURE_TEXT: Record<Signature, { title: string; text: string; tone: string }> = {
-  valid: { title: "Issued and signed by this server", text: "The HMAC signature matches this server's secret.", tone: "ok" },
-  invalid: { title: "Signature does not match", text: "This server's secret does not reproduce the signature. Treat the passport as altered.", tone: "bad" },
+  valid: { title: "Issued and signed by this server", text: "The Ed25519 signature matches this server's published public key (/.well-known/licensegraph-keys.json), so anyone can check it offline.", tone: "ok" },
+  invalid: { title: "Signature does not match", text: "This server's key does not reproduce the signature. Treat the passport as altered.", tone: "bad" },
   unsigned: { title: "Unsigned", text: "This server has no signing secret, so the passport carries no signature. The content checks still stand on their own.", tone: "neutral" },
   unavailable: { title: "Signature not checkable here", text: "The passport is signed, but this server cannot check the signature.", tone: "neutral" },
 };

@@ -131,7 +131,7 @@ describe("real responses match the published schemas", () => {
     await completePayment(s, deps);
 
     const passport = await body(await getPassport(new Request("http://app"), ctx(s.id)));
-    expect(S.Passport.parse(passport).signature?.algorithm).toBe("HMAC-SHA256");
+    expect(S.Passport.parse(passport).signature?.algorithm).toBe("Ed25519");
     const check = S.PassportVerification.parse(await body(await getVerify(new Request("http://app"), ctx(s.id))));
     expect(check).toMatchObject({ ok: true, signature: "valid" });
 

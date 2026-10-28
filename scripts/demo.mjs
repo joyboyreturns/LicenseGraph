@@ -45,6 +45,8 @@ const env = {
   PAYPAL_CLIENT_ID: "",
   PAYPAL_CLIENT_SECRET: "",
   LICENSEGRAPH_DATA_DIR: dataDir,
+  // Offline demo passports are signed too, with a key anyone can read here: it proves the mechanism, not an issuer.
+  LICENSEGRAPH_PASSPORT_SECRET: process.env.LICENSEGRAPH_PASSPORT_SECRET || "licensegraph-offline-demo-secret",
   APP_URL: process.env.APP_URL ?? `http://localhost:${port}`,
   ...(flag("fail-first-payout") ? { LICENSEGRAPH_SIMULATOR_FAIL_FIRST_PAYOUT: "1" } : {}),
 };

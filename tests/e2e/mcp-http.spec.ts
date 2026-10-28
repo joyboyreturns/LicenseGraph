@@ -1,3 +1,4 @@
+import { verifyWithPublicKey } from "../../src/server/passport-signing";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { expect, test } from "@playwright/test";
@@ -74,4 +75,21 @@ test("an agent can find the MCP endpoint without being told: llms.txt, the serve
   expect(robots).toContain("Disallow: /run/");
   expect(robots).toContain("Sitemap:");
   expect(await (await request.get("/sitemap.xml")).text()).toContain("/agents");
+});
+
+test("a paid passport can be checked against the server's published public key, offline, and a changed one fails", async ({ request }) => {
+  const { id } = await (await request.post("/api/sessions", { data: { scenarioId: "podcast" } })).json();
+  await expect.poll(async () => (await (await request.get(`/api/sessions/${id}`)).json()).phase, { timeout: 30_000 }).toBe("verified");
+  await request.post(`/api/sessions/${id}/approve`, { data: { approvedBy: "Kiran" } });
+  const paid = await (await request.post(`/api/sessions/${id}/pay`)).json();
+  await request.post(`/api/simulator/orders/${paid.order.id}`);
+  await request.post(`/api/sessions/${id}/capture`);
+
+  const passport = await (await request.get(`/api/passports/${id}`)).json();
+  const { keys } = await (await request.get("/.well-known/licensegraph-keys.json")).json();
+  expect(passport.signature).toMatchObject({ algorithm: "Ed25519", keyId: keys[0].keyId });
+  // No secret and no server call: the public key alone.
+  expect(verifyWithPublicKey(passport, keys[0].publicKey)).toBe("valid");
+  passport.paypal.captureId = "FORGED";
+  expect(verifyWithPublicKey(passport, keys[0].publicKey)).toBe("invalid");
 });

@@ -29,7 +29,7 @@ Create the settings file from the example and lock it down:
 sudo cp deploy/env.production.example /opt/licensegraph/.env
 sudo chown licensegraph:licensegraph /opt/licensegraph/.env && sudo chmod 600 /opt/licensegraph/.env
 sudo nano /opt/licensegraph/.env       # fill in APP_URL, PayPal Sandbox keys, gateway key, passport secret
-openssl rand -hex 32                   # paste into LICENSEGRAPH_PASSPORT_SECRET
+openssl rand -hex 32                   # paste into LICENSEGRAPH_PASSPORT_SECRET (the Ed25519 signing key is derived from it; keep it, because changing it changes the key)
 ```
 
 `APP_URL` must be the exact public address (step 4), because PayPal sends the buyer back to it and passport QR codes point at it.

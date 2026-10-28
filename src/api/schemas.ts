@@ -101,7 +101,7 @@ export const Passport = z
     approval: z.object({ approvedBy: z.string(), approvedAt: z.string(), bundleDigest: z.string() }),
     paypal: z.object({ orderId: z.string(), captureId: z.string(), amount: money, environment: z.enum(["sandbox", "simulator"]) }),
     ledger: z.object({ events: z.array(LedgerEvent), head: z.string() }),
-    signature: z.object({ algorithm: z.literal("HMAC-SHA256"), value: z.string() }).optional(),
+    signature: z.object({ algorithm: z.enum(["Ed25519", "HMAC-SHA256"]), value: z.string(), keyId: z.string().optional() }).optional(),
   })
   .meta({ id: "Passport", description: "A self-contained record of one paid run. It can be re-checked from its own contents, with no server." });
 
@@ -109,7 +109,7 @@ export const PassportVerification = z
   .object({
     ok: z.boolean(),
     checks: z.array(z.object({ id: z.string(), label: z.string(), ok: z.boolean(), detail: z.string() })),
-    signature: z.enum(["valid", "invalid", "unsigned", "unavailable"]).describe("Whether this server signed the passport. Only the server can check this."),
+    signature: z.enum(["valid", "invalid", "unsigned", "unavailable"]).describe("Whether this server signed the passport. Anyone can check an Ed25519 signature offline with the public key at /.well-known/licensegraph-keys.json."),
   })
   .meta({ id: "PassportVerification" });
 
