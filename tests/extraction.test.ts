@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { verifyBundle } from "../src/core/rules";
 import type { Project } from "../src/core/types";
 import { extractOffer, locateQuote } from "../src/extraction/extract";
-import { createGatewayModel, minIntervalFromEnv, type ModelClient } from "../src/extraction/model";
+import { createGatewayModel, gatewayConfigFromEnv, minIntervalFromEnv, type ModelClient } from "../src/extraction/model";
 import { cannedReply, fixtures, OPTIONAL_TERM_KEYS } from "../src/demo/fixtures";
 
 const replying = (...replies: string[]): ModelClient & { complete: ReturnType<typeof vi.fn> } => {
@@ -70,7 +70,9 @@ describe("optional terms", () => {
     const model = replying(JSON.stringify(reply), cannedReply(voiceover));
     const { offer } = await extractOffer(model, voiceover.doc);
     expect(offer).toBeDefined();
-    expect(model.complete.mock.calls[1]![0].user).toMatch(/missing evidence for sublicensing/);
+    // Only the quote is missing, so the follow-up asks for just that quote, not the whole extraction again.
+    expect(model.complete.mock.calls[1]![0].system).toMatch(/find supporting quotes/);
+    expect(model.complete.mock.calls[1]![0].user).toMatch(/Give one verbatim quote .* for each of: sublicensing\./);
   });
 
   it("rejects an invented quote for an optional term", async () => {
@@ -172,7 +174,7 @@ describe("extractOffer rejects what it cannot verify", () => {
 
   it("gives up after the attempt limit and returns the problems", async () => {
     const bad = withQuote("term", "This licence is valid forever.");
-    const result = await extractOffer(replying(bad, bad), f.doc);
+    const result = await extractOffer(replying(bad, bad, bad), f.doc);
 
     expect(result.offer).toBeUndefined();
     expect(result.problems[0]).toMatch(/term/);
@@ -242,6 +244,26 @@ describe("createGatewayModel", () => {
     expect(down).toHaveBeenCalledTimes(1);
   });
 
+  it("gives up on a request that never answers, with a message a retry can act on", async () => {
+    const hang = (_url: string, init?: RequestInit) =>
+      new Promise<Response>((_, reject) => init?.signal?.addEventListener("abort", () => reject(init.signal!.reason)));
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => (url.endsWith("/v1/models") ? models(free) : hang(url, init)));
+    const model = createGatewayModel({ apiKey: "k", model: "m/x", timeoutMs: 30, fetch: fetchMock as unknown as typeof fetch });
+    await expect(model.complete({ system: "s", user: "u" })).rejects.toThrow(/The model request timed out after 30ms/);
+  });
+
+  it("says why a reply was empty", async () => {
+    const empty = (message: object, finish = "length") => vi.fn(async (url: string) => (url.endsWith("/v1/models") ? models(free) : new Response(JSON.stringify({ choices: [{ message, finish_reason: finish }] }), { status: 200 })));
+    const ask = (fetchMock: ReturnType<typeof empty>) => createGatewayModel({ apiKey: "k", model: "m/x", fetch: fetchMock as unknown as typeof fetch }).complete({ system: "s", user: "u" });
+    await expect(ask(empty({ content: "" }))).rejects.toThrow(/returned no content \(finish reason: length\)/);
+    await expect(ask(empty({ content: "", reasoning_content: "thinking..." }))).rejects.toThrow(/finish reason: length, it produced only reasoning/);
+  });
+
+  it("reads the timeout from the environment", () => {
+    expect(gatewayConfigFromEnv({ AI_GATEWAY_API_KEY: "k", LICENSEGRAPH_MODEL: "m/x", LICENSEGRAPH_MODEL_TIMEOUT_MS: "45000" }).timeoutMs).toBe(45_000);
+    expect(gatewayConfigFromEnv({ AI_GATEWAY_API_KEY: "k", LICENSEGRAPH_MODEL: "m/x" }).timeoutMs).toBeUndefined();
+  });
+
   it("recovers after a transient price-check failure instead of caching it, and still checks before sending", async () => {
     let checks = 0;
     const fetchMock = vi.fn(async (url: string) => {
@@ -309,5 +331,152 @@ describe("gateway pacing", () => {
     expect(minIntervalFromEnv({})).toBe(12_500);
     expect(minIntervalFromEnv({ LICENSEGRAPH_MODEL_RPM: "20" })).toBe(3_500);
     expect(minIntervalFromEnv({ LICENSEGRAPH_MODEL_RPM: "0" })).toBe(12_500);
+  });
+});
+
+
+describe("small-model failure modes", () => {
+  const f = fixtures[0]!;
+  const reply = () => JSON.parse(cannedReply(f));
+  const evidenceOf = () => reply().evidence as { field: string; quote: string }[];
+  const noEvidence = () => JSON.stringify({ ...reply(), evidence: [] });
+  const onlyEvidence = (evidence = evidenceOf()) => JSON.stringify({ evidence });
+
+  describe("reading the reply", () => {
+    it("ignores a thinking block that contains braces", async () => {
+      const r = await extractOffer(replying(`<think>The format is {"priceCents": ...} so I should fill it in.</think>\n${cannedReply(f)}`), f.doc, { attempts: 1 });
+      expect(r.problems).toEqual([]);
+      expect(r.offer?.priceCents).toBe(f.expected.priceCents);
+    });
+
+    it("takes the answer, not an example object that came before it", async () => {
+      const r = await extractOffer(replying(`For example: {"note": "not the answer"}\nAnswer:\n${cannedReply(f)}\nHope that helps {smile}`), f.doc, { attempts: 1 });
+      expect(r.offer?.priceCents).toBe(f.expected.priceCents);
+    });
+
+    it("keeps braces inside quoted text from ending the object early", async () => {
+      const tricky = { ...reply(), mediums: null, evidence: evidenceOf() };
+      expect((await extractOffer(replying(`{"x": "}{"} ${JSON.stringify(tricky)}`), f.doc, { attempts: 1 })).problems).toEqual([]);
+    });
+
+    it("unwraps an answer nested under offer, result or terms", async () => {
+      expect((await extractOffer(replying(JSON.stringify({ offer: reply() })), f.doc, { attempts: 1 })).problems).toEqual([]);
+      const { commercialUse, territories, termMonths, ...top } = reply();
+      expect((await extractOffer(replying(JSON.stringify({ ...top, terms: { commercialUse, territories, termMonths } })), f.doc, { attempts: 1 })).problems).toEqual([]);
+    });
+
+    it("repairs evidence given as a map of field to {field, quote} objects, as the free model has answered", async () => {
+      const asObjects = Object.fromEntries(evidenceOf().map((e) => [e.field, { field: e.field, quote: e.quote }]));
+      const r = await extractOffer(replying(JSON.stringify({ ...reply(), evidence: asObjects })), f.doc, { attempts: 1 });
+      expect(r.problems).toEqual([]);
+      expect(r.offer?.evidence.map((e) => e.field).sort()).toEqual(["commercialUse", "price", "term", "territories"].sort());
+    });
+
+    it("reads the reply nemotron-lightning-3.5 actually gave for the song licence (evidence as a map of objects)", async () => {
+      const real = "{\n  \"priceCents\": 20000,\n  \"currency\": \"USD\",\n  \"commercialUse\": true,\n  \"territories\": [\"WORLD\"],\n  \"termMonths\": 24,\n  \"mediums\": null,\n  \"attributionRequired\": null,\n  \"sublicensing\": null,\n  \"exclusive\": null,\n  \"fixedEndDate\": null,\n  \"offerValidUntil\": null,\n  \"evidence\": {\n    \"price\": {\"field\": \"price\", \"quote\": \"USD 200.00\"},\n    \"commercialUse\": {\"field\": \"commercialUse\", \"quote\": \"The Licensee may use the Track in commercial productions, including advertising and paid distribution.\"},\n    \"territories\": {\"field\": \"territories\", \"quote\": \"Worldwide.\"},\n    \"term\": {\"field\": \"term\", \"quote\": \"This licence is valid for 24 months from the date of purchase.\"}\n  }\n}";
+      const r = await extractOffer(replying(real), f.doc, { attempts: 1 });
+      expect(r.problems).toEqual([]);
+      expect(r.offer?.terms).toEqual(f.expected.terms);
+      expect(r.offer?.evidence).toHaveLength(4);
+    });
+
+    it("repairs evidence given as a list with several quotes per field", async () => {
+      const grouped = evidenceOf().map((e) => ({ field: e.field, quotes: [e.quote] }));
+      const r = await extractOffer(replying(JSON.stringify({ ...reply(), evidence: grouped })), f.doc, { attempts: 1 });
+      expect(r.problems).toEqual([]);
+    });
+
+    it("still locates every repaired quote in the text: an invented one is rejected", async () => {
+      const asObjects = Object.fromEntries(evidenceOf().map((e) => [e.field, { field: e.field, quote: e.field === "price" ? "Only $1" : e.quote }]));
+      const r = await extractOffer(replying(JSON.stringify({ ...reply(), evidence: asObjects })), f.doc, { attempts: 1 });
+      expect(r.offer).toBeUndefined();
+      expect(r.problems.join(" ")).toMatch(/price not found in the document/);
+    });
+
+    it("accepts near spellings of the evidence field names, and ignores entries it cannot use", async () => {
+      const spelled = evidenceOf().map((e) => ({ field: ({ price: "Price", commercialUse: "commercial", territories: "territory", term: "duration" } as Record<string, string>)[e.field] ?? e.field, quote: e.quote }));
+      const noise = [{ field: "mood", quote: "whatever" }, { field: "price" }, "stray text", null];
+      const r = await extractOffer(replying(JSON.stringify({ ...reply(), evidence: [...noise, ...spelled] })), f.doc, { attempts: 1 });
+      expect(r.problems).toEqual([]);
+      expect(r.offer?.evidence.map((e) => e.field).sort()).toEqual(["commercialUse", "price", "term", "territories"].sort());
+    });
+  });
+
+  describe("telling the model what was wrong", () => {
+    it("names the missing field and its format instead of dumping validation JSON", async () => {
+      const { priceCents, ...withoutPrice } = reply();
+      const model = replying(JSON.stringify(withoutPrice), cannedReply(f));
+      const r = await extractOffer(model, f.doc);
+      expect(r.offer).toBeDefined();
+      const hint = model.complete.mock.calls[1]![0].user as string;
+      expect(hint).toMatch(/priceCents: .*\(must be an integer number of cents/);
+      expect(hint).not.toMatch(/invalid_type|"code"/);
+    });
+
+    it("explains an unusable termMonths in words", async () => {
+      const model = replying(JSON.stringify({ ...reply(), termMonths: "a while" }), cannedReply(f));
+      await extractOffer(model, f.doc);
+      expect(model.complete.mock.calls[1]![0].user).toMatch(/termMonths: .*\(must be an integer number of months, or "perpetual"\)/);
+    });
+  });
+
+  describe("an empty or wrong evidence list", () => {
+    it("asks only for the quotes, keeps the values already given, and finishes in two calls", async () => {
+      const model = replying(noEvidence(), onlyEvidence());
+      const r = await extractOffer(model, f.doc);
+      expect(r.problems).toEqual([]);
+      expect(r.offer?.priceCents).toBe(f.expected.priceCents);
+      expect(r.offer?.terms).toEqual(f.expected.terms);
+      expect(model.complete).toHaveBeenCalledTimes(2);
+      const ask = model.complete.mock.calls[1]![0];
+      expect(ask.system).toMatch(/find supporting quotes/);
+      expect(ask.user).toContain(f.doc.text);
+      expect(ask.user).toMatch(/- price: 200\.00 USD/);
+      expect(ask.user).toMatch(/for each of: price, commercialUse, territories, term\./);
+    });
+
+    it("keeps the quotes that were real, names the invented ones, and asks only for what is still missing", async () => {
+      const partial = evidenceOf().map((e) => (e.field === "term" ? { field: "term", quote: "This licence is valid forever." } : e));
+      const model = replying(JSON.stringify({ ...reply(), evidence: partial }), onlyEvidence(evidenceOf().filter((e) => e.field === "term")));
+      const r = await extractOffer(model, f.doc);
+      expect(r.problems).toEqual([]);
+      expect(r.offer?.evidence.map((e) => e.field).sort()).toEqual(["commercialUse", "price", "term", "territories"].sort());
+      const ask = model.complete.mock.calls[1]![0].user as string;
+      expect(ask).toMatch(/for each of: term\./);
+      expect(ask).toMatch(/This licence is valid forever\..*not found in the document|not found in the document.*This licence is valid forever\./s);
+      expect(ask).not.toMatch(/- price:/);
+    });
+
+    it("does not let a quote from the follow-up through unless it is really in the document", async () => {
+      const made = onlyEvidence(evidenceOf().map((e) => ({ field: e.field, quote: `invented: ${e.field}` })));
+      const r = await extractOffer(replying(noEvidence(), made, made), f.doc);
+      expect(r.offer).toBeUndefined();
+      expect(r.problems.join(" ")).toMatch(/not found in the document/);
+    });
+
+    it("keeps asking for just the quotes when a follow-up comes back unreadable", async () => {
+      const model = replying(noEvidence(), "I am unable to find quotes.", onlyEvidence());
+      const r = await extractOffer(model, f.doc);
+      expect(r.offer).toBeDefined();
+      expect(model.complete).toHaveBeenCalledTimes(3);
+      expect(model.complete.mock.calls[2]![0].system).toMatch(/find supporting quotes/);
+    });
+  });
+
+  describe("transport trouble", () => {
+    it("retries after a failed or empty request", async () => {
+      const complete = vi.fn().mockRejectedValueOnce(new Error("AI Gateway request timed out")).mockResolvedValueOnce(cannedReply(f));
+      const r = await extractOffer({ complete }, f.doc);
+      expect(r.offer).toBeDefined();
+      expect(complete).toHaveBeenCalledTimes(2);
+    });
+
+    it("tries three times by default and reports the last problem", async () => {
+      const complete = vi.fn().mockRejectedValue(new Error("AI Gateway returned no content"));
+      const r = await extractOffer({ complete }, f.doc);
+      expect(complete).toHaveBeenCalledTimes(3);
+      expect(r.offer).toBeUndefined();
+      expect(r.problems[0]).toMatch(/no content/);
+    });
   });
 });

@@ -1,3 +1,4 @@
+import { isObject, readJsonObject } from "../extraction/json-reply";
 import type { ModelClient } from "../extraction/model";
 import type { ProposalRequest, Proposer } from "./loop";
 
@@ -28,10 +29,8 @@ function describe({ project, requiredAssetIds, candidates, history }: ProposalRe
 }
 
 function parse(raw: string): { offerIds: string[]; rationale?: string } {
-  const start = raw.indexOf("{");
-  const end = raw.lastIndexOf("}");
-  if (start === -1 || end <= start) throw new Error("no JSON object in model reply");
-  const body = JSON.parse(raw.slice(start, end + 1)) as { offerIds?: unknown; rationale?: unknown };
+  const body = readJsonObject(raw, ["offerIds"]);
+  if (!isObject(body)) throw new Error("no JSON object in model reply");
   if (!Array.isArray(body.offerIds) || !body.offerIds.every((x) => typeof x === "string")) throw new Error("offerIds must be an array of strings");
   return { offerIds: body.offerIds as string[], rationale: typeof body.rationale === "string" ? body.rationale : undefined };
 }

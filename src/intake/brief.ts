@@ -1,3 +1,4 @@
+import { readJsonObject } from "../extraction/json-reply";
 import { z } from "zod";
 import type { Project } from "../core/types";
 import type { ModelClient } from "../extraction/model";
@@ -177,9 +178,7 @@ export async function parseBrief(text: string, model?: ModelClient): Promise<Bri
   if (!model) return local;
   try {
     const raw = await model.complete({ system: SYSTEM, user: `Description:\n"""\n${text}\n"""` });
-    const start = raw.indexOf("{");
-    const end = raw.lastIndexOf("}");
-    const m = modelBrief.parse(JSON.parse(raw.slice(start, end + 1)));
+    const m = modelBrief.parse(readJsonObject(raw, ["name", "commercial", "territories", "termMonths", "budgetUsd", "assets"]));
     const project: Project = {
       ...local.project,
       name: m.name ?? local.project.name,

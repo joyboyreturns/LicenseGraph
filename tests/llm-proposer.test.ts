@@ -49,3 +49,17 @@ describe("createLlmProposer", () => {
     await expect(proposer.propose({ project, requiredAssetIds: ["song"], candidates, history: [] })).rejects.toThrow(/array of strings/);
   });
 });
+
+describe("reading the proposer's reply", () => {
+  const ask = (reply: string) => createLlmProposer(modelReplying(reply)).propose({ project, requiredAssetIds: ["song"], candidates, history: [] });
+
+  it("ignores a thinking block and an example before the answer, and a closing remark with braces", async () => {
+    const reply = '<think>I should answer with {"offerIds": [...]}</think>Example: {"note": "x"}\n{"offerIds": ["good"], "rationale": "cheapest that fits"}\nHope this helps {:)}';
+    expect(await ask(reply)).toEqual({ offerIds: ["good"], rationale: "cheapest that fits" });
+  });
+
+  it("still refuses a reply with no object, and one that is not valid JSON", async () => {
+    await expect(ask("I would pick the good one.")).rejects.toThrow(/no JSON object/);
+    await expect(ask("{offerIds: [good]}")).rejects.toThrow();
+  });
+});

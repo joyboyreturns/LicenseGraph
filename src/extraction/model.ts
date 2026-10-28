@@ -11,6 +11,8 @@ export interface GatewayConfig {
   fetch?: typeof fetch;
   /** Minimum gap between the starts of two requests, to stay inside the provider's rate limit. */
   minIntervalMs?: number;
+  /** How long to wait for a completion before giving up on it (default 100 s). A hung request would otherwise stall the run. */
+  timeoutMs?: number;
   /** Injectable for tests. */
   now?: () => number;
   sleep?: (ms: number) => Promise<void>;
@@ -25,7 +27,18 @@ export function minIntervalFromEnv(env: Record<string, string | undefined> = pro
 export function gatewayConfigFromEnv(env: Record<string, string | undefined> = process.env): GatewayConfig {
   const { AI_GATEWAY_API_KEY: apiKey, LICENSEGRAPH_MODEL: model } = env;
   if (!apiKey || !model) throw new Error("AI_GATEWAY_API_KEY and LICENSEGRAPH_MODEL must be set");
-  return { apiKey, model, minIntervalMs: minIntervalFromEnv(env) };
+  const timeoutMs = Number(env.LICENSEGRAPH_MODEL_TIMEOUT_MS);
+  return { apiKey, model, minIntervalMs: minIntervalFromEnv(env), ...(timeoutMs > 0 ? { timeoutMs } : {}) };
+}
+
+/** fetch with a deadline; the error says what timed out, so a retry hint and the run's history are readable. */
+async function fetchWithin(doFetch: typeof fetch, url: string, init: RequestInit, ms: number, what: string): Promise<Response> {
+  try {
+    return await doFetch(url, { ...init, signal: AbortSignal.timeout(ms) });
+  } catch (e) {
+    if (e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError")) throw new Error(`${what} timed out after ${ms >= 1000 ? `${Math.round(ms / 1000)}s` : `${ms}ms`}`);
+    throw e;
+  }
 }
 
 /**
@@ -34,9 +47,7 @@ export function gatewayConfigFromEnv(env: Record<string, string | undefined> = p
  */
 export async function assertModelIsFree(config: GatewayConfig): Promise<void> {
   const doFetch = config.fetch ?? fetch;
-  const res = await doFetch(`${config.baseUrl ?? "https://ai-gateway.vercel.sh"}/v1/models`, {
-    headers: { Authorization: `Bearer ${config.apiKey}` },
-  });
+  const res = await fetchWithin(doFetch, `${config.baseUrl ?? "https://ai-gateway.vercel.sh"}/v1/models`, { headers: { Authorization: `Bearer ${config.apiKey}` } }, 15_000, "The model price check");
   if (!res.ok) throw new Error(`Could not check model pricing (${res.status}); not sending any request`);
   const { data } = (await res.json()) as { data?: { id: string; pricing?: { input?: string | number; output?: string | number } }[] };
   const entry = data?.find((m) => m.id === config.model);
@@ -67,7 +78,7 @@ export function createGatewayModel(config: GatewayConfig): ModelClient {
       const slot = Math.max(now(), nextSlot);
       nextSlot = slot + (config.minIntervalMs ?? 0);
       if (slot > now()) await sleep(slot - now());
-      const res = await doFetch(`${config.baseUrl ?? "https://ai-gateway.vercel.sh"}/v1/chat/completions`, {
+      const res = await fetchWithin(doFetch, `${config.baseUrl ?? "https://ai-gateway.vercel.sh"}/v1/chat/completions`, {
         method: "POST",
         headers: { Authorization: `Bearer ${config.apiKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -80,11 +91,19 @@ export function createGatewayModel(config: GatewayConfig): ModelClient {
             { role: "user", content: user },
           ],
         }),
-      });
-      const body = (await res.json().catch(() => ({}))) as { choices?: { message?: { content?: string } }[]; error?: { message?: string } };
+      }, config.timeoutMs ?? 100_000, "The model request");
+      const body = (await res.json().catch(() => ({}))) as {
+        choices?: { message?: { content?: string; reasoning?: string; reasoning_content?: string }; finish_reason?: string }[];
+        error?: { message?: string };
+      };
       if (!res.ok) throw new Error(`AI Gateway request failed: ${res.status} ${body.error?.message ?? ""}`.trim());
       const content = body.choices?.[0]?.message?.content;
-      if (!content) throw new Error("AI Gateway returned no content (the model may have run out of tokens while reasoning)");
+      if (!content) {
+        // Say what the gateway did say, so an empty reply can be told apart from one that ran out of tokens while thinking.
+        const choice = body.choices?.[0];
+        const reasoned = Boolean(choice?.message?.reasoning || choice?.message?.reasoning_content);
+        throw new Error(`AI Gateway returned no content (finish reason: ${choice?.finish_reason ?? "none"}${reasoned ? ", it produced only reasoning" : ""})`);
+      }
       return content;
     },
   };
