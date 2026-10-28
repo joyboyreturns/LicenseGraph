@@ -43,6 +43,7 @@ export function SiteFooter() {
           <Link prefetch={false} href="/dashboard">Portfolio</Link>
           <Link prefetch={false} href="/agents">Agents</Link>
           <Link prefetch={false} href="/verify">Verify a passport</Link>
+          <Link prefetch={false} href="/rules">How the rules work</Link>
           <a href={REPO_URL} rel="noreferrer">
             Source code (MIT)
           </a>

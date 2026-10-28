@@ -68,6 +68,8 @@ Two more custom widgets sit beside it, built the same way: a *licence timeline* 
 
 Each licence in a passport also links to a printable **creator receipt** (`/passport/<run id>/receipt/<asset>`): the price, the payout to that creator, the terms, when the licence ends, and the quoted sentences they came from.
 
+The rules themselves are explained on one page of the app (`/rules`): every rule, when the brief makes it apply, and what happens when a licence is silent. A test keeps that page in step with the engine's rule list.
+
 ## Check a passport without the app
 
 A Licence Passport can be re-verified from a terminal, with no browser and no running server: `npm run verify:passport -- licence-passport.json` (a file saved from the passport page), or pass the address of a running instance's `/api/passports/<run id>`. It recomputes the hash chain, the bundle digest, the quotes and the rules-engine verdict, prints one PASS or FAIL line per check, and exits 0 only when every check passes, so it fits in a script or a CI job.

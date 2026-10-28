@@ -156,3 +156,14 @@ test("each licence has a creator receipt: the price, the payout, the terms and t
   await page.goto(`/passport/${id}/receipt/no-such-asset`);
   await expect(page.getByText(/no licence for "no-such-asset"/)).toBeVisible();
 });
+
+test("the rules page explains every rule, and says silence does not pass", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("link", { name: "How the rules work" }).click();
+  await page.waitForURL(/\/rules$/);
+  await expect(page.getByRole("heading", { name: "How the rules decide" })).toBeVisible();
+  const table = page.getByRole("table", { name: "The rules every licence offer is checked against" });
+  await expect(table.locator("tbody tr")).toHaveCount(11);
+  await expect(table.getByRole("row", { name: /Media/ })).toContainText("A licence that does not say which media it covers is not assumed to cover them");
+  await expect(page.getByRole("heading", { name: "Checked on the bundle as a whole" })).toBeVisible();
+});
