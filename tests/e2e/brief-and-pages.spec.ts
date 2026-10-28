@@ -112,3 +112,22 @@ test("a shared passport link has its own preview card, and an unpaid or unknown 
   await page.goto(`/passport/${id}`);
   await expect(page.locator('meta[property="og:image"]')).toHaveAttribute("content", new RegExp(`/passport/${id}/opengraph-image`));
 });
+
+test("pages and API answers carry the security headers, and the app still works with them", async ({ request, page }) => {
+  for (const path of ["/", "/api/health", "/passport/none"]) {
+    const h = (await request.get(path)).headers();
+    expect(h["x-content-type-options"], path).toBe("nosniff");
+    expect(h["x-frame-options"], path).toBe("DENY");
+    expect(h["referrer-policy"], path).toBe("strict-origin-when-cross-origin");
+    expect(h["content-security-policy"], path).toContain("frame-ancestors 'none'");
+  }
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  // The AG Studio trial notice is also logged as an error until a licence key is set; only policy refusals matter here.
+  page.on("console", (m) => m.type() === "error" && /Content Security Policy|Refused to/i.test(m.text()) && errors.push(m.text()));
+  const { id } = await (await page.request.post("/api/sessions", { data: { scenarioId: "documentary" } })).json();
+  await expect.poll(async () => (await (await page.request.get(`/api/sessions/${id}`)).json()).phase, { timeout: 30_000 }).toBe("verified");
+  await page.goto("/dashboard?portfolio=1");
+  await expect(page.getByRole("table", { name: /How many times each rule rejected each asset/ })).toBeVisible({ timeout: 30_000 });
+  expect(errors).toEqual([]);
+});

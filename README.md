@@ -179,6 +179,7 @@ The suite covers the rules, the payment gate, payouts and their failure and retr
 - Sandbox only. The app refuses any PayPal host other than the Sandbox API.
 - A run belongs to the browser that created it (an anonymous, HttpOnly cookie): only that browser can approve, pay or list it. Anyone holding a run or passport link can *read* it, so a passport can be shared; do not run confidential licences through a public instance.
 - Creator email addresses are masked in the UI and never stored in the ledger or passport.
+- Every response carries `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, a strict `Referrer-Policy`, a locked-down `Permissions-Policy` and a `Content-Security-Policy` that only forbids framing, plugins and a changed base address (so nothing the app loads is affected). The public agent endpoint caps how much one call may carry (200 offers, 50 assets, 20 quotes per offer), and a model run is limited to three at a time.
 - Passports are tamper-evident and, when `LICENSEGRAPH_PASSPORT_SECRET` is set, signed so the issuing server can confirm them. "Verified" proves the record is consistent and unchanged. It does **not** prove the licence documents are genuine or that the licensor owns the rights, and it is not legal advice.
 
 ## AI tools disclosure
