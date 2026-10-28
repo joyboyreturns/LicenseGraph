@@ -28,6 +28,10 @@ for (const scheme of ["light", "dark"] as const) {
       await page.goto("/verify");
       await expect(page.locator("main")).toBeVisible();
       expect(await violations(page)).toEqual([]);
+      await page.goto("/agents");
+      await expect(page.getByRole("heading", { name: "Agents can shop. Only people can spend." })).toBeVisible();
+      await expect(page.getByRole("region", { name: "What it finds there" }).getByText("get_purchase_status")).toBeVisible({ timeout: 20_000 });
+      expect(await violations(page)).toEqual([]);
     });
 
     test("a verified run and a run with no bundle have none either", async ({ page }) => {
