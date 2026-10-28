@@ -2,11 +2,12 @@
 
 import { AgStudioAiModule, createAiHarness, directLlmRunner, type AgAiHarnessSetup, type AgReportState } from "ag-studio";
 import { AgStudio, AgStudioProvider } from "ag-studio-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { SessionView } from "@/src/app-logic/session";
 import { buildStudioData } from "@/src/dashboard/data";
 import { buildPortfolioData, PORTFOLIO_INITIAL_STATE } from "@/src/dashboard/portfolio";
 import { chatCompletionsAdapter } from "@/src/dashboard/llm-adapter";
+import { licenseGraphTheme } from "@/src/dashboard/theme";
 import { describeSchema } from "@/src/dashboard/schema-text";
 import { AGGREGATIONS, buildChart, buildKpi, buildTable, catalogFrom, CHART_TYPES, placeWidget, type Aggregation, type Built, type ChartKind } from "@/src/dashboard/widget-tools";
 
@@ -35,7 +36,7 @@ const initialState: AgReportState = {
         requirementCost: {
           type: "bar-chart-grouped",
           dataMapping: { categoryKey: [{ id: "requirements.requirement" }], valueKey: [{ id: "requirements.extraCost", aggregation: "sum" }] },
-          format: { title: { enabled: true, text: "What each requirement adds to the cost" } },
+          format: { title: { enabled: true, text: "Cost of each requirement" } },
         },
         gapRequests: {
           type: "grid",
@@ -99,12 +100,35 @@ const PORTFOLIO_PROMPT_STARTERS = [
 ];
 
 
+/** Follows the site's light/dark choice: the toggle sets data-theme on <html>, otherwise the system preference applies. */
+function useDarkMode(): boolean {
+  const [dark, setDark] = useState(false);
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const read = () => {
+      const explicit = document.documentElement.dataset.theme;
+      setDark(explicit === "dark" || (explicit !== "light" && media.matches));
+    };
+    read();
+    media.addEventListener("change", read);
+    const observer = new MutationObserver(read);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    return () => {
+      media.removeEventListener("change", read);
+      observer.disconnect();
+    };
+  }, []);
+  return dark;
+}
+
 type StudioProps = { assistant: boolean } & ({ view: SessionView; portfolio?: undefined } | { portfolio: SessionView[]; view?: undefined });
 
 export default function Studio(props: StudioProps) {
   const { assistant } = props;
   const isPortfolio = props.portfolio !== undefined;
   const [mode, setMode] = useState<"view" | "edit">("view");
+  const dark = useDarkMode();
+  const theme = useMemo(() => licenseGraphTheme(dark), [dark]);
   const data = useMemo(() => {
     const def = props.portfolio ? buildPortfolioData(props.portfolio) : buildStudioData(props.view);
     // Money fields are in major units of the run's own currency (dollars for the portfolio); show them with its symbol.
@@ -172,7 +196,7 @@ export default function Studio(props: StudioProps) {
         <button type="button" className={mode === "view" ? "primary" : ""} onClick={() => setMode("view")}>View</button>
         <button type="button" className={mode === "edit" ? "primary" : ""} onClick={() => setMode("edit")}>Edit dashboard</button>
       </div>
-      <AgStudio data={data as never} initialState={(isPortfolio ? PORTFOLIO_INITIAL_STATE : initialState) as AgReportState} mode={mode} ai={ai} style={{ height: "calc(100vh - 108px)" }} />
+      <AgStudio data={data as never} initialState={(isPortfolio ? PORTFOLIO_INITIAL_STATE : initialState) as AgReportState} mode={mode} ai={ai} theme={theme} style={{ height: "calc(100vh - 108px)" }} />
     </AgStudioProvider>
   );
 }

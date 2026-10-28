@@ -142,7 +142,7 @@ export const PORTFOLIO_INITIAL_STATE = {
         requirementCost: {
           type: "bar-chart-grouped",
           dataMapping: { categoryKey: [{ id: "requirements.requirement" }], valueKey: [{ id: "requirements.extraCost", aggregation: "sum" }] },
-          format: { title: { enabled: true, text: "What each requirement adds to the cost" } },
+          format: { title: { enabled: true, text: "Cost of each requirement" } },
         },
         offerStatus: {
           type: "donut-chart",

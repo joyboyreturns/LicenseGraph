@@ -1,0 +1,39 @@
+# Render blueprint: https://render.com/docs/blueprint-spec
+# Create a Blueprint from this repository; Render asks for the secret values marked sync: false.
+# PayPal runs in SANDBOX only (the app refuses any other host). Sessions live on the instance's disk;
+# on the free plan the disk is wiped on a restart, which only clears old demo runs.
+services:
+  - type: web
+    name: licensegraph
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      # Built-in scenarios replay recorded model output; set to "live" (and the gateway vars) to read your own licences.
+      - key: LICENSEGRAPH_MODE
+        value: demo
+      - key: LICENSEGRAPH_PASSPORT_SECRET
+        generateValue: true
+      - key: PAYPAL_CLIENT_ID
+        sync: false
+      - key: PAYPAL_CLIENT_SECRET
+        sync: false
+      - key: PAYPAL_BASE_URL
+        value: https://api-m.sandbox.paypal.com
+      # Comma-separated Sandbox personal account emails that receive the creator payouts.
+      - key: LICENSEGRAPH_CREATOR_EMAILS
+        sync: false
+      # Only for live mode. The app refuses any model the gateway does not list as free.
+      - key: AI_GATEWAY_API_KEY
+        sync: false
+      - key: LICENSEGRAPH_MODEL
+        sync: false
+      - key: LICENSEGRAPH_MODEL_RPM
+        value: "5"
+      - key: LICENSEGRAPH_DATA_DIR
+        value: /tmp/licensegraph
+      # APP_URL is not needed on Render: the app reads RENDER_EXTERNAL_URL.

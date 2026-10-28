@@ -31,7 +31,8 @@ export interface Runtime {
   appUrl: string;
 }
 
-const appUrl = () => (process.env.APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
+/** The public address: APP_URL, else the one Render provides, else local. PayPal and passport QR codes point at it. */
+const appUrl = () => (process.env.APP_URL || process.env.RENDER_EXTERNAL_URL || "http://localhost:3000").replace(/\/$/, "");
 
 function build(): Runtime {
   const hasGateway = Boolean(process.env.AI_GATEWAY_API_KEY && process.env.LICENSEGRAPH_MODEL);
