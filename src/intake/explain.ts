@@ -1,4 +1,5 @@
 import type { SessionView } from "../app-logic/session";
+import { negotiationOutlook } from "../core/negotiation";
 import type { ModelClient } from "../extraction/model";
 
 export interface Answer {
@@ -14,6 +15,9 @@ const runCurrency = (v: SessionView) => v.bundle?.currency ?? v.project.currency
 const termText = (t: SessionView["candidates"][number]["terms"]) =>
   [t.commercialUse ? "commercial" : "non-commercial", t.territories.join("/"), t.termMonths === "perpetual" ? "perpetual" : `${t.termMonths} months`, t.mediums ? (t.mediums === "ALL" ? "any medium" : t.mediums.join("/")) : "media not stated"].join(", ");
 
+/** For a run with no compliant bundle: the best case if every licensor agreed to every ask, at the prices already quoted. */
+const outlookOf = (v: SessionView) => (v.bundle || !v.analysis?.gaps.length ? undefined : negotiationOutlook(v.project, v.analysis.assets.map((a) => a.assetId), v.candidates, runCurrency(v), { today: v.runDate }));
+
 /** The facts of a run as compact text: the only thing the model is allowed to answer from. */
 export function runFacts(v: SessionView): string {
   const failedBy = new Map<string, string[]>();
@@ -28,6 +32,9 @@ export function runFacts(v: SessionView): string {
     `Status: ${v.phase}. Agent rounds: ${v.rounds ?? "n/a"}.`,
     ...v.candidates.map((o) => `Offer ${o.id} for ${o.assetId}: ${usd(o.priceCents, o.currency)}; ${termText(o.terms)}. ${chosen.has(o.id) ? "CHOSEN." : failedBy.has(o.id) ? `REJECTED (${failedBy.get(o.id)!.join("; ")}).` : "Not chosen."} Evidence: ${o.evidence.map((e) => `${e.field ?? "term"}: "${e.quote}"`).join(" | ")}`),
   ];
+  for (const g of v.analysis?.gaps ?? []) lines.push(`Gap for ${g.assetId}: no compliant offer. Closest is ${g.offerId} at ${usd(g.priceCents, g.currency)}. Ask the licensor to: ${g.asks.map((a) => a.ask).join(" ")}`);
+  const outlook = outlookOf(v);
+  if (outlook) lines.push(`If every licensor agreed to those changes at their quoted prices, the cheapest compliant bundle would cost ${usd(outlook.totalCents, outlook.currency)}${outlook.headroomCents !== undefined ? (outlook.headroomCents >= 0 ? `, ${usd(outlook.headroomCents, outlook.currency)} under budget` : `, ${usd(-outlook.headroomCents, outlook.currency)} over budget`) : ""}. This is a best case, not an offer.`);
   if (v.bundle) lines.push(`Verified bundle total ${usd(v.bundle.totalCents, v.bundle.currency)}.`);
   if (v.analysis) lines.push(`A price-only buyer would pay ${usd(v.analysis.naiveTotalCents, runCurrency(v))}; compliance premium ${usd(v.analysis.compliancePremiumCents, runCurrency(v))}; blocked purchases: ${v.analysis.blockedPurchases.map((b) => `${b.offerId} (${b.reasons.join(", ")})`).join("; ") || "none"}.`);
   if (v.payouts) lines.push(`Creators paid: ${v.payouts.lines.map((l) => `${l.licensorName} ${usd(l.amountCents, l.currency)} for ${l.assetId} (${l.status})`).join("; ")}.`);
@@ -44,6 +51,22 @@ export function answerLocally(v: SessionView, question: string): Answer {
   }
   const mentioned = v.candidates.filter((o) => q.includes(o.id.toLowerCase()) || q.includes(o.id.replace(/^offer-/, "").toLowerCase()));
   const cite = (ids: string[]) => ({ citations: [...new Set(ids)], source: "local" as const });
+
+  // A run with nothing to buy: what blocks each asset, what to ask, and what a yes would cost, from the exact checks.
+  const gaps = v.bundle ? [] : (v.analysis?.gaps ?? []);
+  if (gaps.length) {
+    const ids = gaps.map((g) => g.offerId);
+    if (/(if|when).*(agree|accept|yes|say)|best case|would it cost|how much.*(agree|yes)/.test(q)) {
+      const out = outlookOf(v);
+      if (out) return { answer: `If every licensor agreed to the changes asked for, at the prices they already quoted, the cheapest compliant bundle would cost ${usd(out.totalCents, out.currency)}${out.headroomCents === undefined ? "" : out.headroomCents >= 0 ? `, which is ${usd(out.headroomCents, out.currency)} under the budget` : `, which is ${usd(-out.headroomCents, out.currency)} over the budget`}. That is a best case, not an offer: a licensor may ask for more, and nothing is bought until revised terms are checked.`, ...cite(out.assets.map((a) => a.offerId)) };
+    }
+    if (/(ask|request|change|negotiat|what (should|do|can) (i|we)|next|fix|close the gap)/.test(q)) {
+      return { answer: gaps.map((g) => `For the ${g.assetId}, ask the licensor of ${g.offerId} (${usd(g.priceCents, g.currency)}) to: ${g.asks.map((a) => a.ask).join(" ")}`).join("\n"), ...cite(ids) };
+    }
+    if (/(why|what).*(nothing|no bundle|not (be )?(bought|buy)|can'?t|cannot|block|fail|reject|wrong)|nothing|no bundle/.test(q)) {
+      return { answer: `Nothing can be bought as it stands: ${gaps.length === 1 ? "one asset has" : `${gaps.length} assets have`} no licence that meets every requirement. ${gaps.map((g) => `${g.assetId}: the closest offer, ${g.offerId}, fails because it needs ${g.asks.map((a) => a.rule).join(", ")} changed`).join("; ")}. The agent was not asked to propose a bundle, because the independent cost check proves none can pass.`, ...cite(ids) };
+    }
+  }
 
   if (/(why|what).*(reject|fail|block|wrong|not chosen|skip)|rejected|blocked/.test(q)) {
     const subject = mentioned.length ? mentioned : v.candidates.filter((o) => failed.has(o.id));
@@ -68,7 +91,7 @@ export function answerLocally(v: SessionView, question: string): Answer {
     return { answer: mentioned.map((o) => `${o.id}: ${o.evidence.map((e) => `${e.field ?? "term"} is backed by "${e.quote}"`).join("; ")}`).join("\n"), ...cite(mentioned.map((o) => o.id)) };
   }
   return {
-    answer: `This run has ${v.candidates.length} licence offers for ${new Set(v.candidates.map((c) => c.assetId)).size} assets. ${v.bundle ? `The verified bundle costs ${usd(v.bundle.totalCents, v.bundle.currency)}.` : "No bundle has been verified yet."} Try asking why an offer was rejected, what the total is, or who gets paid.`,
+    answer: `This run has ${v.candidates.length} licence offers for ${new Set(v.candidates.map((c) => c.assetId)).size} assets. ${v.bundle ? `The verified bundle costs ${usd(v.bundle.totalCents, v.bundle.currency)}.` : "No bundle has been verified yet."} Try asking ${gaps.length ? "why nothing can be bought, what to ask the licensors, or what a yes would cost" : "why an offer was rejected, what the total is, or who gets paid"}.`,
     ...cite([]),
   };
 }

@@ -467,3 +467,19 @@ describe("answering a gap request", () => {
     expect((await body(late)).error).toMatch(/payment in progress/);
   });
 });
+
+describe("a run that ended before any proposal", () => {
+  it("can still be asked about, listed, and exported without errors", async () => {
+    install();
+    const { id } = await body(await postSession(post("http://app/api/sessions", { scenarioId: "exclusive-theme" })));
+    const view = await waitFor(id, "failed");
+    expect(view.rounds ?? 0).toBe(0);
+    expect(view.bundle).toBeUndefined();
+    const answer = await body(await postAsk(post("http://app", { question: "Why could nothing be bought?" }), ctx(id)));
+    expect(typeof answer.answer).toBe("string");
+    expect(answer.answer.length).toBeGreaterThan(10);
+    const listed = (await body(await listSessions(get()))).runs as { id: string; phase: string; rounds?: number }[];
+    expect(listed.find((r) => r.id === id)).toMatchObject({ phase: "failed" });
+    expect((await getPortfolio(get())).status).toBe(200);
+  });
+});

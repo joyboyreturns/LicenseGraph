@@ -84,6 +84,36 @@ describe("answerLocally", () => {
   });
 });
 
+describe("answerLocally when no licence can be bought", () => {
+  it("explains the blockers, the asks and the best case from the exact checks", async () => {
+    const v = await view("exclusive-theme");
+    expect(v.bundle).toBeUndefined();
+    const why = answerLocally(v, "Why could nothing be bought?");
+    expect(why.answer).toMatch(/3 assets have no licence/);
+    expect(why.answer).toContain("offer-pod-song-network");
+    const ask = answerLocally(v, "What should I ask the licensors?");
+    expect(ask.answer.split("\n")).toHaveLength(3);
+    expect(ask.answer).toContain("Make the licence exclusive.");
+    expect(ask.answer).toContain("$340.00");
+    const yes = answerLocally(v, "How much would it cost if they agree?");
+    expect(yes.answer).toContain("$690.00");
+    expect(yes.answer).toMatch(/\$810\.00 under the budget/);
+    expect(yes.answer).toMatch(/best case, not an offer/);
+    expect(yes.citations).toEqual(expect.arrayContaining(["offer-pod-song-network"]));
+    expect(answerLocally(v, "tell me a joke").answer).toContain("what to ask the licensors");
+  });
+
+  it("puts the gaps and the best case in the facts a model is given", async () => {
+    const facts = runFacts(await view("exclusive-theme"));
+    expect(facts).toContain("Gap for song");
+    expect(facts).toContain("$690.00");
+  });
+
+  it("leaves verified runs alone", async () => {
+    expect(runFacts(await view())).not.toContain("Gap for");
+  });
+});
+
 describe("answerQuestion with a model", () => {
   const reply = (text: string) => ({ complete: vi.fn().mockResolvedValue(text) });
 
