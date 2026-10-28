@@ -21,6 +21,7 @@ export interface StoredSession {
   order?: Session["order"];
   capture?: Session["capture"];
   payouts?: Session["payouts"];
+  refund?: Session["refund"];
   paymentsMode?: Session["paymentsMode"];
   claim?: Session["claim"];
   events: LedgerEvent[];
@@ -42,6 +43,7 @@ export function serializeSession(s: Session): StoredSession {
     order: s.order,
     capture: s.capture,
     payouts: s.payouts,
+    refund: s.refund,
     paymentsMode: s.paymentsMode,
     claim: s.claim,
     events: s.ledger.events(),
@@ -67,6 +69,7 @@ export function deserializeSession(stored: StoredSession): Session {
     order: stored.order,
     capture: stored.capture,
     payouts: stored.payouts,
+    refund: stored.refund,
     paymentsMode: stored.paymentsMode,
     claim: stored.claim,
   };

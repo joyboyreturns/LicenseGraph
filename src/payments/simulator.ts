@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { CapturedOrder, CreatedOrder, PayoutItemInput, PayoutStatus } from "./paypal";
+import type { CapturedOrder, CreatedOrder, PayoutItemInput, PayoutStatus, RefundedCapture } from "./paypal";
 import { centsToValue } from "./paypal";
 
 interface SimOrder {
@@ -30,6 +30,7 @@ export function createPayPalSimulator(options: { appUrl: () => string; now?: () 
   const orders = new Map<string, SimOrder>();
   const byRequest = new Map<string, string>();
   const payouts = new Map<string, SimPayout>();
+  const refunds = new Map<string, RefundedCapture>();
   let failNext = options.failFirstPayout ?? false;
 
   return {
@@ -51,6 +52,17 @@ export function createPayPalSimulator(options: { appUrl: () => string; now?: () 
       if (!order.approved) throw new Error(`PayPal /v2/checkout/orders/${orderId}/capture failed: 422 ORDER_NOT_APPROVED (simulator)`);
       order.captured = { id: order.id, status: "COMPLETED", captureId: `SIMCAP-${randomUUID().slice(0, 10).toUpperCase()}`, amount: { currency: order.currency, value: centsToValue(order.amountCents) } };
       return order.captured;
+    },
+
+    async refundCapture(captureId: string, requestId: string): Promise<RefundedCapture> {
+      const earlier = refunds.get(requestId);
+      if (earlier) return earlier;
+      const order = [...orders.values()].find((o) => o.captured?.captureId === captureId);
+      if (!order) throw new Error(`PayPal /v2/payments/captures/${captureId}/refund failed: 404 RESOURCE_NOT_FOUND (simulator)`);
+      if ([...refunds.values()].some((r) => r.id.endsWith(captureId))) throw new Error(`PayPal /v2/payments/captures/${captureId}/refund failed: 422 CAPTURE_FULLY_REFUNDED (simulator)`);
+      const refund = { id: `SIMREF-${captureId}`, status: "COMPLETED", amount: { currency: order.currency, value: centsToValue(order.amountCents) } };
+      refunds.set(requestId, refund);
+      return refund;
     },
 
     async createPayout(input: { batchId: string; subject: string; items: PayoutItemInput[] }): Promise<{ batchId: string; status: string }> {

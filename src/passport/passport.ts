@@ -36,6 +36,7 @@ export const signedMessage = (p: Passport) => {
 
 /** Build a passport for a paid run. Throws if the run has not been paid. */
 export function buildPassport(session: Session, comparison: Passport["comparison"]): Passport {
+  if (session.phase === "refunded") throw new PassportError("This purchase was refunded, so no Licence Passport is issued.");
   const bundle = session.loop?.status === "verified" ? session.loop.bundle : undefined;
   const events = session.ledger.events();
   const captured = events.find((e) => e.kind === "captured");

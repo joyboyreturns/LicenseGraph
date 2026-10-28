@@ -35,6 +35,7 @@ Indie game studios, podcast networks, small agencies, filmmakers and freelancers
 ## How PayPal is used (central, not decorative)
 - **Orders API (Sandbox):** create order, buyer approval, capture; idempotent request ids with stable, bounded keys and concurrent-request protection. Orders are created only through a gate that re-verifies the bundle and requires a human approval for exactly that bundle.
 - **Payouts API (Sandbox):** after capture, each licensor is paid the price of their licence in one batch; payout status is tracked to completion, and a payout problem never undoes the captured payment. Submission retries retain the original batch identity; partial recipient failures require reconciliation.
+- **Refunds API (Sandbox):** if no creator could be paid, the buyer is refunded in full. Offered only when it is certain nobody was paid, so a refund can never double-spend; recorded in the ledger.
 - **Agentic commerce:** an AI agent initiates the purchase by proposing the bundle; deterministic verification and a human approval stand between the proposal and the money.
 - Everything runs against the PayPal **Sandbox**; no real payments are made. A clearly labelled offline payment simulator lets anyone run the whole flow without a PayPal account.
 
@@ -55,7 +56,7 @@ Small free models are unreliable and slow, so we made every AI step safe to be w
 An independently checked minimum compliant cost, plus a purchase you can audit end to end: from the sentence in a licence to the PayPal capture and the creator payouts, in one tamper-evident passport that verifies in any browser.
 
 ## What's next
-Licensor onboarding and verified payee accounts, PDF ingestion, multi-currency, a public licence marketplace, and refund/dispute handling.
+Licensor onboarding and verified payee accounts, PDF ingestion, multi-currency, a public licence marketplace, and dispute handling.
 
 ## Built with
 TypeScript, Next.js, React, PayPal Orders and Payouts (Sandbox), AG Studio, AG Grid, Vercel AI Gateway, Zod, Vitest, Playwright, Tailscale Funnel.

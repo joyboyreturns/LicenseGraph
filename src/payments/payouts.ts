@@ -23,6 +23,8 @@ export interface PayoutSummary {
   lines: PayoutLine[];
   createdAt: string;
   error?: string;
+  /** True when the batch was certainly never sent to PayPal, so no creator can have been paid. Absent when unsure. */
+  notSent?: boolean;
 }
 
 const FINAL = new Set(["SUCCESS", "DENIED", "CANCELED", "PARTIAL"]);

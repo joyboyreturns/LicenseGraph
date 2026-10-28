@@ -145,7 +145,7 @@ function Theatre({ view, accept, refresh }: { view: SessionView; accept: (v: Ses
       } catch (e) {
         const raw = errorMessage(e);
         const friendly = /ORDER_NOT_APPROVED/.test(raw) ? "The buyer has not approved this order yet. Open the checkout and approve it first, then complete the payment." : raw;
-        toast.push({ tone: "bad", title: key === "approve" ? "Approval failed" : key === "pay" ? "Could not create the order" : key === "capture" ? "Payment not completed" : "Payouts not sent", body: friendly });
+        toast.push({ tone: "bad", title: key === "approve" ? "Approval failed" : key === "pay" ? "Could not create the order" : key === "capture" ? "Payment not completed" : key === "refund" ? "Refund not made" : "Payouts not sent", body: friendly });
         void refresh();
       } finally {
         setBusy(null);
@@ -199,7 +199,7 @@ function Theatre({ view, accept, refresh }: { view: SessionView; accept: (v: Ses
 
   const caption = captionFor(state, view, catalog);
   const requirements = projectRequirements(view.project, currency);
-  const showSettlement = ["approved", "order_created", "captured", "settled"].includes(view.phase);
+  const showSettlement = ["approved", "order_created", "captured", "settled", "refunded"].includes(view.phase);
 
   return (
     <div className="container-wide">
@@ -297,6 +297,7 @@ function Theatre({ view, accept, refresh }: { view: SessionView; accept: (v: Ses
                 pay: () => run("pay", "pay", {}, () => "Order created"),
                 capture: () => run("capture", "capture", {}, () => "Payment captured"),
                 retryPayouts: () => run("payouts", "payouts", {}, (v) => (v.payouts?.status === "FAILED" ? null : "Payouts sent")),
+                refund: () => run("refund", "refund", {}, () => "Buyer refunded"),
               }}
             />
           )}

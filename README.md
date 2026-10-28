@@ -73,6 +73,7 @@ LICENSEGRAPH_URL=http://localhost:3000 npx tsx scripts/mcp-server.ts
 
 - **Orders API (Sandbox):** create order, buyer approval, capture, with stable, bounded idempotency keys and coalesced concurrent requests. Orders are created only through a gate that re-verifies the bundle and requires a human approval for exactly that bundle.
 - **Payouts API (Sandbox):** after capture, each licensor is paid the price of their licence in one batch. Payout status is tracked per recipient. A batch is settled only when every creator payment succeeds; uncertain submissions reuse the same batch key when retried.
+- **Refunds API (Sandbox):** if the creators could not be paid, the buyer's payment can be returned in full (`POST /v2/payments/captures/{id}/refund`, idempotent). A refund is offered only when it is certain no creator was paid (nothing was sent, PayPal denied the whole batch, or it was rejected outright); after an unsure failure such as a timeout it is refused until the batch is reconciled, because refunding then could lose the money twice. The refund is recorded in the hash-chained ledger and no Licence Passport is issued for a refunded purchase.
 - **Agentic commerce:** an AI agent, ours or any MCP client, initiates the purchase. Deterministic verification and a human who has explicitly taken control stand between that proposal and any money moving; PayPal executes the payment and the payouts.
 
 ## How AI is used

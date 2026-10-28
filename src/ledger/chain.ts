@@ -15,6 +15,7 @@ export type LedgerKind =
   | "order_created"
   | "captured"
   | "capture_mismatch"
+  | "refunded"
   | "payout_created"
   | "payout_failed"
   | "payout_settled";

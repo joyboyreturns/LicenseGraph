@@ -266,6 +266,7 @@ const PHASES: Record<string, { label: string; tone: Tone }> = {
   order_created: { label: "Awaiting buyer approval", tone: "info" },
   captured: { label: "Payment captured", tone: "ok" },
   settled: { label: "Settled", tone: "ok" },
+  refunded: { label: "Refunded", tone: "warn" },
 };
 
 export function phaseInfo(phase: string): { label: string; tone: Tone } {

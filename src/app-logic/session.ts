@@ -8,13 +8,13 @@ import { Ledger, type LedgerEvent } from "../ledger/ledger";
 import { approve, startCheckout, type Approval, type PayPalClient } from "../payments/checkout";
 import type { SessionRepository } from "./persistence";
 import { applyPayoutStatus, isFinalPayout, planPayouts, toPayoutItems, type PayoutSummary } from "../payments/payouts";
-import type { CapturedOrder, CreatedOrder } from "../payments/paypal";
+import type { CapturedOrder, CreatedOrder, RefundedCapture } from "../payments/paypal";
 import { centsToValue } from "../payments/paypal";
 import { paymentRequestId } from "../payments/request-id";
 import { isIsoDate } from "../core/dates";
 import { minimumCompliantCost } from "../core/optimizer";
 
-export type Phase = "created" | "extracting" | "proposing" | "verified" | "failed" | "approved" | "order_created" | "captured" | "settled";
+export type Phase = "created" | "extracting" | "proposing" | "verified" | "failed" | "approved" | "order_created" | "captured" | "settled" | "refunded";
 
 export interface SessionInput {
   project: Project;
@@ -42,6 +42,8 @@ export interface Session {
   order?: CreatedOrder;
   capture?: CapturedOrder;
   payouts?: PayoutSummary;
+  /** The buyer's money was returned because the creators could not be paid. */
+  refund?: { id: string; status: string; amount: { currency: string; value: string }; at: string };
   /** Present until a person takes over an agent-started run: only a hash of the one-time claim token is kept. */
   claim?: { tokenHash: string; expiresAt: string };
   /** Which payment backend took this run's order, so the passport can say so truthfully. */
@@ -56,7 +58,7 @@ export interface Deps {
   model: ModelClient;
   proposer: Proposer;
   /** Absent when PayPal credentials are not configured. */
-  payments?: Pick<PayPalClient, "createOrder" | "captureOrder"> & Partial<Pick<PayPalClient, "createPayout" | "getPayout">>;
+  payments?: Pick<PayPalClient, "createOrder" | "captureOrder"> & Partial<Pick<PayPalClient, "createPayout" | "getPayout" | "refundCapture">>;
   /** Replace licensor emails in order, so a demo can pay real Sandbox accounts. */
   payeeOverrides?: string[];
   /** Which payment backend `payments` is. */
@@ -140,6 +142,7 @@ function singleFlight<T>(pending: WeakMap<Session, Promise<T>>, session: Session
 const ordersInFlight = new WeakMap<Session, Promise<CreatedOrder>>();
 const capturesInFlight = new WeakMap<Session, Promise<CapturedOrder>>();
 const payoutsInFlight = new WeakMap<Session, Promise<PayoutSummary | undefined>>();
+const refundsInFlight = new WeakMap<Session, Promise<RefundedCapture>>();
 
 /** Extract terms from every document, then run the propose-verify-revise loop. Runs once per session. */
 export async function runPipeline(session: Session, deps: Deps): Promise<void> {
@@ -263,6 +266,7 @@ export function settleCreators(session: Session, deps: Deps): Promise<PayoutSumm
 
 async function settleCreatorsOnce(session: Session, deps: Deps): Promise<PayoutSummary | undefined> {
   const bundle = session.loop?.bundle;
+  if (session.phase === "refunded") return session.payouts; // the buyer was refunded; paying creators now would pay twice
   if (!deps.payments?.createPayout || !bundle || !session.capture) return undefined;
   if (session.payouts && session.payouts.status !== "FAILED") return session.payouts;
   const previous = session.payouts;
@@ -285,16 +289,52 @@ async function settleCreatorsOnce(session: Session, deps: Deps): Promise<PayoutS
     session.payouts = { ...base, status: "FAILED", lines: plan.lines.map((l) => ({ ...l, status: "PENDING" })), error: "Payout submission awaiting confirmation. Retry to reconcile the original batch." };
     touch(session);
     const created = await deps.payments.createPayout({ batchId, subject: "Licence payment via LicenseGraph", items: payload });
-    session.payouts = { ...base, batchId: created.batchId, status: created.status === "SUCCESS" ? "PROCESSING" : created.status, lines: plan.lines.map((l) => ({ ...l, status: "PENDING" })) };
+    session.payouts = { ...base, notSent: undefined, batchId: created.batchId, status: created.status === "SUCCESS" ? "PROCESSING" : created.status, lines: plan.lines.map((l) => ({ ...l, status: "PENDING" })) };
     touch(session);
     session.ledger.append("payout_created", { batchId: created.batchId, status: created.status, totalCents, currency, lines: plan.lines.map((l) => ({ assetId: l.assetId, licensor: l.licensorName, amountCents: l.amountCents })) });
   } catch (e) {
     const error = e instanceof Error ? e.message : "Payout failed";
-    session.payouts = { ...(previous ?? { ...base, lines: plan.lines.map((l) => ({ ...l, status: "FAILED" })) }), status: "FAILED", error };
+    // Certain only when the batch was never sent: refused before the request, or rejected with a client error
+    // (4xx), and no earlier attempt could have been accepted. A timeout or a duplicate-batch answer is not certain.
+    const neverSent = (e instanceof SessionError || /failed: 4\d\d\b/.test(error)) && !/BATCH_ID_ALREADY_EXISTS/.test(error) && (!previous || previous.notSent === true);
+    session.payouts = { ...(previous ?? { ...base, lines: plan.lines.map((l) => ({ ...l, status: "FAILED" })) }), status: "FAILED", error, notSent: neverSent };
     touch(session);
     session.ledger.append("payout_failed", { error: error.slice(0, 300) });
   }
   return session.payouts;
+}
+
+/**
+ * Why a captured payment cannot be refunded, or undefined when it can. A refund is allowed only when
+ * it is certain that no creator was paid, because refunding the buyer after paying creators would
+ * lose the money twice. An unsure failure (a timeout, say) has to be reconciled first.
+ */
+export function refundBlockedReason(session: Session): string | undefined {
+  if (session.phase === "refunded") return "This purchase has already been refunded.";
+  if (session.phase !== "captured" || !session.capture) return "Only a captured payment whose creators have not been paid can be refunded.";
+  const p = session.payouts;
+  if (!p) return undefined;
+  if ((p.status === "DENIED" || p.status === "CANCELED") && p.lines.every((l) => l.status !== "SUCCESS")) return undefined;
+  if (p.status === "FAILED" && p.notSent === true) return undefined;
+  return "The creator payouts may already have been sent. Reconcile the batch with PayPal first; refunding now could pay out twice.";
+}
+
+/** Return the buyer's money for a run whose creators could not be paid. Idempotent at PayPal; recorded in the ledger. */
+export function refundPurchase(session: Session, deps: Deps): Promise<RefundedCapture> {
+  return singleFlight(refundsInFlight, session, () => refundPurchaseOnce(session, deps));
+}
+
+async function refundPurchaseOnce(session: Session, deps: Deps): Promise<RefundedCapture> {
+  if (!deps.payments?.refundCapture) throw new SessionError("Refunds are not available on this payment rail.");
+  const blocked = refundBlockedReason(session);
+  if (blocked) throw new SessionError(blocked);
+  const refund = await deps.payments.refundCapture(session.capture!.captureId, paymentRequestId("refund", session.id));
+  // PayPal's answer to a full refund normally has no amount; it is the captured amount.
+  session.refund = { id: refund.id, status: refund.status, amount: refund.amount ?? session.capture!.amount, at: new Date().toISOString() };
+  session.phase = "refunded";
+  touch(session);
+  session.ledger.append("refunded", { refundId: refund.id, captureId: session.capture!.captureId, amount: session.refund.amount, reason: session.payouts ? "creator payouts could not be sent" : "no creator payout was sent" });
+  return refund;
 }
 
 /** Ask PayPal how the payout batch is going. Throttled, and records the moment it reaches a final state. */
@@ -338,6 +378,9 @@ export interface SessionView {
   approval?: Approval;
   order?: CreatedOrder;
   capture?: CapturedOrder;
+  refund?: Session["refund"];
+  /** The captured payment can be returned to the buyer: creators were certainly not paid. */
+  canRefund?: boolean;
   payouts?: Omit<PayoutSummary, "lines"> & { lines: (Omit<PayoutSummary["lines"][number], "email"> & { emailMasked: string })[] };
   events: LedgerEvent[];
   chainValid: boolean;
@@ -365,6 +408,8 @@ export function viewOf(session: Session): SessionView {
     approval: session.approval,
     order: session.order,
     capture: session.capture,
+    refund: session.refund,
+    canRefund: session.capture ? refundBlockedReason(session) === undefined : undefined,
     payouts: session.payouts && { ...session.payouts, lines: session.payouts.lines.map(({ email, ...rest }) => ({ ...rest, emailMasked: maskEmail(email) })) },
     events: session.ledger.events(),
     chainValid: session.ledger.verify(),
@@ -372,7 +417,7 @@ export function viewOf(session: Session): SessionView {
 }
 
 const ACTIVE: Phase[] = ["created", "extracting", "proposing"];
-const EVICTABLE: Phase[] = ["failed", "verified", "settled"];
+const EVICTABLE: Phase[] = ["failed", "verified", "settled", "refunded"];
 
 /** Sessions with a size cap, optionally saved to disk so they survive a restart. */
 export class SessionStore {

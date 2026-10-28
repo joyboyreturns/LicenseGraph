@@ -16,6 +16,7 @@ export const KIND_LABEL: Record<LedgerKind, string> = {
   order_created: "PayPal order created",
   captured: "Payment captured",
   capture_mismatch: "Capture did not match the approval",
+  refunded: "Buyer refunded",
   payout_created: "Creator payouts sent",
   payout_failed: "Creator payouts failed",
   payout_settled: "Creator payouts settled",
@@ -58,6 +59,8 @@ export function eventTitle(e: Pick<LedgerEvent, "kind" | "payload">, catalog?: P
       return `Order ${String(p.orderId ?? "")} created`;
     case "captured":
       return `Payment captured${p.amount && typeof p.amount === "object" ? `: ${(p.amount as { value?: string }).value ?? ""} ${(p.amount as { currency?: string }).currency ?? ""}` : ""}`;
+    case "refunded":
+      return `Buyer refunded${p.amount && typeof p.amount === "object" ? `: ${(p.amount as { value?: string }).value ?? ""} ${(p.amount as { currency?: string }).currency ?? ""}` : ""}`;
     case "capture_mismatch":
       return "Capture did not match the approved order; no creators were paid";
     case "payout_created":

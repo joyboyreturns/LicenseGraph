@@ -21,6 +21,13 @@ export interface CapturedOrder {
   amount: { currency: string; value: string };
 }
 
+export interface RefundedCapture {
+  id: string;
+  status: string;
+  /** PayPal's refund response usually leaves the amount out; a full refund is then the captured amount. */
+  amount?: { currency: string; value: string };
+}
+
 export interface PayoutItemInput {
   itemId: string;
   receiver: string;
@@ -175,6 +182,13 @@ export function createPayPalClient(config: PayPalConfig) {
         status: json.batch_header.batch_status,
         items: (json.items ?? []).map((i: any) => ({ itemId: i.payout_item?.sender_item_id, status: i.transaction_status, receiver: i.payout_item?.receiver, error: i.errors?.name })),
       };
+    },
+
+    /** Refund a whole capture. The request id makes a retry return the same refund instead of a second one. */
+    async refundCapture(captureId: string, requestId: string): Promise<RefundedCapture> {
+      const json = await call(`/v2/payments/captures/${encodeURIComponent(captureId)}/refund`, requestId, { note_to_payer: "Your LicenseGraph licence purchase was not completed, so it has been refunded." });
+      if (json.status !== "COMPLETED") throw new Error(`PayPal refund is not completed (status ${String(json.status)})`);
+      return { id: json.id, status: json.status, ...(json.amount?.value ? { amount: { currency: json.amount.currency_code, value: json.amount.value } } : {}) };
     },
 
     async captureOrder(orderId: string, requestId: string): Promise<CapturedOrder> {

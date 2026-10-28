@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, BadgeCheck, Check, CreditCard, ExternalLink, FileBadge, FlaskConical, Hand, RotateCw, Send, Wallet } from "lucide-react";
+import { ArrowRight, BadgeCheck, Check, CreditCard, ExternalLink, FileBadge, FlaskConical, Hand, RotateCw, Send, Undo2, Wallet } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import type { SessionView } from "@/src/app-logic/session";
@@ -44,6 +44,7 @@ export interface SettlementActions {
   pay: () => void;
   capture: () => void;
   retryPayouts: () => void;
+  refund: () => void;
 }
 
 export function SettlementPanel({ view, config, busy, actions }: { view: SessionView; config: AppConfig | null; busy: string | null; actions: SettlementActions }) {
@@ -61,7 +62,8 @@ export function SettlementPanel({ view, config, busy, actions }: { view: Session
   const s2: StepState = captured ? "done" : phase === "order_created" ? "current" : "todo";
   const s3: StepState = captured ? "done" : "todo";
   const s4: StepState = !captured ? "todo" : payoutsFailed ? "failed" : payoutsDone ? (allPaid ? "done" : "failed") : "current";
-  const s5: StepState = captured ? (allPaid || !payouts ? "done" : "current") : "todo";
+  const refunded = Boolean(view.refund);
+  const s5: StepState = refunded ? "todo" : captured ? (allPaid || !payouts ? "done" : "current") : "todo";
 
   return (
     <div className={styles.panel}>
@@ -203,7 +205,7 @@ export function SettlementPanel({ view, config, busy, actions }: { view: Session
                   </tbody>
                 </table>
               </div>
-              {payoutsFailed && (
+              {payoutsFailed && !view.refund && (
                 <div className="callout tone-bad" role="alert">
                   <div>
                     <p>
@@ -212,11 +214,24 @@ export function SettlementPanel({ view, config, busy, actions }: { view: Session
                     <p className="small muted" style={{ marginTop: 4 }}>
                       The buyer&rsquo;s payment stays captured; only the transfer to creators needs another try.
                     </p>
-                    <button type="button" className="btn btn-sm" style={{ marginTop: 10 }} onClick={actions.retryPayouts} disabled={busy !== null}>
-                      {busy === "payouts" ? <Spinner label="Retrying" /> : <RotateCw aria-hidden />} Retry payouts
-                    </button>
+                    <div className="row" style={{ marginTop: 10 }}>
+                      <button type="button" className="btn btn-sm" onClick={actions.retryPayouts} disabled={busy !== null}>
+                        {busy === "payouts" ? <Spinner label="Retrying" /> : <RotateCw aria-hidden />} Retry payouts
+                      </button>
+                      {view.canRefund && (
+                        <button type="button" className="btn btn-sm btn-ghost" onClick={actions.refund} disabled={busy !== null} title="PayPal returns the whole payment to the buyer. Available only because no creator was paid.">
+                          {busy === "refund" ? <Spinner label="Refunding" /> : <Undo2 aria-hidden />} Refund the buyer
+                        </button>
+                      )}
+                    </div>
+                    {view.canRefund && <p className="small muted" style={{ marginTop: 6 }}>No creator was paid, so the buyer can be refunded in full instead.</p>}
                   </div>
                 </div>
+              )}
+              {view.refund && (
+                <p className="callout tone-warn" role="status">
+                  <b>The buyer was refunded {formatMoney(Math.round(Number(view.refund.amount.value) * 100), view.refund.amount.currency)}.</b> No creator was paid and no Licence Passport is issued. Refund <code className="mono">{view.refund.id}</code>.
+                </p>
               )}
               {payoutsDone && !allPaid && (
                 <p className="callout tone-warn" role="status">Some creators have not received their payment. Review each line above and reconcile the batch with PayPal. Sending the entire batch again could pay successful recipients twice.</p>
@@ -226,7 +241,7 @@ export function SettlementPanel({ view, config, busy, actions }: { view: Session
         </Step>
 
         <Step n={5} state={s5} icon={<FileBadge />} title="Licence Passport issued">
-          {captured && (
+          {captured && !refunded && (
             <div className="row">
               <p className={styles.sText} style={{ flex: "1 1 260px" }}>
                 A shareable, printable record that anyone can re-verify in their own browser.
