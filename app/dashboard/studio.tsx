@@ -3,13 +3,14 @@
 import { AgStudioAiModule, createAiHarness, directLlmRunner, type AgAiHarnessSetup, type AgReportState } from "ag-studio";
 import { AgStudio, AgStudioProvider } from "ag-studio-react";
 import { widgets, type StudioRegistry } from "./rule-matrix";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { SessionView } from "@/src/app-logic/session";
 import { buildStudioData } from "@/src/dashboard/data";
 import { buildPortfolioData, PORTFOLIO_INITIAL_STATE } from "@/src/dashboard/portfolio";
 import { chatCompletionsAdapter } from "@/src/dashboard/llm-adapter";
 import { licenseGraphTheme } from "@/src/dashboard/theme";
 import { describeSchema } from "@/src/dashboard/schema-text";
+import { clearSavedState, loadSavedState, saveState, savedStateKey } from "@/src/dashboard/saved-state";
 import { AGGREGATIONS, buildChart, buildKpi, buildLicenceTimeline, buildMoneyFlow, buildTable, catalogFrom, CHART_TYPES, placeWidget, type Aggregation, type Built, type ChartKind } from "@/src/dashboard/widget-tools";
 
 const initialState: AgReportState<StudioRegistry> = {
@@ -136,6 +137,49 @@ export default function Studio(props: StudioProps) {
   const { assistant } = props;
   const isPortfolio = props.portfolio !== undefined;
   const [mode, setMode] = useState<"view" | "edit">("view");
+  // The layout, and any widgets the person or the assistant added, are kept in this browser between visits.
+  const storageKey = savedStateKey(isPortfolio);
+  const [layoutVersion, setLayoutVersion] = useState(0);
+  const [restored, setRestored] = useState(false);
+  const startState = useMemo(
+    () => (layoutVersion >= 0 ? loadSavedState(window.localStorage, storageKey) : undefined) as AgReportState<StudioRegistry> | undefined,
+    [storageKey, layoutVersion],
+  );
+  useEffect(() => setRestored(Boolean(startState)), [startState]);
+  const saveTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(saveTimer.current), []);
+  // Studio reports its starting layout as soon as it loads. Only a layout that differs from that is worth keeping,
+  // so someone who only looked at the dashboard does not get today's default frozen in their browser.
+  const baseline = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    baseline.current = undefined;
+  }, [layoutVersion]);
+  const onStateUpdated = useCallback(
+    (e: { state: unknown }) => {
+      const now = JSON.stringify(e.state);
+      if (baseline.current === undefined) {
+        baseline.current = now;
+        return;
+      }
+      if (now === baseline.current) return;
+      setRestored(true);
+      clearTimeout(saveTimer.current);
+      saveTimer.current = setTimeout(() => saveState(window.localStorage, storageKey, e.state), 500);
+    },
+    [storageKey],
+  );
+  const resetLayout = useCallback(() => {
+    clearTimeout(saveTimer.current);
+    clearSavedState(window.localStorage, storageKey);
+    setLayoutVersion((v) => v + 1);
+  }, [storageKey]);
+  // A saved layout the dashboard cannot load (the data it names has changed) is dropped, and the default comes back.
+  const onErrorRaised = useCallback(
+    (e: { fatal: boolean }) => {
+      if (e.fatal && loadSavedState(window.localStorage, storageKey)) resetLayout();
+    },
+    [storageKey, resetLayout],
+  );
   const dark = useDarkMode();
   const theme = useMemo(() => licenseGraphTheme(dark), [dark]);
   const data = useMemo(() => {
@@ -219,8 +263,24 @@ export default function Studio(props: StudioProps) {
       <div style={{ display: "flex", gap: 8, padding: "8px 16px" }}>
         <button type="button" className={mode === "view" ? "primary" : ""} onClick={() => setMode("view")}>View</button>
         <button type="button" className={mode === "edit" ? "primary" : ""} onClick={() => setMode("edit")}>Edit dashboard</button>
+        {restored && (
+          <button type="button" onClick={resetLayout} title="Your changes to this dashboard are kept in this browser. This puts the original layout back.">
+            Reset to the original layout
+          </button>
+        )}
       </div>
-      <AgStudio<StudioRegistry> data={data as never} widgets={widgets} initialState={(isPortfolio ? PORTFOLIO_INITIAL_STATE : initialState) as AgReportState<StudioRegistry>} mode={mode} ai={ai} theme={theme} style={{ height: "calc(100vh - 108px)" }} />
+      <AgStudio<StudioRegistry>
+        key={layoutVersion}
+        data={data as never}
+        widgets={widgets}
+        initialState={(startState ?? (isPortfolio ? PORTFOLIO_INITIAL_STATE : initialState)) as AgReportState<StudioRegistry>}
+        onStateUpdated={onStateUpdated as never}
+        onErrorRaised={onErrorRaised as never}
+        mode={mode}
+        ai={ai}
+        theme={theme}
+        style={{ height: "calc(100vh - 108px)" }}
+      />
     </AgStudioProvider>
   );
 }

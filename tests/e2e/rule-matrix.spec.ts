@@ -62,3 +62,32 @@ test("the custom licence timeline widget draws a bar for every licence a paid ru
   await expect(flow).toHaveAccessibleName(/Marlow Voice \$210\.00/);
   expect(errors).toEqual([]);
 });
+
+test("a dashboard someone changed is kept in their browser and can be put back; one that was only looked at is not frozen", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.request.post("/api/sessions", { data: { scenarioId: "documentary" } });
+  const key = "licensegraph.studio.portfolio.v1";
+  const saved = () => page.evaluate((k) => localStorage.getItem(k), key);
+  const grid = page.getByRole("table", { name: /How many times each rule rejected each asset/ });
+
+  await page.goto("/dashboard?portfolio=1");
+  await expect(grid).toBeVisible({ timeout: 30_000 });
+  await page.waitForTimeout(1_200);
+  expect(await saved()).toBeNull();
+
+  // Remove the rule matrix in edit mode: the layout now differs from the original, so it is kept.
+  await page.getByRole("button", { name: "Edit dashboard" }).click();
+  await grid.click({ force: true });
+  await page.keyboard.press("Delete");
+  await expect.poll(saved, { timeout: 10_000 }).not.toBeNull();
+
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Reset to the original layout" })).toBeVisible({ timeout: 30_000 });
+  await expect(grid).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Reset to the original layout" }).click();
+  await expect(grid).toBeVisible({ timeout: 30_000 });
+  await expect.poll(saved).toBeNull();
+  expect(errors).toEqual([]);
+});
