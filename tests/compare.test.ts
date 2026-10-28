@@ -1,3 +1,4 @@
+import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { compareRuns, type RunOutcome } from "../src/core/compare";
 import type { LicenseOffer } from "../src/core/types";
@@ -28,5 +29,37 @@ describe("compareRuns", () => {
   it("does not subtract totals in different currencies", () => {
     const eur = { ...outcome(offer("a", "song", 100)), currency: "EUR" };
     expect(compareRuns(outcome(offer("a", "song", 100)), eur).deltaCents).toBeNull();
+  });
+});
+
+describe("compareRuns, for any two bundles", () => {
+  const assetIds = ["song", "image", "font", "voice"];
+  const bundle = fc
+    .uniqueArray(fc.constantFrom(...assetIds), { maxLength: 4 })
+    .chain((ids) => fc.tuple(...ids.map((assetId) => fc.record({ id: fc.constantFrom("a", "b", "c"), price: fc.integer({ min: 1, max: 100_000 }) }).map((o) => offer(`${assetId}-${o.id}`, assetId, o.price)))))
+    .map((offers) => outcome(...offers));
+
+  it("covers every asset of either run once, and its delta is exactly the difference of the totals", () => {
+    fc.assert(
+      fc.property(bundle, bundle, (before, after) => {
+        const r = compareRuns(before, after);
+        const expected = [...new Set([...before.offers, ...after.offers].map((o) => o.assetId))].sort();
+        expect(r.assets.map((a) => a.assetId)).toEqual(expected);
+        expect(r.deltaCents).toBe(after.totalCents - before.totalCents);
+        // The per-asset prices explain the delta: nothing moved that the rows do not show.
+        const rows = r.assets.reduce((n, a) => n + (a.after?.priceCents ?? 0) - (a.before?.priceCents ?? 0), 0);
+        expect(rows).toBe(r.deltaCents);
+      }),
+    );
+  });
+
+  it("calls an unchanged run the same, and swapping the runs swaps cheaper and dearer", () => {
+    fc.assert(
+      fc.property(bundle, bundle, (a, b) => {
+        expect(compareRuns(a, a).assets.every((x) => x.change === "same")).toBe(true);
+        const flip: Record<string, string> = { cheaper: "dearer", dearer: "cheaper", gained: "lost", lost: "gained", same: "same", "other-licence": "other-licence" };
+        expect(compareRuns(b, a).assets.map((x) => x.change)).toEqual(compareRuns(a, b).assets.map((x) => flip[x.change]));
+      }),
+    );
   });
 });
