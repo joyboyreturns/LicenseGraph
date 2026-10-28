@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildChart, buildKpi, buildLicenceTimeline, buildTable, catalogFrom, placeWidget, type StateLike } from "../src/dashboard/widget-tools";
+import { buildChart, buildKpi, buildLicenceTimeline, buildMoneyFlow, buildTable, catalogFrom, placeWidget, type StateLike } from "../src/dashboard/widget-tools";
 
 const catalog = catalogFrom({
   sources: [
@@ -117,5 +117,23 @@ describe("buildLicenceTimeline", () => {
     const result = buildLicenceTimeline(run, { title: "Ends" });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.errors.join(" ")).toContain('"licences.endsOn"');
+  });
+});
+
+describe("buildMoneyFlow", () => {
+  const portfolio = catalogFrom({ sources: [{ id: "payouts", fields: [{ id: "licensor", format: "textFormat" }, { id: "amount", format: "currencyFormat" }] }] });
+
+  it("maps the payouts table's licensor and amount onto the money flow widget", () => {
+    expect(buildMoneyFlow(portfolio, { title: "Money" })).toMatchObject({
+      ok: true,
+      widget: { type: "money-flow", dataMapping: { payee: [{ id: "payouts.licensor" }], amount: [{ id: "payouts.amount" }] }, format: { title: { text: "Money" } } },
+    });
+  });
+
+  it("says plainly that a dashboard without a payouts table cannot draw one", () => {
+    const run = catalogFrom({ sources: [{ id: "offers", fields: [{ id: "price", format: "currencyFormat" }] }] });
+    const result = buildMoneyFlow(run, { title: "Money" });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors.join(" ")).toContain('"payouts.amount"');
   });
 });

@@ -144,6 +144,18 @@ export function buildLicenceTimeline(c: FieldCatalog, a: TimelineArgs): Built<Re
   };
 }
 
+/** Money flow: what was paid, split by who received it, from the payouts table. Only offered where that table exists. */
+export function buildMoneyFlow(c: FieldCatalog, a: TimelineArgs): Built<Record<string, unknown>> {
+  const errors: string[] = [];
+  for (const id of ["payouts.licensor", "payouts.amount"]) if (!c.byId[id]) errors.push(`This dashboard has no "${id}" field, so it cannot draw where the money went.`);
+  if (errors.length) return { ok: false, errors };
+  return {
+    ok: true,
+    size: { xSpan: 12, ySpan: 6 },
+    widget: { type: "money-flow", dataMapping: { payee: [{ id: "payouts.licensor" }], amount: [{ id: "payouts.amount" }] }, format: { title: { enabled: true, text: a.title } } },
+  };
+}
+
 type Layout = { xTrack: number; yTrack: number; xSpan: number; ySpan: number };
 export interface PageLike {
   id: string;

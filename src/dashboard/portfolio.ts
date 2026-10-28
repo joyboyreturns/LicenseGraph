@@ -209,6 +209,11 @@ export const PORTFOLIO_INITIAL_STATE = {
           dataMapping: { label: [{ id: "licences.label" }], start: [{ id: "licences.boughtOn" }], end: [{ id: "licences.endsOn" }] },
           format: { title: { enabled: true, text: "When each bought licence ends" } },
         },
+        moneyFlow: {
+          type: "money-flow",
+          dataMapping: { payee: [{ id: "payouts.licensor" }], amount: [{ id: "payouts.amount" }] },
+          format: { title: { enabled: true, text: "Where the money went" } },
+        },
         licencesGrid: {
           type: "grid",
           dataMapping: { cols: ["licences.run", "licences.licensor", "licences.asset", "licences.price", "licences.boughtOn", "licences.endsOn", "licences.cover"].map((id) => ({ id })) },
@@ -233,7 +238,8 @@ export const PORTFOLIO_INITIAL_STATE = {
         ruleMatrix: { xTrack: 6, yTrack: 16, xSpan: 6, ySpan: 5 },
         offersGrid: { xTrack: 0, yTrack: 21, xSpan: 12, ySpan: 6 },
         licenceTimeline: { xTrack: 0, yTrack: 27, xSpan: 12, ySpan: 5 },
-        licencesGrid: { xTrack: 0, yTrack: 32, xSpan: 12, ySpan: 5 },
+        moneyFlow: { xTrack: 0, yTrack: 32, xSpan: 12, ySpan: 6 },
+        licencesGrid: { xTrack: 0, yTrack: 38, xSpan: 12, ySpan: 5 },
       },
     },
   ],

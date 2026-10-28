@@ -5,6 +5,7 @@ import { createWidgets, type AgRegistry, type AgWidgetDefinition } from "ag-stud
 import { useEffect, useState } from "react";
 import { buildMatrix, readRow, type Matrix } from "@/src/dashboard/rule-matrix";
 import { licenceTimelineType, type LicenceTimelineDefinition } from "./licence-timeline";
+import { moneyFlowType, type MoneyFlowDefinition } from "./money-flow";
 
 /**
  * A custom AG Studio widget: a heat grid of which rule rejected which asset (or any two text fields and
@@ -18,7 +19,7 @@ interface MatrixDef extends AgWidgetData<MatrixMapping, AgWidgetDataFormat<unkno
 }
 export type RuleMatrixDefinition = AgWidgetDefinition<"rule-matrix", MatrixDef>;
 export interface StudioRegistry extends AgRegistry {
-  widgets: readonly (AgDefaultWidgetDefinition | RuleMatrixDefinition | LicenceTimelineDefinition)[];
+  widgets: readonly (AgDefaultWidgetDefinition | RuleMatrixDefinition | LicenceTimelineDefinition | MoneyFlowDefinition)[];
 }
 
 const asList = (v: unknown): { id?: string }[] => (Array.isArray(v) ? v : v ? [v as { id?: string }] : []);
@@ -124,6 +125,7 @@ export const widgets = (config: AgWidgetsConfig<StudioRegistry>) =>
         minSize: { width: 240, height: 160 },
       },
       licenceTimelineType,
+      moneyFlowType,
     ],
-    menu: [...config.menu, { label: "LicenseGraph", widgetIds: ["rule-matrix", "licence-timeline"] }],
+    menu: [...config.menu, { label: "LicenseGraph", widgetIds: ["rule-matrix", "licence-timeline", "money-flow"] }],
   });

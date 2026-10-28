@@ -53,5 +53,12 @@ test("the custom licence timeline widget draws a bar for every licence a paid ru
   await expect(timeline.getByRole("listitem")).toHaveCount(3);
   await expect(timeline.getByRole("img", { name: /Tapeloop · song: .* to \d{4}-\d{2}-\d{2}, \d+ days left/ })).toBeVisible();
   await expect(timeline.getByRole("img", { name: /Greyscale Lane · image: perpetual/ })).toBeVisible();
+
+  // The same run's payouts, drawn as money flowing to each creator: $340 + $140 + $210 = $690.
+  const flow = page.getByRole("img", { name: /^Where the \$690\.00 went:/ });
+  await expect(flow).toBeVisible();
+  await expect(flow).toHaveAccessibleName(/Tapeloop \$340\.00/);
+  await expect(flow).toHaveAccessibleName(/Greyscale Lane \$140\.00/);
+  await expect(flow).toHaveAccessibleName(/Marlow Voice \$210\.00/);
   expect(errors).toEqual([]);
 });

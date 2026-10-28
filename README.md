@@ -59,6 +59,8 @@ Both are also tables in AG Studio (`requirements`, `gaps`), and the portfolio ha
 
 The dashboards also include a **custom Studio widget**, the *rule matrix* (`app/dashboard/rule-matrix.tsx`): a heat grid of which rule rejected which asset, across every run on the portfolio page. It is a real Studio widget type, not a chart in disguise. It appears in the widget menu, takes its fields through the edit panel, and follows the page's filters and cross-filtering. The grouping logic is plain code with unit tests (`src/dashboard/rule-matrix.ts`).
 
+Two more custom widgets sit beside it, built the same way: a *licence timeline* (`licence-timeline.tsx`, a bar for each bought licence from the day of purchase to the day it stops covering the project, with a line for today) and a *money flow* (`money-flow.tsx`, what buyers paid drawn as bands flowing to each creator). Their layout code is also pure and tested, and the dashboard assistant has a tool for each.
+
 ## Agents can shop, only people can spend (MCP)
 
 `scripts/mcp-server.ts` exposes LicenseGraph as a [Model Context Protocol](https://modelcontextprotocol.io) server over stdio, so any MCP-capable AI agent can use it:

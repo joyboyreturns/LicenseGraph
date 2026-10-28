@@ -63,7 +63,7 @@ The visible propose, verify, reject, revise cycle is the product. The model neve
 | `src/intake/` | The plain-English brief reader and grounded run Q&A, each with an offline fallback. |
 | `src/demo/` | Built-in scenarios and the recorded model output they replay. |
 | `src/ui/`, `app/` | The Next.js front end: home, run theatre (rights graph, replay, matrix, evidence, settlement), passport, verify, simulator checkout. Pure UI logic is unit-tested in `tests/ui`. |
-| `src/dashboard/`, `app/dashboard/` | AG Studio dashboards: a single run, and the cross-run portfolio, with two custom widgets (rule matrix, licence timeline) whose layout code is pure and tested. Validated chart, table, KPI and timeline tools for the assistant. |
+| `src/dashboard/`, `app/dashboard/` | AG Studio dashboards: a single run, and the cross-run portfolio, with three custom widgets (rule matrix, licence timeline, money flow) whose layout code is pure and tested. Validated chart, table, KPI, timeline and money-flow tools for the assistant. |
 | `src/mcp/`, `scripts/mcp-server.ts` | The MCP server: tools (`check_licence_bundle`, `cheapest_compliant_bundle`, `what_if_brief`, `licence_end_dates`, `start_licence_purchase`, `get_purchase_status`) and the `buy_licences` prompt, built once in `server.ts` and served over stdio and, statelessly, over HTTP at `/api/mcp`. |
 | `app/api/` | HTTP routes: sessions (including `revise`), payments, passports (and their badge), scenarios, intake, portfolio, assistant proxy, simulator, PayPal webhooks, MCP, health, and the generated OpenAPI document. |
 

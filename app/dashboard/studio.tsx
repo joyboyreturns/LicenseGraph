@@ -10,7 +10,7 @@ import { buildPortfolioData, PORTFOLIO_INITIAL_STATE } from "@/src/dashboard/por
 import { chatCompletionsAdapter } from "@/src/dashboard/llm-adapter";
 import { licenseGraphTheme } from "@/src/dashboard/theme";
 import { describeSchema } from "@/src/dashboard/schema-text";
-import { AGGREGATIONS, buildChart, buildKpi, buildLicenceTimeline, buildTable, catalogFrom, CHART_TYPES, placeWidget, type Aggregation, type Built, type ChartKind } from "@/src/dashboard/widget-tools";
+import { AGGREGATIONS, buildChart, buildKpi, buildLicenceTimeline, buildMoneyFlow, buildTable, catalogFrom, CHART_TYPES, placeWidget, type Aggregation, type Built, type ChartKind } from "@/src/dashboard/widget-tools";
 
 const initialState: AgReportState<StudioRegistry> = {
   selectedPageId: "overview",
@@ -95,7 +95,7 @@ const PORTFOLIO_INSTRUCTIONS = [
   "You build dashboard views for a licence-rights tool called LicenseGraph.",
   "The data covers every licensing run: runs (what each verified bundle cost versus a price-only purchase), licence offers with their terms, rule violations, creator payouts and ledger events. All prices are US dollars.",
   "The data schema is below. Fields are written table.field, for example runs.verifiedTotal.",
-  "To build something, call create_chart, create_table or create_kpi straight away. Prefer a chart for comparisons and a table only when asked for one. For when licences end, call create_licence_timeline.",
+  "To build something, call create_chart, create_table or create_kpi straight away. Prefer a chart for comparisons and a table only when asked for one. For when licences end, call create_licence_timeline. For where the money went, call create_money_flow.",
   "Only say you added something if the tool reported success. If a tool returns an error, fix the arguments and call it again.",
   "Keep replies to one or two sentences.",
 ].join("\n");
@@ -105,6 +105,7 @@ const PORTFOLIO_PROMPT_STARTERS = [
   { label: "Who got paid?", prompt: "Show a chart of the amount paid to each creator." },
   { label: "Terms we keep missing", prompt: "Add a chart counting offers by their attribution status." },
   { label: "When do licences end?", prompt: "Add a timeline of when each bought licence ends." },
+  { label: "Where did the money go?", prompt: "Add a money flow diagram of what was paid to each creator." },
 ];
 
 
@@ -190,13 +191,20 @@ export default function Studio(props: StudioProps) {
         execute: (a: { title: string }, ctx: any) => add(a.title, buildLicenceTimeline(catalog, { title: a.title }), "licence timeline", ctx),
       } as never);
 
+      const createMoneyFlow = api.defineAiTool({
+        name: "create_money_flow",
+        description: "Add a diagram of the money paid by buyers flowing to each creator who received it.",
+        params: (s: any) => s.object({ title: s.string() }),
+        execute: (a: { title: string }, ctx: any) => add(a.title, buildMoneyFlow(catalog, { title: a.title }), "money flow", ctx),
+      } as never);
+
       return createAiHarness(api, () => ({
         agents: [
           directLlmRunner({
             id: "analyst",
             adapter,
             instructions: () => `${isPortfolio ? PORTFOLIO_INSTRUCTIONS : INSTRUCTIONS}\n\n${describeSchema(api.getAiContext().schema() as never)}`,
-            tools: () => (isPortfolio ? [createChart, createTable, createKpi, createTimeline] : [createChart, createTable, createKpi]),
+            tools: () => (isPortfolio ? [createChart, createTable, createKpi, createTimeline, createMoneyFlow] : [createChart, createTable, createKpi]),
           }),
         ],
         primary: "analyst",
