@@ -35,11 +35,19 @@ function normaliseMediums(v: string | string[] | null | undefined): string[] | "
 
 const isoDate = z.string().refine(isIsoDate, "Expected a real calendar date (YYYY-MM-DD)");
 
+/** The rules compare territory codes exactly, so "us" or " US " must become "US"; anything else is sent back for a retry. */
+const territory = z
+  .string()
+  .trim()
+  .toUpperCase()
+  .transform((t) => (t === "WORLDWIDE" ? "WORLD" : t))
+  .pipe(z.string().regex(/^(WORLD|[A-Z]{2})$/, 'Expected "WORLD" or an ISO 3166-1 alpha-2 country code'));
+
 const modelOutput = z.object({
   priceCents: z.number().int().safe().positive(),
   currency: z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/),
   commercialUse: z.boolean(),
-  territories: z.array(z.string().min(2)).min(1),
+  territories: z.array(territory).min(1),
   termMonths: z.union([z.number().int().safe().positive(), z.literal("perpetual")]),
   // null (or absent) means the text does not state it.
   mediums: z

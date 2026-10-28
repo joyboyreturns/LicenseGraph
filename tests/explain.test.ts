@@ -33,6 +33,22 @@ describe("runFacts", () => {
   });
 });
 
+describe("currency", () => {
+  it("states totals in the run's currency, not always dollars", async () => {
+    const v = await view();
+    const eur = { ...v, project: { ...v.project, currency: "EUR", budgetCents: 100_000 }, bundle: { ...v.bundle!, currency: "EUR" }, payouts: { batchId: "b", status: "SUCCESS", totalCents: 100, currency: "EUR", createdAt: "x", lines: [{ assetId: "song", offerId: "offer-song", documentId: "d", licensorName: "Ana", currency: "EUR", amountCents: 12_345, status: "SUCCESS", emailMasked: "a•@x.com" }] } };
+    const facts = runFacts(eur);
+    expect(facts).toContain("Budget €1,000.00");
+    expect(facts).toContain("price-only buyer would pay €294.00");
+    expect(facts).toContain("Ana €123.45 for song");
+    expect(facts).not.toContain("$294.00");
+    const cost = answerLocally(eur, "How much did it cost in total?").answer;
+    expect(cost).toContain("€329.00");
+    expect(cost).toContain("would have cost €294.00");
+    expect(cost).not.toContain("$");
+  });
+});
+
 describe("answerLocally", () => {
   it("explains a rejection with the rule's own message", async () => {
     const a = answerLocally(await view(), "Why was the photo rejected?");

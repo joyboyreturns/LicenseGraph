@@ -53,6 +53,45 @@ describe("parseBriefLocally", () => {
     expect(p("plain brief")).toMatchObject({ canCredit: undefined, needsSublicensing: undefined, requiresExclusive: undefined });
   });
 
+  it("does not mistake other numbers for a budget", () => {
+    expect(p("Need it within 12 months").budgetCents).toBeUndefined();
+    expect(p("up to 3 songs").budgetCents).toBeUndefined();
+    expect(p("Under 30 seconds long, under $500").budgetCents).toBe(50_000);
+    // The stated budget wins over a limit-like phrase that comes earlier in the text.
+    expect(p("Ad campaign, up to 3 songs, budget $2,000").budgetCents).toBe(200_000);
+    expect(p("within $800 for everything").budgetCents).toBe(80_000);
+  });
+
+  it("reads decimal terms whole", () => {
+    expect(p("1.5 years").termMonths).toBe(18);
+    expect(p("2.5 years of use").termMonths).toBe(30);
+    expect(p("a 6 month licence").termMonths).toBe(6);
+  });
+
+  it("does not turn a negated exclusivity into a requirement", () => {
+    expect(p("We are fine with a non-exclusive licence").requiresExclusive).toBeUndefined();
+    expect(p("It does not need to be exclusive").requiresExclusive).toBeUndefined();
+    expect(p("We don't need exclusivity").requiresExclusive).toBeUndefined();
+    expect(p("no exclusivity required").requiresExclusive).toBeUndefined();
+    expect(p("non-exclusive images but we need the song to be exclusive").requiresExclusive).toBe(true);
+  });
+
+  it("reads the United States only when it is named, not the pronoun \"us\"", () => {
+    expect(p("A song for us to use in an ad").territories).toEqual(["WORLD"]);
+    expect(p("Send the final cut back to us").territories).toEqual(["WORLD"]);
+    for (const text of ["A US ad", "an ad in the U.S.", "launching in the USA", "across the United States", "American audiences"]) {
+      expect(p(text).territories).toEqual(["US"]);
+    }
+  });
+
+  it("does not read a commercial brief as non-commercial because of a stray word", () => {
+    expect(p("A commercial ad for a school fundraiser").commercial).toBe(true);
+    expect(p("Brand video made with a student").commercial).toBe(true);
+    expect(p("A student film").commercial).toBe(false);
+    expect(p("hobby project").commercial).toBe(false);
+    expect(p("A not-for-profit campaign").commercial).toBe(false);
+  });
+
   it("recognises assets and media vocabulary", () => {
     const r = parseBriefLocally("podcast with theme music, cover art, a voiceover and sound effects");
     expect(r.requiredAssetIds).toEqual(["song", "image", "voiceover", "sfx"]);
@@ -75,6 +114,13 @@ describe("parseBrief with a model", () => {
   it("only ever tightens credit, never invents a freedom the text did not state", async () => {
     expect((await parseBrief(text, reply({ canCredit: true }))).project.canCredit).toBeUndefined();
     expect((await parseBrief(text, reply({ canCredit: false }))).project.canCredit).toBe(false);
+  });
+
+  it("normalises the model's territory codes and rejects ones the run API would refuse", async () => {
+    expect((await parseBrief(text, reply({ territories: ["usa", "uk", " ca "] }))).project.territories).toEqual(["US", "GB", "CA"]);
+    expect((await parseBrief(text, reply({ territories: ["Worldwide"] }))).project.territories).toEqual(["WORLD"]);
+    // A country name is not a code: the reply is discarded and the local reading is used.
+    expect(await parseBrief(text, reply({ territories: ["Germany"] }))).toEqual(parseBriefLocally(text));
   });
 
   it("falls back to the local reading on bad, invalid or failing replies", async () => {

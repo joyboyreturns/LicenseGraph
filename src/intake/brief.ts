@@ -15,7 +15,9 @@ export interface BriefResult {
 const EU = ["AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU", "IE", "IT", "LV", "LT", "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE"];
 const PLACES: [RegExp, string[]][] = [
   [/\b(worldwide|world-wide|global(?:ly)?|international(?:ly)?|anywhere|all countries)\b/i, ["WORLD"]],
-  [/\b(u\.?s\.?a?\.?|united states|america(?:n)?)\b/i, ["US"]],
+  [/\b(united states|america(?:n)?)\b/i, ["US"]],
+  // Case-sensitive, so the pronoun "us" ("a song for us") is not read as the United States.
+  [/(?<![\w.])(?:U\.S\.A?\.?|USA?)(?!\w)/, ["US"]],
   [/\b(uk|u\.k\.|united kingdom|britain|british|england)\b/i, ["GB"]],
   [/\b(india|indian)\b/i, ["IN"]],
   [/\b(canada|canadian)\b/i, ["CA"]],
@@ -48,15 +50,28 @@ const WORDS: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five:
 
 function months(text: string): number | undefined {
   if (/\b(perpetual|forever|lifetime|permanent(?:ly)?|in perpetuity)\b/i.test(text)) return 1200;
-  const m = /\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|a|an)[\s-]*(month|months|mo|year|years|yr|yrs)\b/i.exec(text);
+  // Decimals are read whole ("1.5 years" is 18 months, not "5 years").
+  const m = /(?<![\d.])\b(\d+(?:\.\d+)?|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|a|an)[\s-]*(month|months|mo|year|years|yr|yrs)\b/i.exec(text);
   if (!m) return /\b(annual|yearly)\b/i.test(text) ? 12 : undefined;
   const raw = m[1]!.toLowerCase();
-  const n = /^\d+$/.test(raw) ? Number(raw) : (WORDS[raw] ?? 1);
-  return /^y/i.test(m[2]!) ? n * 12 : n;
+  const n = /^\d/.test(raw) ? Number(raw) : (WORDS[raw] ?? 1);
+  const result = Math.round(/^y/i.test(m[2]!) ? n * 12 : n);
+  return result >= 1 ? result : undefined;
 }
 
+const AMOUNT = String.raw`([\d][\d,]*(?:\.\d+)?)`;
+const LIMIT_WORD = String.raw`(?:under|below|up to|at most|max(?:imum)?|less than|within|no more than|cap(?:ped)?\s+at|<)`;
+
+/**
+ * A number is a budget only when the text says so: after the word "budget", or with a money signal
+ * ($, usd, dollars, k). "within 12 months", "up to 3 songs" and "under 30 seconds" are not budgets.
+ */
 function budgetCents(text: string): number | undefined {
-  const m = /(?:under|below|up to|at most|max(?:imum)?|budget(?:\s+of|\s+is)?|less than|within|no more than|cap(?:ped)?\s+at|<)\s*(?:of\s*)?(?:us)?\$?\s*([\d][\d,]*(?:\.\d+)?)\s*(k\b|usd|dollars?)?/i.exec(text) ?? /\$\s*([\d][\d,]*(?:\.\d+)?)\s*(k\b)?\s*(?:budget|max|cap|limit)/i.exec(text);
+  const m =
+    new RegExp(String.raw`\bbudget(?:\s+(?:of|is))?\s*(?:us)?\s*\$?\s*${AMOUNT}\s*(k\b|usd|dollars?)?`, "i").exec(text) ??
+    new RegExp(String.raw`${LIMIT_WORD}\s*(?:of\s*)?(?:us)?\s*\$\s*${AMOUNT}\s*(k\b|usd|dollars?)?`, "i").exec(text) ??
+    new RegExp(String.raw`${LIMIT_WORD}\s*(?:of\s*)?${AMOUNT}\s*(k\b|usd|dollars?)`, "i").exec(text) ??
+    /\$\s*([\d][\d,]*(?:\.\d+)?)\s*(k\b)?\s*(?:budget|max|cap|limit)/i.exec(text);
   if (!m) return undefined;
   const value = Number(m[1]!.replace(/,/g, "")) * (/^k$/i.test(m[2] ?? "") ? 1000 : 1);
   return Number.isFinite(value) && value > 0 ? Math.round(value * 100) : undefined;
@@ -70,8 +85,11 @@ export function parseBriefLocally(text: string): BriefResult {
   const name = /["“]([^"”]{3,60})["”]/.exec(text)?.[1]?.trim() ?? /\b(?:called|named|project)\s+([A-Z][\w' -]{2,40})/.exec(text)?.[1]?.trim();
   if (name) found.push(`Project: ${name}`);
 
-  const nonCommercial = /\b(non[- ]?commercial|personal (?:use|project)|hobby|school|student|not for profit|editorial only)\b/i.test(text);
   const commercialCue = /\b(commercial|advert\w*|\bads?\b|sell\w*|monetiz\w*|paid|brand\w*|client\w*|campaign|promo\w*|product|business|revenue)\b/i.test(text);
+  // "school" or "hobby" only suggest non-commercial use when nothing in the brief points to a commercial one
+  // ("a commercial ad for a school fundraiser" is commercial). Reading a commercial project as non-commercial is the unsafe mistake.
+  const nonCommercial =
+    /\b(non[- ]?commercial|personal (?:use|project)|not[- ]for[- ]profit|editorial only)\b/i.test(text) || (/\b(hobby|school|student)\b/i.test(text) && !commercialCue);
   const commercial = !nonCommercial;
   if (nonCommercial) found.push("Non-commercial use");
   else if (commercialCue) found.push("Commercial use");
@@ -97,7 +115,9 @@ export function parseBriefLocally(text: string): BriefResult {
   if (canCredit === false) found.push("Cannot credit creators");
   const needsSublicensing = /\b(sublicens\w*|resell\w*|white[- ]?label|for (?:our |my )?clients|agency|redistribut\w*)\b/i.test(text) ? true : undefined;
   if (needsSublicensing) found.push("Needs sublicensing");
-  const requiresExclusive = /\b(exclusive|exclusivity|no one else|nobody else)\b/i.test(text) ? true : undefined;
+  // "non-exclusive", "not exclusive" and "don't need exclusivity" say the opposite of requiring it.
+  const withoutNegated = text.replace(/\b(?:non[- ]?exclusiv\w*|not\s+(?:\w+\s+)?exclusiv\w*|no\s+exclusiv\w*|(?:don'?t|do not|doesn'?t|does not|needn'?t|need not|no need)\s+(?:\w+\s+){0,4}?exclusiv\w*)/gi, " ");
+  const requiresExclusive = /\b(exclusive|exclusivity|no one else|nobody else)\b/i.test(withoutNegated) ? true : undefined;
   if (requiresExclusive) found.push("Needs an exclusive licence");
 
   const required = [...new Set(ASSETS.filter(([re]) => re.test(text)).map(([, a]) => a))];
@@ -123,10 +143,19 @@ export function parseBriefLocally(text: string): BriefResult {
   };
 }
 
+const TERRITORY_ALIASES: Record<string, string> = { USA: "US", UK: "GB", WORLDWIDE: "WORLD" };
+/** The same codes the run API accepts, so a model's "usa" or "uk" never reaches the form as an invalid code. */
+const briefTerritory = z
+  .string()
+  .trim()
+  .toUpperCase()
+  .transform((t) => TERRITORY_ALIASES[t] ?? t)
+  .pipe(z.string().regex(/^(WORLD|[A-Z]{2})$/));
+
 const modelBrief = z.object({
   name: z.string().min(1).max(80).optional(),
   commercial: z.boolean().optional(),
-  territories: z.array(z.string().min(2).max(5)).min(1).max(30).optional(),
+  territories: z.array(briefTerritory).min(1).max(30).optional(),
   termMonths: z.number().int().min(1).max(1200).optional(),
   budgetUsd: z.number().positive().max(10_000_000).optional(),
   mediums: z.array(z.string().min(1).max(20)).max(10).optional(),

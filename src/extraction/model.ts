@@ -56,7 +56,12 @@ export function createGatewayModel(config: GatewayConfig): ModelClient {
   let nextSlot = 0;
   return {
     async complete({ system, user }) {
-      checked ??= assertModelIsFree(config);
+      // A failed check is retried on the next call, never cached: one blip on the price list must not
+      // disable the model until a restart. The check still has to pass before any completion is sent.
+      checked ??= assertModelIsFree(config).catch((e) => {
+        checked = undefined;
+        throw e;
+      });
       await checked;
       // Take the next free slot so several calls in a row never outrun the provider's rate limit.
       const slot = Math.max(now(), nextSlot);

@@ -9,6 +9,8 @@ export interface Answer {
 }
 
 const usd = (cents: number, currency = "USD") => (cents / 100).toLocaleString("en-US", { style: "currency", currency });
+/** Totals that are not tied to one offer (price-only total, premium, budget) are in the run's settlement currency, not always dollars. */
+const runCurrency = (v: SessionView) => v.bundle?.currency ?? v.project.currency ?? "USD";
 const termText = (t: SessionView["candidates"][number]["terms"]) =>
   [t.commercialUse ? "commercial" : "non-commercial", t.territories.join("/"), t.termMonths === "perpetual" ? "perpetual" : `${t.termMonths} months`, t.mediums ? (t.mediums === "ALL" ? "any medium" : t.mediums.join("/")) : "media not stated"].join(", ");
 
@@ -22,13 +24,13 @@ export function runFacts(v: SessionView): string {
   }
   const chosen = new Set(v.bundle?.offers.map((o) => o.id));
   const lines = [
-    `Project: ${v.project.name}. Commercial: ${v.project.commercial}. Territories: ${v.project.territories.join(", ")}. Needs ${v.project.termMonths} months.${v.project.mediums ? ` Media: ${v.project.mediums.join(", ")}.` : ""}${v.project.budgetCents ? ` Budget ${usd(v.project.budgetCents)}.` : ""}`,
+    `Project: ${v.project.name}. Commercial: ${v.project.commercial}. Territories: ${v.project.territories.join(", ")}. Needs ${v.project.termMonths} months.${v.project.mediums ? ` Media: ${v.project.mediums.join(", ")}.` : ""}${v.project.budgetCents ? ` Budget ${usd(v.project.budgetCents, v.project.currency)}.` : ""}`,
     `Status: ${v.phase}. Agent rounds: ${v.rounds ?? "n/a"}.`,
     ...v.candidates.map((o) => `Offer ${o.id} for ${o.assetId}: ${usd(o.priceCents, o.currency)}; ${termText(o.terms)}. ${chosen.has(o.id) ? "CHOSEN." : failedBy.has(o.id) ? `REJECTED (${failedBy.get(o.id)!.join("; ")}).` : "Not chosen."} Evidence: ${o.evidence.map((e) => `${e.field ?? "term"}: "${e.quote}"`).join(" | ")}`),
   ];
   if (v.bundle) lines.push(`Verified bundle total ${usd(v.bundle.totalCents, v.bundle.currency)}.`);
-  if (v.analysis) lines.push(`A price-only buyer would pay ${usd(v.analysis.naiveTotalCents)}; compliance premium ${usd(v.analysis.compliancePremiumCents)}; blocked purchases: ${v.analysis.blockedPurchases.map((b) => `${b.offerId} (${b.reasons.join(", ")})`).join("; ") || "none"}.`);
-  if (v.payouts) lines.push(`Creators paid: ${v.payouts.lines.map((l) => `${l.licensorName} ${usd(l.amountCents)} for ${l.assetId} (${l.status})`).join("; ")}.`);
+  if (v.analysis) lines.push(`A price-only buyer would pay ${usd(v.analysis.naiveTotalCents, runCurrency(v))}; compliance premium ${usd(v.analysis.compliancePremiumCents, runCurrency(v))}; blocked purchases: ${v.analysis.blockedPurchases.map((b) => `${b.offerId} (${b.reasons.join(", ")})`).join("; ") || "none"}.`);
+  if (v.payouts) lines.push(`Creators paid: ${v.payouts.lines.map((l) => `${l.licensorName} ${usd(l.amountCents, l.currency)} for ${l.assetId} (${l.status})`).join("; ")}.`);
   if (v.capture) lines.push(`PayPal capture ${v.capture.captureId} for ${v.capture.amount.value} ${v.capture.amount.currency}.`);
   return lines.join("\n");
 }
@@ -54,7 +56,7 @@ export function answerLocally(v: SessionView, question: string): Answer {
   if (/(cost|total|price|pay|spend|save|saving|premium|cheap|how much)/.test(q) && !/(who|creator|licensor)/.test(q)) {
     if (!v.bundle || !v.analysis) return { answer: "No bundle has been verified yet, so there is no total.", ...cite([]) };
     return {
-      answer: `The verified bundle costs ${usd(v.bundle.totalCents, v.bundle.currency)}. Buying the cheapest offer for every asset would have cost ${usd(v.analysis.naiveTotalCents)}, but ${v.analysis.blockedPurchases.length} of those licences break the project's rules, so staying compliant costs ${usd(v.analysis.compliancePremiumCents)} more.`,
+      answer: `The verified bundle costs ${usd(v.bundle.totalCents, v.bundle.currency)}. Buying the cheapest offer for every asset would have cost ${usd(v.analysis.naiveTotalCents, runCurrency(v))}, but ${v.analysis.blockedPurchases.length} of those licences break the project's rules, so staying compliant costs ${usd(v.analysis.compliancePremiumCents, runCurrency(v))} more.`,
       ...cite(v.bundle.offers.map((o) => o.id)),
     };
   }

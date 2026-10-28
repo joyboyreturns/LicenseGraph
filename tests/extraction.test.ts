@@ -114,6 +114,24 @@ describe("optional terms", () => {
   });
 });
 
+describe("territory codes", () => {
+  const f = fixtures[0]!;
+  const withTerritories = (territories: unknown) => JSON.stringify({ ...JSON.parse(cannedReply(f)), territories });
+
+  it("normalises case and spacing so an equivalent code still matches the project", async () => {
+    const result = await extractOffer(replying(withTerritories([" us ", "ca", "Worldwide"])), f.doc, { attempts: 1 });
+    expect(result.offer?.terms.territories).toEqual(["US", "CA", "WORLD"]);
+  });
+
+  it("sends a country name back for a retry instead of storing something the rules cannot match", async () => {
+    const model = replying(withTerritories(["United States"]), cannedReply(f));
+    const result = await extractOffer(model, f.doc);
+    expect(result.offer).toBeDefined();
+    expect(model.complete).toHaveBeenCalledTimes(2);
+    expect(model.complete.mock.calls[1]![0].user).toMatch(/alpha-2/);
+  });
+});
+
 describe("extractOffer rejects what it cannot verify", () => {
   const f = fixtures[0]!;
   const withQuote = (field: string, quote: string) => {
@@ -201,6 +219,30 @@ describe("createGatewayModel", () => {
     const down = vi.fn(async () => new Response("{}", { status: 500 }));
     await expect(createGatewayModel({ apiKey: "k", model: "m/x", fetch: down as unknown as typeof fetch }).complete({ system: "s", user: "u" })).rejects.toThrow(/not sending any request/);
     expect(down).toHaveBeenCalledTimes(1);
+  });
+
+  it("recovers after a transient price-check failure instead of caching it, and still checks before sending", async () => {
+    let checks = 0;
+    const fetchMock = vi.fn(async (url: string) => {
+      if (!url.endsWith("/v1/models")) return chat("hi");
+      return ++checks === 1 ? new Response("{}", { status: 503 }) : models(free);
+    });
+    const model = createGatewayModel({ apiKey: "k", model: "m/x", fetch: fetchMock as unknown as typeof fetch });
+
+    await expect(model.complete({ system: "s", user: "u" })).rejects.toThrow(/not sending any request/);
+    expect(fetchMock.mock.calls.some((c) => c[0].endsWith("/chat/completions"))).toBe(false);
+
+    expect(await model.complete({ system: "s", user: "u" })).toBe("hi");
+    expect(await model.complete({ system: "s", user: "u" })).toBe("hi");
+    expect(fetchMock.mock.calls.filter((c) => c[0].endsWith("/v1/models"))).toHaveLength(2); // the pass is cached, the failure was not
+  });
+
+  it("keeps refusing a paid model on every call", async () => {
+    const fetchMock = router({ input: "0.000003", output: "0.000015" }, () => chat("should not happen"));
+    const model = createGatewayModel({ apiKey: "k", model: "m/x", fetch: fetchMock as unknown as typeof fetch });
+    await expect(model.complete({ system: "s", user: "u" })).rejects.toThrow(/not free/);
+    await expect(model.complete({ system: "s", user: "u" })).rejects.toThrow(/not free/);
+    expect(fetchMock.mock.calls.some((c) => c[0].endsWith("/chat/completions"))).toBe(false);
   });
 
   it("explains empty content and gateway errors", async () => {
