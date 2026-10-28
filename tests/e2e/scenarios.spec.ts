@@ -45,6 +45,12 @@ test("Exclusive theme tune: no licence can be bought, and the run says what to a
   const href = (await mail.getAttribute("href"))!;
   expect(href).toMatch(/^mailto:\?subject=Licence%20terms%20for%20the%20/);
   expect(decodeURIComponent(href)).toContain("Make the licence exclusive.");
+
+  // The questions on offer fit a run with nothing to buy, and are answered from the exact checks.
+  await page.getByRole("button", { name: "How much would it cost if they agree?" }).click();
+  await expect(page.getByText("the cheapest compliant bundle would cost $690.00")).toBeVisible();
+  await page.getByRole("button", { name: "What should I ask the licensors?" }).click();
+  await expect(page.getByText("Make the licence exclusive.").last()).toBeVisible();
   expect(errors).toEqual([]);
 });
 
