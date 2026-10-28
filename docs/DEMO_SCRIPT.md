@@ -15,6 +15,10 @@ Record at 1920x1080 in a clean browser window (hide bookmarks, use the app's dar
 | 2:30 to 2:45 | Passport verification animating | "Anyone can verify it in their own browser: the hash chain, the rules re-run on the exact terms, the quotes in the licence text, the PayPal capture." |
 | 2:45 to 3:00 | Dashboard with the AG Studio assistant: ask for a chart | "A portfolio dashboard in AG Studio, with an assistant that builds views from plain English. AI proposes. Code verifies. People approve. PayPal pays the creators." |
 
+## Two beats worth swapping in for a live walk-through (no time for them in three minutes)
+- **What if the project changed?** On a verified run, type "only Canada for 6 months, no exclusivity" into the panel. The exact cheapest bundle re-prices in the browser, with which licence would change. No model is involved.
+- **When the answer is no.** Run "Exclusive theme tune": nobody sells exclusivity, so the rules engine buys nothing. The run names the closest licence for each asset and what to ask for, prices the best case ("if every licensor said yes": $690) and how far each asset could rise before the budget breaks, and drafts the email. Press "Simulate the licensors agreeing": their exclusive replies are checked as a new run, which verifies at $1,160, and its passport carries the negotiation.
+
 ## Checklist before you record
 - Run the scenario once beforehand so the first view is warm (the replay plays once on first open; use a fresh run for the video).
 - Have the Sandbox buyer login ready; log in with a private window.
