@@ -250,10 +250,10 @@
   background: color-mix(in srgb, var(--ok-soft) 55%, var(--surface));
   box-shadow: 0 0 0 3px var(--ok-soft), 0 14px 32px -14px var(--ok-glow);
 }
+/* De-emphasised by a quieter surface (and, for an ineligible offer, a dashed edge), not by fading its text, which would drop it below readable contrast. */
 .offer[data-state="alternative"] {
-  opacity: 0.66;
+  background: var(--surface-2);
 }
-/* De-emphasised by a quieter surface and a dashed edge, not by fading its text, which would drop it below readable contrast. */
 .offer[data-state="ineligible"] {
   background: var(--surface-2);
   border-style: dashed;

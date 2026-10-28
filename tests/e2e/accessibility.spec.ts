@@ -54,6 +54,16 @@ for (const scheme of ["light", "dark"] as const) {
       expect(await violations(page)).toEqual([]);
     });
 
+    test("a rebriefed run, with its comparison beside the run it came from, has none", async ({ page }) => {
+      const first = await runOf(page, "documentary");
+      const next = await (await page.request.post(`/api/sessions/${first}/rebrief`, { data: { change: { commercial: false } } })).json();
+      await expect.poll(async () => (await (await page.request.get(`/api/sessions/${next.id}`)).json()).phase, { timeout: 30_000 }).toBe("verified");
+      await page.goto(`/run/${next.id}`);
+      await toResult(page);
+      await expect(page.getByTestId("compare-earlier")).toContainText("Cheaper licence", { timeout: 30_000 });
+      expect(await violations(page)).toEqual([]);
+    });
+
     test("the portfolio dashboard, with its custom widgets drawn, has none", async ({ page }) => {
       const id = await runOf(page, "podcast");
       await page.request.post(`/api/sessions/${id}/approve`, { data: { approvedBy: "Kiran" } });
