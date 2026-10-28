@@ -21,6 +21,8 @@ That needs **no accounts and no API keys**: the four built-in scenarios replay r
 
 Requires Node.js 20.19 or newer (22 recommended). The first run builds the app (about a minute).
 
+The **tour** (`/tour`) lists seven things to try in order, with what to look for in each.
+
 ## What you will see
 
 | | |

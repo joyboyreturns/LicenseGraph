@@ -167,3 +167,18 @@ test("the rules page explains every rule, and says silence does not pass", async
   await expect(table.getByRole("row", { name: /Media/ })).toContainText("A licence that does not say which media it covers is not assumed to cover them");
   await expect(page.getByRole("heading", { name: "Checked on the bundle as a whole" })).toBeVisible();
 });
+
+test("the tour lists seven steps in order, and its buttons start the scenario they name", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("link", { name: "Take the tour" }).click();
+  await page.waitForURL(/\/tour$/);
+  const steps = page.getByRole("listitem").filter({ has: page.getByRole("heading", { level: 2 }) });
+  await expect(steps).toHaveCount(7);
+  await expect(steps.first().getByRole("heading")).toContainText("Watch a model be corrected by code");
+  await expect(page.getByRole("link", { name: "Open the Verify page" })).toHaveAttribute("href", "/verify");
+
+  await page.getByRole("button", { name: "Start the exclusive theme tune" }).click();
+  await page.waitForURL(/\/run\//);
+  const id = new URL(page.url()).pathname.split("/").pop()!;
+  expect((await (await page.request.get(`/api/sessions/${id}`)).json()).meta.scenarioId).toBe("exclusive-theme");
+});

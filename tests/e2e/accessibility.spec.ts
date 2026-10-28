@@ -28,6 +28,9 @@ for (const scheme of ["light", "dark"] as const) {
       await page.goto("/verify");
       await expect(page.locator("main")).toBeVisible();
       expect(await violations(page)).toEqual([]);
+      await page.goto("/tour");
+      await expect(page.getByRole("heading", { name: "Seven things to try" })).toBeVisible();
+      expect(await violations(page)).toEqual([]);
       await page.goto("/rules");
       await expect(page.getByRole("heading", { name: "How the rules decide" })).toBeVisible();
       expect(await violations(page)).toEqual([]);

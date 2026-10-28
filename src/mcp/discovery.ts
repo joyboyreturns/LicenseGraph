@@ -69,6 +69,7 @@ export function llmsTxt(appUrl: string, tools: ToolSummary[]): string {
     "",
     "## Pages",
     "",
+    `- ${appUrl}/tour: seven things to try, in order, with what to look for in each`,
     `- ${appUrl}/rules: every rule the engine checks, and what silence in a licence means`,
     `- ${appUrl}/verify: re-check a Licence Passport in the browser`,
     "",

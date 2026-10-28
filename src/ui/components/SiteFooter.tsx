@@ -40,6 +40,7 @@ export function SiteFooter() {
         <nav className={styles.links} aria-label="Footer">
           <h2 className="eyebrow">Explore</h2>
           <Link prefetch={false} href="/">Home</Link>
+          <Link prefetch={false} href="/tour">Take the tour</Link>
           <Link prefetch={false} href="/dashboard">Portfolio</Link>
           <Link prefetch={false} href="/agents">Agents</Link>
           <Link prefetch={false} href="/verify">Verify a passport</Link>
