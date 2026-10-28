@@ -147,13 +147,21 @@ const payoutsInFlight = new WeakMap<Session, Promise<PayoutSummary | undefined>>
 const refundsInFlight = new WeakMap<Session, Promise<RefundedCapture>>();
 
 /** Extract terms from every document, then run the propose-verify-revise loop. Runs once per session. */
-export async function runPipeline(session: Session, deps: Deps): Promise<void> {
+export async function runPipeline(session: Session, deps: Deps, carried?: { fromRunId: string; offers: LicenseOffer[] }): Promise<void> {
   if (session.phase !== "created") throw new SessionError(`Cannot run from phase "${session.phase}".`);
   session.phase = "extracting";
   session.runDate = today(deps);
   touch(session);
 
+  // A revised run does not read again what the run it answers already read: the same licence text gives the same terms.
+  const carriedByDocument = new Map((carried?.offers ?? []).map((o) => [o.evidence[0]?.documentId, o]));
   for (const doc of session.input.documents) {
+    const earlier = carriedByDocument.get(doc.id);
+    if (earlier && earlier.assetId === doc.assetId) {
+      session.candidates.push(structuredClone(earlier));
+      session.ledger.append("extracted", { documentId: doc.id, assetId: doc.assetId, offerId: earlier.id, priceCents: earlier.priceCents, terms: earlier.terms, evidence: earlier.evidence, carriedFromRun: carried!.fromRunId });
+      continue;
+    }
     const result = await extractOffer(deps.model, doc);
     if (result.offer) {
       session.candidates.push(result.offer);

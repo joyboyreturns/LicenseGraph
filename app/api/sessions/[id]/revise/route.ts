@@ -44,7 +44,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     recordRevision(session, from);
     rt.store.add(session);
     const deps = simulated ? rt.demoDeps : rt.deps;
-    void runPipeline(session, deps).catch((e) => {
+    void runPipeline(session, deps, { fromRunId: from.id, offers: from.candidates }).catch((e) => {
       session.phase = "failed";
       session.failure = e instanceof Error ? e.message : "The run failed.";
       session.onChange?.();

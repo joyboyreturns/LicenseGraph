@@ -1,6 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { greedyProposer } from "../src/agent/greedy";
+import { demoModel } from "../src/demo/mock-model";
 import { reviseInput } from "../src/app-logic/revision";
-import { SessionError, type SessionInput } from "../src/app-logic/session";
+import { createSession, runPipeline, SessionError, viewOf, type Deps, type SessionInput } from "../src/app-logic/session";
 import { scenarioById } from "../src/demo/scenarios";
 
 const sc = scenarioById("exclusive-theme")!;
@@ -43,5 +45,29 @@ describe("reviseInput", () => {
     let big = input();
     for (let i = 0; i < 6; i++) big = reviseInput(big, "r", { assetId: "song", text: `Price: USD ${i + 1}.00.` });
     expect(() => reviseInput(big, "r", { assetId: "song", text: "one more" })).toThrow(/at most 12/);
+  });
+});
+
+describe("a revised run does not read the earlier licences again", () => {
+  it("asks the model only about the added licences, records the carried ones, and still verifies", async () => {
+    const complete = vi.fn((req: Parameters<typeof demoModel.complete>[0]) => demoModel.complete(req));
+    const deps: Deps = { model: { complete }, proposer: greedyProposer, today: () => "2026-11-05" };
+    const first = createSession(input());
+    await runPipeline(first, deps);
+    expect(first.phase).toBe("failed");
+    expect(complete).toHaveBeenCalledTimes(sc.documents.length);
+
+    complete.mockClear();
+    const second = createSession(reviseInput(first.input, first.id, { simulate: true }));
+    await runPipeline(second, deps, { fromRunId: first.id, offers: first.candidates });
+    expect(complete).toHaveBeenCalledTimes(3); // only the three replies
+    expect(second.phase).toBe("verified");
+    const extracted = second.ledger.events().filter((e) => e.kind === "extracted");
+    expect(extracted).toHaveLength(sc.documents.length + 3);
+    expect(extracted.filter((e) => e.payload.carriedFromRun === first.id)).toHaveLength(sc.documents.length);
+    expect(second.ledger.verify()).toBe(true);
+    // The carried terms are exactly what the first run read.
+    expect(second.candidates.slice(0, sc.documents.length)).toEqual(first.candidates);
+    expect(viewOf(second).bundle!.totalCents).toBe(116_000);
   });
 });
