@@ -2749,6 +2749,10 @@
             "description": "The run this one answers, when a licensor's revised licence was added.",
             "type": "string"
           },
+          "rebriefedFrom": {
+            "description": "The run whose brief this one changed: the same licences, checked against a different brief.",
+            "type": "string"
+          },
           "rounds": {
             "type": "integer",
             "minimum": -9007199254740991,

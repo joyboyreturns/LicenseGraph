@@ -20,6 +20,8 @@ export interface RunSummary {
   scenarioId?: string;
   /** The run this one answers, when a licensor's revised licence was added. */
   revisedFrom?: string;
+  /** The run whose brief this one changed. */
+  rebriefedFrom?: string;
   rounds?: number;
   totalCents?: number;
   currency?: string;

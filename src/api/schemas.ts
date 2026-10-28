@@ -81,6 +81,7 @@ export const RunSummary = z
     runKind: z.enum(["demo", "live"]).optional(),
     scenarioId: z.string().optional(),
     revisedFrom: z.string().optional().describe("The run this one answers, when a licensor's revised licence was added."),
+    rebriefedFrom: z.string().optional().describe("The run whose brief this one changed: the same licences, checked against a different brief."),
     rounds: z.number().int().optional(),
     totalCents: z.number().int().optional(),
     currency: z.string().optional(),

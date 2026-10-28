@@ -246,6 +246,14 @@ function Portfolio() {
                               </Link>
                             </>
                           )}
+                          {r.rebriefedFrom && (
+                            <>
+                              {" · "}
+                              <Link prefetch={false} href={`/run/${r.rebriefedFrom}`}>
+                                brief changed from an earlier run
+                              </Link>
+                            </>
+                          )}
                         </div>
                       </td>
                       <td>

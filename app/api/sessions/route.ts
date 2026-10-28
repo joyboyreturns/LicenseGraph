@@ -81,6 +81,7 @@ export function GET(req: Request) {
       runKind: s.input.meta?.runKind,
       scenarioId: s.input.meta?.scenarioId,
       revisedFrom: s.input.meta?.revisedFrom,
+      rebriefedFrom: s.input.meta?.rebriefedFrom,
       rounds: v.rounds,
       totalCents: v.bundle?.totalCents,
       currency: v.bundle?.currency,

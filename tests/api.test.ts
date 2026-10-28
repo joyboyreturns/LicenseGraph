@@ -434,6 +434,9 @@ describe("making a what-if real: the same licences against a changed brief", () 
     // Every licence was carried over from the first run, not read again.
     expect(next.events.filter((e: { kind: string }) => e.kind === "extracted").every((e: { payload: { carriedFromRun?: string } }) => e.payload.carriedFromRun === id)).toBe(true);
     expect(next.chainValid).toBe(true);
+    const listed = (await body(await listSessions(get()))).runs as { id: string; rebriefedFrom?: string }[];
+    expect(listed.find((r) => r.id === created.id)?.rebriefedFrom).toBe(id);
+    expect(listed.find((r) => r.id === id)?.rebriefedFrom).toBeUndefined();
 
     const again = await body(await getSession(get(), ctx(id)));
     expect(again.project.commercial).toBe(true);
