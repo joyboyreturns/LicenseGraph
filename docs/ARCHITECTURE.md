@@ -59,12 +59,14 @@ The visible propose, verify, reject, revise cycle is the product. The model neve
 | `src/payments/` | `paypal.ts`: Orders v2 and Payouts client (Sandbox host only). `checkout.ts`: `startCheckout` gate (re-verify and approval digest match). `payouts.ts`: who is paid what. `simulator.ts`: an offline stand-in with PayPal's ordering rules. |
 | `src/passport/` | Passport builder and `verifyPassport`: nine checks that run in a browser (including that the payment was not reversed). |
 | `src/app-logic/` | `session.ts`: the flow and its order of steps (extract, propose, verify, approve, pay, capture, settle). Licences are read three at a time and recorded in order; a run ends at once when the exact cost check proves no bundle can exist. `revision.ts`: a licensor's revised licence becomes a new run linked to the one it answers (the first ledger event, `answers_run`). `persistence.ts`: one JSON file per run, ledger chain re-checked on load. |
-| `src/server/` | Runtime wiring (demo or live; PayPal, simulator or none), owner cookies, the assistant's model proxy, rate limiters, passport signing. |
+| `src/server/` | Runtime wiring (demo or live; PayPal, simulator or none), owner cookies, the assistant's model proxy, rate limiters, and passport signing: an Ed25519 key derived (HKDF) from `LICENSEGRAPH_PASSPORT_SECRET`, so the public half can be published at `/.well-known/licensegraph-keys.json` and checked offline (`src/passport/signature.ts` does it with WebCrypto in a browser; earlier HMAC passports still verify on the server). |
 | `src/intake/` | The plain-English brief reader and grounded run Q&A, each with an offline fallback. |
 | `src/demo/` | Built-in scenarios and the recorded model output they replay. |
 | `src/ui/`, `app/` | The Next.js front end: home, run theatre (rights graph, replay, matrix, evidence, settlement), passport, verify, simulator checkout. Pure UI logic is unit-tested in `tests/ui`. |
 | `src/dashboard/`, `app/dashboard/` | AG Studio dashboards: a single run, and the cross-run portfolio, with three custom widgets (rule matrix, licence timeline, money flow) whose layout code is pure and tested. Validated chart, table, KPI, timeline and money-flow tools for the assistant. |
 | `src/mcp/`, `scripts/mcp-server.ts` | The MCP server: tools (`check_licence_bundle`, `cheapest_compliant_bundle`, `what_if_brief`, `licence_end_dates`, `start_licence_purchase`, `get_purchase_status`) and the `buy_licences` prompt, built once in `server.ts` and served over stdio and, statelessly, over HTTP at `/api/mcp`. |
+| `src/mcp/discovery.ts` | `/llms.txt` and the `/.well-known/mcp.json` server card, built from the running MCP server's own tool list so they cannot drift from it. |
+| `src/core/compare.ts` | A run beside the run it came from (asset by asset, from the two verified bundles): shown as a panel on the run and as an answer in the Ask box. |
 | `app/api/` | HTTP routes: sessions (including `revise`), payments, passports (and their badge), scenarios, intake, portfolio, assistant proxy, simulator, PayPal webhooks, MCP, health, and the generated OpenAPI document. |
 
 ## Data model
