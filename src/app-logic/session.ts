@@ -146,6 +146,29 @@ const capturesInFlight = new WeakMap<Session, Promise<CapturedOrder>>();
 const payoutsInFlight = new WeakMap<Session, Promise<PayoutSummary | undefined>>();
 const refundsInFlight = new WeakMap<Session, Promise<RefundedCapture>>();
 
+const EXTRACTION_CONCURRENCY = 3;
+
+/** At most `limit` of the given jobs run at once; the rest wait their turn. */
+export function createGate(limit: number) {
+  let running = 0;
+  const waiting: (() => void)[] = [];
+  return async <T>(job: () => Promise<T>): Promise<T> => {
+    // A finished job hands its place straight to the next waiter, so the count never dips and no newcomer can jump in.
+    if (running < limit) running++;
+    else await new Promise<void>((resolve) => waiting.push(resolve));
+    try {
+      return await job();
+    } finally {
+      const next = waiting.shift();
+      if (next) next();
+      else running--;
+    }
+  };
+}
+
+type Settled<T> = { ok: true; value: T } | { ok: false; error: unknown };
+const settle = <T>(p: Promise<T>): Promise<Settled<T>> => p.then((value) => ({ ok: true as const, value }), (error) => ({ ok: false as const, error }));
+
 /** Extract terms from every document, then run the propose-verify-revise loop. Runs once per session. */
 export async function runPipeline(session: Session, deps: Deps, carried?: { fromRunId: string; offers: LicenseOffer[] }): Promise<void> {
   if (session.phase !== "created") throw new SessionError(`Cannot run from phase "${session.phase}".`);
@@ -155,14 +178,24 @@ export async function runPipeline(session: Session, deps: Deps, carried?: { from
 
   // A revised run does not read again what the run it answers already read: the same licence text gives the same terms.
   const carriedByDocument = new Map((carried?.offers ?? []).map((o) => [o.evidence[0]?.documentId, o]));
-  for (const doc of session.input.documents) {
+  const isCarried = (doc: SourceDocument) => {
     const earlier = carriedByDocument.get(doc.id);
-    if (earlier && earlier.assetId === doc.assetId) {
+    return earlier !== undefined && earlier.assetId === doc.assetId;
+  };
+  // Licences are read a few at a time (the model client paces its own requests), but recorded in document order,
+  // so the ledger reads the same whether the model is fast or slow.
+  const gate = createGate(EXTRACTION_CONCURRENCY);
+  const reading = session.input.documents.map((doc) => (isCarried(doc) ? undefined : settle(gate(() => extractOffer(deps.model, doc)))));
+  for (const [i, doc] of session.input.documents.entries()) {
+    const earlier = carriedByDocument.get(doc.id);
+    if (earlier && isCarried(doc)) {
       session.candidates.push(structuredClone(earlier));
       session.ledger.append("extracted", { documentId: doc.id, assetId: doc.assetId, offerId: earlier.id, priceCents: earlier.priceCents, terms: earlier.terms, evidence: earlier.evidence, carriedFromRun: carried!.fromRunId });
       continue;
     }
-    const result = await extractOffer(deps.model, doc);
+    const outcome = await reading[i]!;
+    if (!outcome.ok) throw outcome.error;
+    const result = outcome.value;
     if (result.offer) {
       session.candidates.push(result.offer);
       session.ledger.append("extracted", { documentId: doc.id, assetId: doc.assetId, offerId: result.offer.id, priceCents: result.offer.priceCents, terms: result.offer.terms, evidence: result.offer.evidence });

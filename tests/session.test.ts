@@ -249,3 +249,44 @@ describe("SessionStore", () => {
     expect(store.activeCount()).toBe(1);
   });
 });
+
+describe("reading licences a few at a time", () => {
+  it("never runs more than three reads at once, and records them in document order however they finish", async () => {
+    let active = 0;
+    let peak = 0;
+    const order: string[] = [];
+    const model = {
+      async complete(req: Parameters<typeof demoModel.complete>[0]) {
+        active++;
+        peak = Math.max(peak, active);
+        // The first licences take longest, so they finish last.
+        const idx = sampleDocuments.findIndex((d) => req.user.includes(d.text));
+        await new Promise((r) => setTimeout(r, (sampleDocuments.length - idx) * 15));
+        order.push(sampleDocuments[idx]!.id);
+        active--;
+        return demoModel.complete(req);
+      },
+    };
+    const { deps } = makeDeps({ model });
+    const s = createSession(input());
+    await runPipeline(s, deps);
+    expect(peak).toBeGreaterThan(1);
+    expect(peak).toBeLessThanOrEqual(3);
+    expect(order).not.toEqual(sampleDocuments.map((d) => d.id)); // they really did finish out of order
+    expect(s.ledger.events().filter((e) => e.kind === "extracted").map((e) => e.payload.documentId)).toEqual(sampleDocuments.map((d) => d.id));
+    expect(s.phase).toBe("verified");
+  });
+
+  it("a licence that cannot be read is recorded in its place and fails the run naming its asset, while the others are still read", async () => {
+    const failing = sampleDocuments.find((d) => d.id === "font")!; // the only licence for its asset
+    const model = { async complete(req: Parameters<typeof demoModel.complete>[0]) { if (req.user.includes(failing.text)) throw new Error("gateway down"); return demoModel.complete(req); } };
+    const { deps } = makeDeps({ model });
+    const s = createSession(input());
+    await runPipeline(s, deps);
+    expect(s.phase).toBe("failed");
+    expect(s.failure).toContain(failing.assetId);
+    expect(s.ledger.events().filter((e) => e.kind === "extracted" || e.kind === "extraction_failed").map((e) => [e.kind, e.payload.documentId])).toEqual(
+      sampleDocuments.map((d) => [d.id === failing.id ? "extraction_failed" : "extracted", d.id]),
+    );
+  });
+});
