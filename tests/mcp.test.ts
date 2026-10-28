@@ -7,7 +7,7 @@ import { greedyProposer } from "../src/agent/greedy";
 import { SessionStore } from "../src/app-logic/session";
 import { demoModel } from "../src/demo/mock-model";
 import { scenarioById } from "../src/demo/scenarios";
-import { checkBundleInput, cheapestBundleInput, licenceEndDatesInput, checkBundle, cheapestBundle, licenceEndDates, licenceFinePrint, purchasePlaybook, purchaseStatus, startPurchase, whatIfBrief, whatIfInput, type AppClient } from "../src/mcp/tools";
+import { checkBundleInput, cheapestBundleInput, compareRunsTool, licenceEndDatesInput, checkBundle, cheapestBundle, licenceEndDates, licenceFinePrint, purchasePlaybook, purchaseStatus, startPurchase, whatIfBrief, whatIfInput, type AppClient } from "../src/mcp/tools";
 import type { Runtime } from "../src/server/runtime";
 import { runExample } from "./mcp-fixtures";
 
@@ -155,6 +155,31 @@ describe("start_licence_purchase", () => {
     expect(await run(400)).toMatchObject({ ok: true, mandate: { status: "within", capCents: 40_000, totalCents: 32_900, currency: "USD" } });
     expect(await run(300)).toMatchObject({ ok: true, mandate: { status: "over", capCents: 30_000, totalCents: 32_900 }, awaitingPerson: true });
     expect(await run()).toMatchObject({ ok: true, mandate: null });
+  });
+
+  it("sets two runs side by side from their verified bundles, and reports an unknown run instead of throwing", async () => {
+    const verified = async (project: typeof sc.project) => {
+      const started = await startPurchase(app, { ...input(), project });
+      if (!started.ok) throw new Error(started.error);
+      let status = await purchaseStatus(app, started.runId);
+      for (let i = 0; i < 100 && status.ok && status.phase !== "verified"; i++) {
+        await new Promise((r) => setTimeout(r, 20));
+        status = await purchaseStatus(app, started.runId);
+      }
+      return started.runId;
+    };
+    const first = await verified(sc.project);
+    const cheaper = await verified({ ...sc.project, commercial: false });
+    const same = await compareRunsTool(app, { runId: first, earlierRunId: first });
+    expect(same).toMatchObject({ ok: true, deltaCents: 0, earlierTotalCents: 32_900, totalCents: 32_900 });
+    expect(same.ok && same.assets.every((a) => a.change === "same")).toBe(true);
+
+    const c = await compareRunsTool(app, { runId: cheaper, earlierRunId: first });
+    expect(c).toMatchObject({ ok: true, earlierTotalCents: 32_900, currency: "USD" });
+    expect(c.ok && c.deltaCents).toBe(c.ok && c.totalCents !== null ? c.totalCents - 32_900 : null);
+    expect(c.ok && c.assets.some((a) => a.change !== "same")).toBe(true);
+
+    expect(await compareRunsTool(app, { runId: first, earlierRunId: "no-such-run" })).toMatchObject({ ok: false, error: expect.stringContaining("no-such-run") });
   });
 
   it("reports the app's refusal rather than throwing", async () => {

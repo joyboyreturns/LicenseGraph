@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { finePrint } from "../core/fine-print";
+import { compareRuns, type RunOutcome } from "../core/compare";
 import { gapRequests, requirementCosts } from "../core/insights";
 import { negotiationOutlook, savingLevers } from "../core/negotiation";
 import { buildIcs, licenceEnds } from "../core/renewals";
@@ -260,4 +261,34 @@ export async function passportDocument(app: AppClient, runId: string): Promise<{
   const { status, body } = await call(app, `/api/passports/${encodeURIComponent(runId)}`);
   if (status !== 200) return { ok: false, error: body?.error ?? `The app answered ${status}.` };
   return { ok: true, json: JSON.stringify(body, null, 2) };
+}
+
+export const compareRunsInput = {
+  runId: z.string().min(1).max(100).describe("The newer run, for example one that checked a changed brief or a licensor's revised licence."),
+  earlierRunId: z.string().min(1).max(100).describe("The run it came from."),
+};
+
+/**
+ * Two runs side by side, from their verified bundles: which asset's licence changed, what each now costs, and the difference
+ * in the total. Read-only; nothing is bought or changed.
+ */
+export async function compareRunsTool(app: AppClient, input: { runId: string; earlierRunId: string }) {
+  const outcome = async (id: string): Promise<{ ok: true; value: RunOutcome | undefined } | { ok: false; error: string }> => {
+    const { status, body } = await call(app, `/api/sessions/${encodeURIComponent(id)}`);
+    if (status !== 200) return { ok: false, error: `Run ${id}: ${body?.error ?? `the app answered ${status}.`}` };
+    return { ok: true, value: body.bundle ? { offers: body.bundle.offers, totalCents: body.bundle.totalCents, currency: body.bundle.currency } : undefined };
+  };
+  const [now, before] = await Promise.all([outcome(input.runId), outcome(input.earlierRunId)]);
+  if (!now.ok) return now;
+  if (!before.ok) return before;
+  const c = compareRuns(before.value, now.value);
+  return {
+    ok: true as const,
+    earlierTotalCents: before.value?.totalCents ?? null,
+    totalCents: now.value?.totalCents ?? null,
+    currency: c.currency,
+    deltaCents: c.deltaCents,
+    assets: c.assets,
+    note: "Taken from each run's verified bundle. A run with no compliant bundle has nothing to compare, so its assets read as gained or lost.",
+  };
 }

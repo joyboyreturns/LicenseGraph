@@ -11,7 +11,7 @@ import { passportKey } from "../src/server/passport-signing";
 describe("agent discovery", () => {
   it("lists exactly the tools the MCP server registers", async () => {
     const names = (await listedTools()).map((t) => t.name);
-    expect(names).toEqual(expect.arrayContaining(["check_licence_bundle", "cheapest_compliant_bundle", "what_if_brief", "licence_fine_print", "start_licence_purchase", "get_purchase_status", "verify_licence_passport"]));
+    expect(names).toEqual(expect.arrayContaining(["check_licence_bundle", "cheapest_compliant_bundle", "what_if_brief", "licence_fine_print", "start_licence_purchase", "get_purchase_status", "verify_licence_passport", "compare_runs"]));
     expect((await listedTools()).every((t) => t.description.length > 20)).toBe(true);
   });
 

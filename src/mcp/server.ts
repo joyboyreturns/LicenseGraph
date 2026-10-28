@@ -1,6 +1,6 @@
 import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { checkBundle, checkBundleInput, cheapestBundle, cheapestBundleInput, licenceEndDates, licenceEndDatesInput, licenceFinePrint, licenceFinePrintInput, purchasePlaybook, passportDocument, purchaseStatus, rulesGuide, startPurchase, startPurchaseInput, verifyPassportTool, whatIfBrief, whatIfInput, type AppClient } from "./tools";
+import { checkBundle, checkBundleInput, compareRunsInput, compareRunsTool, cheapestBundle, cheapestBundleInput, licenceEndDates, licenceEndDatesInput, licenceFinePrint, licenceFinePrintInput, purchasePlaybook, passportDocument, purchaseStatus, rulesGuide, startPurchase, startPurchaseInput, verifyPassportTool, whatIfBrief, whatIfInput, type AppClient } from "./tools";
 
 const text = (value: unknown) => ({ content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }] });
 
@@ -51,6 +51,12 @@ export function createLicenseGraphServer(app: AppClient): McpServer {
     "get_purchase_status",
     { description: "Progress of a purchase you started: phase, verified bundle, who approved, PayPal capture, creator payouts, the Licence Passport link and a printable receipt link per creator once paid.", inputSchema: { runId: startPurchaseInput.shape.requiredAssetIds.element.describe("The runId returned by start_licence_purchase.") } },
     async ({ runId }) => text(await purchaseStatus(app, runId)),
+  );
+
+  server.registerTool(
+    "compare_runs",
+    { description: "Set two runs side by side, from their verified bundles: which asset's licence changed, what each now costs, and the difference in the total. Use it after a changed brief or a licensor's revised licence to tell the person exactly what moved. Read-only.", inputSchema: compareRunsInput },
+    async (input) => text(await compareRunsTool(app, input)),
   );
 
   server.registerTool(
