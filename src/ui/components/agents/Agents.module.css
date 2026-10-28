@@ -1,0 +1,150 @@
+.console {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.controls select {
+  width: auto;
+  min-width: 220px;
+}
+.steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.step {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+.handover {
+  background: var(--surface-2);
+  border-style: dashed;
+}
+.stepNum {
+  width: 28px;
+  height: 28px;
+  border-radius: 99px;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-code);
+  font-size: 12px;
+  background: var(--agent-soft);
+  color: var(--agent);
+}
+.stepBody {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.intent {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 650;
+}
+.intent svg {
+  width: 15px;
+  height: 15px;
+  color: var(--agent);
+  flex: none;
+}
+.call {
+  margin: 0;
+}
+.call code,
+.result code {
+  font-family: var(--font-code);
+  font-size: 12.5px;
+  padding: 1px 7px;
+  border-radius: 6px;
+  background: var(--engine-soft);
+  color: var(--engine);
+}
+.result {
+  margin: 0;
+  color: var(--ink-2);
+}
+.raw {
+  margin: 8px 0 0;
+  max-height: 260px;
+  overflow: auto;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--bg-sunk);
+  font-family: var(--font-code);
+  font-size: 12px;
+}
+/* The details element is styled through its step, since module selectors must name a local class. */
+.stepBody details > summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+@media (max-width: 860px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px 20px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  min-width: 0;
+}
+.block h2 {
+  margin: 0;
+  font-size: 18px;
+}
+.snippet {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--bg-sunk);
+  font-family: var(--font-code);
+  font-size: 12.5px;
+  overflow: auto;
+}
+.tools {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.tools li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.tools code {
+  font-family: var(--font-code);
+  font-size: 12.5px;
+  font-weight: 600;
+}

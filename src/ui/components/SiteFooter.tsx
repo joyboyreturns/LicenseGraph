@@ -41,6 +41,7 @@ export function SiteFooter() {
           <h2 className="eyebrow">Explore</h2>
           <Link prefetch={false} href="/">Home</Link>
           <Link prefetch={false} href="/dashboard">Portfolio</Link>
+          <Link prefetch={false} href="/agents">Agents</Link>
           <Link prefetch={false} href="/verify">Verify a passport</Link>
           <a href={REPO_URL} rel="noreferrer">
             Source code (MIT)

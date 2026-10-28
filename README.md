@@ -72,7 +72,7 @@ The dashboards also include a **custom Studio widget**, the *rule matrix* (`app/
 | `start_licence_purchase` | Reads raw licence texts, proposes and verifies a bundle, and returns a claim link for a person |
 | `get_purchase_status` | Verified bundle, approval, PayPal capture, creator payouts and the Licence Passport link |
 
-The same server is also served **over HTTP at `/api/mcp`** (Streamable HTTP, stateless), so an agent can connect to a running instance without cloning anything: in an MCP client that supports remote servers, add `{ "url": "http://localhost:3000/api/mcp" }` (or your deployment's address). It offers exactly the same tools, and the same rule holds: the agent can check, price and start a purchase, and only a person with the claim link can approve and pay.
+The **Agents** page (`/agents`) shows how to connect, lists the tools live from the endpoint, and plays an agent session against it that you can watch (every figure comes from the tools). The same server is also served **over HTTP at `/api/mcp`** (Streamable HTTP, stateless), so an agent can connect to a running instance without cloning anything: in an MCP client that supports remote servers, add `{ "url": "http://localhost:3000/api/mcp" }` (or your deployment's address). It offers exactly the same tools, and the same rule holds: the agent can check, price and start a purchase, and only a person with the claim link can approve and pay.
 
 It also offers a `buy_licences` prompt: the order an agent should work in (read the licences into offers, price them, negotiate when nothing passes, hand the person the claim link), which keeps every figure coming from the tools and approval and payment with the person.
 
