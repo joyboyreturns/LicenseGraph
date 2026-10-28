@@ -1,0 +1,2955 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "LicenseGraph API",
+    "version": "1.0.0",
+    "summary": "Check creative licences against a project, then pay the creators.",
+    "description": "An AI agent reads licences and proposes the cheapest bundle. A deterministic rules engine verifies it against the project and rejects anything that breaks a term. A person approves, PayPal Orders and Payouts settle in the Sandbox, and a Licence Passport lets anyone check the result.\n\nMoney moves only after a person approves. A run an agent starts with `handoff: true` cannot be approved or paid until a person takes control with the one-time claim link. Approve, pay, capture, payouts and refund need the `lg_owner` cookie of the browser that started (or claimed) the run.",
+    "license": {
+      "name": "MIT",
+      "identifier": "MIT"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "This server"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Runs",
+      "description": "Start a run, follow it, and settle it."
+    },
+    {
+      "name": "Passports",
+      "description": "The independently checkable record of a paid run."
+    },
+    {
+      "name": "Intake",
+      "description": "Plain-English helpers."
+    },
+    {
+      "name": "Service",
+      "description": "Health, configuration and demo data."
+    }
+  ],
+  "paths": {
+    "/api/sessions": {
+      "post": {
+        "operationId": "startRun",
+        "tags": [
+          "Runs"
+        ],
+        "summary": "Start a run",
+        "description": "Replay a built-in scenario (`scenarioId`) or read your own licences with the live model. Set `handoff: true` when an agent starts the run for a person: the response then carries a one-time `handoff.claimUrl` and no cookie is set.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/ScenarioStart"
+                  },
+                  {
+                    "$ref": "#/components/schemas/RunInput"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The run was created and is being read in the background. Poll `GET /api/sessions/{id}`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunCreated"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The input is invalid, or your own licences need a model this server does not have.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many runs in progress.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "listRuns",
+        "tags": [
+          "Runs"
+        ],
+        "summary": "List your runs",
+        "description": "The caller's own runs, newest first.",
+        "security": [
+          {
+            "ownerCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Your runs.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "runs": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/RunSummary"
+                      }
+                    }
+                  },
+                  "required": [
+                    "runs"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sessions/{id}": {
+      "get": {
+        "operationId": "getRun",
+        "tags": [
+          "Runs"
+        ],
+        "summary": "Get a run",
+        "description": "Anyone with the link can read a run. Payout statuses are refreshed from PayPal first.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The run id."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The run.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Run"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such run.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sessions/{id}/claim": {
+      "post": {
+        "operationId": "claimRun",
+        "tags": [
+          "Runs"
+        ],
+        "summary": "Take control of a run an agent started",
+        "description": "POST only and single-use: opening the link or previewing it in a chat app changes nothing. Sets the `lg_owner` cookie on success.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The run id."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClaimInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "You now own the run.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Run"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The token is wrong, used, or expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such run.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sessions/{id}/approve": {
+      "post": {
+        "operationId": "approveRun",
+        "tags": [
+          "Runs"
+        ],
+        "summary": "Approve the verified bundle",
+        "description": "Records who approved which exact bundle (by digest). Nothing is charged yet.",
+        "security": [
+          {
+            "ownerCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The run id."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApproveInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The run, approved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Run"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The run is not ready to approve.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "This run belongs to another browser.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such run.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sessions/{id}/pay": {
+      "post": {
+        "operationId": "startPayment",
+        "tags": [
+          "Runs"
+        ],
+        "summary": "Create the PayPal order",
+        "description": "Re-checks the approved bundle with the rules engine, then creates a PayPal order. The response carries `order.approveUrl` for the buyer.",
+        "security": [
+          {
+            "ownerCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The run id."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The run with its order.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Run"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "This run belongs to another browser.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such run.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The rules engine refused the payment.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "PayPal refused or was unreachable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sessions/{id}/capture": {
+      "post": {
+        "operationId": "capturePayment",
+        "tags": [
+          "Runs"
+        ],
+        "summary": "Capture the approved order",
+        "description": "Captures the order this run created, checks the captured amount against the bundle, then pays the creators.",
+        "security": [
+          {
+            "ownerCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The run id."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The run, captured and settled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Run"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "This run belongs to another browser.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such run.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The buyer has not approved the order yet (`ORDER_NOT_APPROVED`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "PayPal refused or was unreachable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sessions/{id}/payouts": {
+      "post": {
+        "operationId": "retryPayouts",
+        "tags": [
+          "Runs"
+        ],
+        "summary": "Retry creator payouts",
+        "description": "After a payout failure. Never touches the captured payment.",
+        "security": [
+          {
+            "ownerCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The run id."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The run.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Run"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "This run belongs to another browser.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such run.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "PayPal refused or was unreachable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sessions/{id}/refund": {
+      "post": {
+        "operationId": "refundPurchase",
+        "tags": [
+          "Runs"
+        ],
+        "summary": "Refund the buyer",
+        "description": "Returns the whole captured payment. Refused unless it is certain no creator was paid. No passport is issued for a refunded run.",
+        "security": [
+          {
+            "ownerCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The run id."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The refunded run.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Run"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Creators may have been paid, or the payment was already refunded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "This run belongs to another browser.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such run.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "PayPal refused or was unreachable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sessions/{id}/return": {
+      "get": {
+        "operationId": "paypalReturn",
+        "tags": [
+          "Runs"
+        ],
+        "summary": "Where PayPal sends the buyer after approval",
+        "description": "Captures the run's own order, then redirects to the run page. Browser flow; not meant for API clients.",
+        "security": [
+          {
+            "ownerCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The run id."
+          }
+        ],
+        "responses": {
+          "307": {
+            "description": "Redirect to the run page."
+          }
+        }
+      }
+    },
+    "/api/sessions/{id}/ask": {
+      "post": {
+        "operationId": "askAboutRun",
+        "tags": [
+          "Runs"
+        ],
+        "summary": "Ask a question about a run",
+        "description": "Answers are grounded in the run's recorded facts, and every offer id cited exists in the run. Falls back to a deterministic answer if the model is unavailable.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The run id."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AskInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Answer"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Ask a question about this run.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such run.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The question is too long.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/passports/{id}": {
+      "get": {
+        "operationId": "getPassport",
+        "tags": [
+          "Passports"
+        ],
+        "summary": "Get the Licence Passport",
+        "description": "Issued once the payment is captured. Add `?download=1` to save it as a file.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The run id."
+          },
+          {
+            "name": "download",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The passport.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Passport"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such run.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not captured yet, or the purchase was refunded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/passports/{id}/verify": {
+      "get": {
+        "operationId": "verifyPassport",
+        "tags": [
+          "Passports"
+        ],
+        "summary": "Verify a passport on the server",
+        "description": "Every content check, plus whether this server signed it. The browser can repeat the content checks without the server.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The run id."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The checks.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PassportVerification"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such run.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not captured yet, or the purchase was refunded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/passports/{id}/qr": {
+      "get": {
+        "operationId": "getPassportQr",
+        "tags": [
+          "Passports"
+        ],
+        "summary": "QR code for the passport page",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The run id."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "An SVG QR code.",
+            "content": {
+              "image/svg+xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such run."
+          }
+        }
+      }
+    },
+    "/api/intake": {
+      "post": {
+        "operationId": "readBrief",
+        "tags": [
+          "Intake"
+        ],
+        "summary": "Turn a plain-English brief into a project",
+        "description": "Uses the model when one is configured and always falls back to a local reader. Assumptions are listed separately from what the text said.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IntakeInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "What was read.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BriefReading"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Describe your project in a sentence or two.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Too long.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/scenarios": {
+      "get": {
+        "operationId": "listScenarios",
+        "tags": [
+          "Service"
+        ],
+        "summary": "Built-in scenarios",
+        "description": "With the licence text, so a client can show what the agent will read. Payee emails are left out.",
+        "responses": {
+          "200": {
+            "description": "The scenarios.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "scenarios": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Scenario"
+                      }
+                    }
+                  },
+                  "required": [
+                    "scenarios"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio": {
+      "get": {
+        "operationId": "getPortfolio",
+        "tags": [
+          "Runs"
+        ],
+        "summary": "Every run in full",
+        "description": "Your runs with licence text removed, newest first. Feeds the dashboard.",
+        "security": [
+          {
+            "ownerCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The runs.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "views": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Run"
+                      }
+                    }
+                  },
+                  "required": [
+                    "views"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/openapi.json": {
+      "get": {
+        "operationId": "getOpenApi",
+        "tags": [
+          "Service"
+        ],
+        "summary": "This document",
+        "responses": {
+          "200": {
+            "description": "The OpenAPI 3.1 description of this API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/config": {
+      "get": {
+        "operationId": "getConfig",
+        "tags": [
+          "Service"
+        ],
+        "summary": "What this server can do",
+        "responses": {
+          "200": {
+            "description": "The configuration. Contains no secrets.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Config"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/health": {
+      "get": {
+        "operationId": "getHealth",
+        "tags": [
+          "Service"
+        ],
+        "summary": "Health check",
+        "responses": {
+          "200": {
+            "description": "The server is up.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/llm": {
+      "post": {
+        "operationId": "assistantProxy",
+        "tags": [
+          "Service"
+        ],
+        "summary": "Model proxy for the AG Studio assistant",
+        "description": "Used by the dashboard's built-in assistant. Forwards to the configured free model.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The model's reply.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "No model is configured."
+          }
+        }
+      }
+    },
+    "/api/simulator/orders/{id}": {
+      "get": {
+        "operationId": "describeSimulatedOrder",
+        "tags": [
+          "Service"
+        ],
+        "summary": "Simulated checkout page data",
+        "description": "Exists only when the offline payment simulator is running.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The run id."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The simulated order."
+          },
+          "404": {
+            "description": "No simulator, or no such order.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "approveSimulatedOrder",
+        "tags": [
+          "Service"
+        ],
+        "summary": "Approve a simulated order",
+        "description": "The buyer pressing Approve at the simulated checkout. Exists only when the offline payment simulator is running.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The run id."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Approved; says where to send the browser."
+          },
+          "404": {
+            "description": "No simulator, or no such order.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ownerCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "lg_owner",
+        "description": "An unguessable id set when a browser starts or claims a run. Only that browser may approve, pay, refund or list the run."
+      }
+    },
+    "schemas": {
+      "Project": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "commercial": {
+            "type": "boolean",
+            "description": "True if the project earns or promotes money."
+          },
+          "territories": {
+            "minItems": 1,
+            "maxItems": 250,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^(WORLD|[A-Z]{2})$"
+            },
+            "description": "Where the project is released: [\"WORLD\"] or country codes such as \"US\"."
+          },
+          "termMonths": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 1200,
+            "description": "How many months the assets are needed."
+          },
+          "budgetCents": {
+            "description": "Budget in the smallest currency unit.",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "currency": {
+            "description": "Budget and settlement currency; USD if omitted.",
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 3
+          },
+          "mediums": {
+            "description": "Media used, e.g. \"web\", \"broadcast\".",
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40
+            }
+          },
+          "canCredit": {
+            "description": "False if the project cannot credit creators.",
+            "type": "boolean"
+          },
+          "needsSublicensing": {
+            "type": "boolean"
+          },
+          "requiresExclusive": {
+            "type": "boolean"
+          },
+          "endDate": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "commercial",
+          "territories",
+          "termMonths"
+        ],
+        "additionalProperties": false
+      },
+      "Offer": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 55
+          },
+          "assetId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 55
+          },
+          "priceCents": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "currency": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 3
+          },
+          "terms": {
+            "type": "object",
+            "properties": {
+              "commercialUse": {
+                "type": "boolean"
+              },
+              "territories": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^(WORLD|[A-Z]{2})$"
+                }
+              },
+              "termMonths": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "string",
+                    "const": "perpetual"
+                  }
+                ]
+              },
+              "mediums": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  {
+                    "type": "string",
+                    "const": "ALL"
+                  }
+                ]
+              },
+              "attributionRequired": {
+                "type": "boolean"
+              },
+              "sublicensing": {
+                "type": "boolean"
+              },
+              "exclusive": {
+                "type": "boolean"
+              },
+              "fixedEndDate": {
+                "type": "string"
+              },
+              "offerValidUntil": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "commercialUse",
+              "territories",
+              "termMonths"
+            ],
+            "additionalProperties": false
+          },
+          "evidence": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "documentId": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "quote": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "field": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "documentId",
+                "quote"
+              ],
+              "additionalProperties": false
+            },
+            "description": "Quotes from the licence text that support the terms."
+          }
+        },
+        "required": [
+          "id",
+          "assetId",
+          "priceCents",
+          "currency",
+          "terms",
+          "evidence"
+        ],
+        "additionalProperties": false,
+        "description": "One licence offer read from a licence document, with the quotes that back each term."
+      },
+      "LedgerEvent": {
+        "type": "object",
+        "properties": {
+          "seq": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "at": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "extracted",
+              "extraction_failed",
+              "proposed",
+              "rejected",
+              "revised",
+              "verified",
+              "proposal_error",
+              "handed_over",
+              "approved",
+              "order_created",
+              "captured",
+              "capture_mismatch",
+              "refunded",
+              "payout_created",
+              "payout_failed",
+              "payout_settled"
+            ]
+          },
+          "payload": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "prevHash": {
+            "type": "string",
+            "minLength": 64,
+            "maxLength": 64
+          },
+          "hash": {
+            "type": "string",
+            "minLength": 64,
+            "maxLength": 64,
+            "description": "SHA-256 over the event and prevHash; changing any event breaks every hash after it."
+          }
+        },
+        "required": [
+          "seq",
+          "at",
+          "kind",
+          "payload",
+          "prevHash",
+          "hash"
+        ],
+        "additionalProperties": false
+      },
+      "Run": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "phase": {
+            "type": "string",
+            "enum": [
+              "created",
+              "extracting",
+              "proposing",
+              "verified",
+              "failed",
+              "approved",
+              "order_created",
+              "captured",
+              "settled",
+              "refunded"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "failure": {
+            "type": "string"
+          },
+          "awaitingPerson": {
+            "description": "An agent started this run and no person has taken control yet, so it cannot be approved or paid.",
+            "type": "boolean"
+          },
+          "project": {
+            "$ref": "#/components/schemas/Project"
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "scenarioId": {
+                "type": "string"
+              },
+              "brief": {
+                "type": "string"
+              },
+              "runKind": {
+                "type": "string",
+                "enum": [
+                  "demo",
+                  "live"
+                ]
+              },
+              "startedBy": {
+                "type": "string",
+                "const": "agent"
+              }
+            },
+            "additionalProperties": false
+          },
+          "documents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "assetId": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                },
+                "licensorName": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "assetId",
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "candidates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Offer"
+            },
+            "description": "Every offer read from the licences."
+          },
+          "loopStatus": {
+            "type": "string",
+            "enum": [
+              "verified",
+              "exhausted",
+              "stalled"
+            ]
+          },
+          "rounds": {
+            "description": "How many proposals the agent made before the rules engine accepted one.",
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "bundle": {
+            "description": "The verified bundle. Absent until the rules engine accepts a proposal.",
+            "type": "object",
+            "properties": {
+              "offers": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Offer"
+                }
+              },
+              "totalCents": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "currency": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "offers",
+              "totalCents",
+              "currency"
+            ],
+            "additionalProperties": false
+          },
+          "analysis": {
+            "description": "Every offer checked against every rule, the price-only comparison, requirement costs and gaps.",
+            "type": "object",
+            "properties": {
+              "naiveTotalCents": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "compliancePremiumCents": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "naiveTotalCents",
+              "compliancePremiumCents"
+            ],
+            "additionalProperties": {}
+          },
+          "approval": {
+            "type": "object",
+            "properties": {
+              "approvedBy": {
+                "type": "string"
+              },
+              "approvedAt": {
+                "type": "string"
+              },
+              "bundleDigest": {
+                "type": "string"
+              },
+              "digestVersion": {
+                "type": "number",
+                "const": 2
+              }
+            },
+            "required": [
+              "approvedBy",
+              "approvedAt",
+              "bundleDigest"
+            ],
+            "additionalProperties": false
+          },
+          "order": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "approveUrl": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "status",
+              "approveUrl"
+            ],
+            "additionalProperties": false
+          },
+          "capture": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "captureId": {
+                "type": "string"
+              },
+              "amount": {
+                "type": "object",
+                "properties": {
+                  "currency": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 3
+                  },
+                  "value": {
+                    "type": "string",
+                    "description": "Decimal amount as PayPal writes it, e.g. \"329.00\"."
+                  }
+                },
+                "required": [
+                  "currency",
+                  "value"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "status",
+              "captureId",
+              "amount"
+            ],
+            "additionalProperties": false
+          },
+          "refund": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "amount": {
+                "type": "object",
+                "properties": {
+                  "currency": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 3
+                  },
+                  "value": {
+                    "type": "string",
+                    "description": "Decimal amount as PayPal writes it, e.g. \"329.00\"."
+                  }
+                },
+                "required": [
+                  "currency",
+                  "value"
+                ],
+                "additionalProperties": false
+              },
+              "at": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "status",
+              "amount",
+              "at"
+            ],
+            "additionalProperties": false
+          },
+          "canRefund": {
+            "description": "The payment can be returned to the buyer: it is certain no creator was paid.",
+            "type": "boolean"
+          },
+          "payouts": {
+            "type": "object",
+            "properties": {
+              "batchId": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "totalCents": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "currency": {
+                "type": "string"
+              },
+              "lines": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "assetId": {
+                      "type": "string"
+                    },
+                    "offerId": {
+                      "type": "string"
+                    },
+                    "documentId": {
+                      "type": "string"
+                    },
+                    "licensorName": {
+                      "type": "string"
+                    },
+                    "emailMasked": {
+                      "type": "string",
+                      "description": "The payee's email with the middle hidden."
+                    },
+                    "amountCents": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "currency": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "assetId",
+                    "offerId",
+                    "documentId",
+                    "licensorName",
+                    "emailMasked",
+                    "amountCents",
+                    "currency",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "error": {
+                "type": "string"
+              },
+              "notSent": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "batchId",
+              "status",
+              "totalCents",
+              "currency",
+              "lines",
+              "createdAt"
+            ],
+            "additionalProperties": false
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LedgerEvent"
+            }
+          },
+          "chainValid": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "phase",
+          "createdAt",
+          "project",
+          "documents",
+          "candidates",
+          "events",
+          "chainValid"
+        ],
+        "additionalProperties": false,
+        "description": "Everything known about one run: what was read, what was verified, what was paid."
+      },
+      "RunCreated": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "phase": {
+            "type": "string",
+            "enum": [
+              "created",
+              "extracting",
+              "proposing",
+              "verified",
+              "failed",
+              "approved",
+              "order_created",
+              "captured",
+              "settled",
+              "refunded"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "failure": {
+            "type": "string"
+          },
+          "awaitingPerson": {
+            "description": "An agent started this run and no person has taken control yet, so it cannot be approved or paid.",
+            "type": "boolean"
+          },
+          "project": {
+            "$ref": "#/components/schemas/Project"
+          },
+          "meta": {
+            "type": "object",
+            "properties": {
+              "scenarioId": {
+                "type": "string"
+              },
+              "brief": {
+                "type": "string"
+              },
+              "runKind": {
+                "type": "string",
+                "enum": [
+                  "demo",
+                  "live"
+                ]
+              },
+              "startedBy": {
+                "type": "string",
+                "const": "agent"
+              }
+            },
+            "additionalProperties": false
+          },
+          "documents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "assetId": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                },
+                "licensorName": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "assetId",
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "candidates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Offer"
+            },
+            "description": "Every offer read from the licences."
+          },
+          "loopStatus": {
+            "type": "string",
+            "enum": [
+              "verified",
+              "exhausted",
+              "stalled"
+            ]
+          },
+          "rounds": {
+            "description": "How many proposals the agent made before the rules engine accepted one.",
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "bundle": {
+            "description": "The verified bundle. Absent until the rules engine accepts a proposal.",
+            "type": "object",
+            "properties": {
+              "offers": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Offer"
+                }
+              },
+              "totalCents": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "currency": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "offers",
+              "totalCents",
+              "currency"
+            ],
+            "additionalProperties": false
+          },
+          "analysis": {
+            "description": "Every offer checked against every rule, the price-only comparison, requirement costs and gaps.",
+            "type": "object",
+            "properties": {
+              "naiveTotalCents": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "compliancePremiumCents": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "naiveTotalCents",
+              "compliancePremiumCents"
+            ],
+            "additionalProperties": {}
+          },
+          "approval": {
+            "type": "object",
+            "properties": {
+              "approvedBy": {
+                "type": "string"
+              },
+              "approvedAt": {
+                "type": "string"
+              },
+              "bundleDigest": {
+                "type": "string"
+              },
+              "digestVersion": {
+                "type": "number",
+                "const": 2
+              }
+            },
+            "required": [
+              "approvedBy",
+              "approvedAt",
+              "bundleDigest"
+            ],
+            "additionalProperties": false
+          },
+          "order": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "approveUrl": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "status",
+              "approveUrl"
+            ],
+            "additionalProperties": false
+          },
+          "capture": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "captureId": {
+                "type": "string"
+              },
+              "amount": {
+                "type": "object",
+                "properties": {
+                  "currency": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 3
+                  },
+                  "value": {
+                    "type": "string",
+                    "description": "Decimal amount as PayPal writes it, e.g. \"329.00\"."
+                  }
+                },
+                "required": [
+                  "currency",
+                  "value"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "status",
+              "captureId",
+              "amount"
+            ],
+            "additionalProperties": false
+          },
+          "refund": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "amount": {
+                "type": "object",
+                "properties": {
+                  "currency": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 3
+                  },
+                  "value": {
+                    "type": "string",
+                    "description": "Decimal amount as PayPal writes it, e.g. \"329.00\"."
+                  }
+                },
+                "required": [
+                  "currency",
+                  "value"
+                ],
+                "additionalProperties": false
+              },
+              "at": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "status",
+              "amount",
+              "at"
+            ],
+            "additionalProperties": false
+          },
+          "canRefund": {
+            "description": "The payment can be returned to the buyer: it is certain no creator was paid.",
+            "type": "boolean"
+          },
+          "payouts": {
+            "type": "object",
+            "properties": {
+              "batchId": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "totalCents": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "currency": {
+                "type": "string"
+              },
+              "lines": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "assetId": {
+                      "type": "string"
+                    },
+                    "offerId": {
+                      "type": "string"
+                    },
+                    "documentId": {
+                      "type": "string"
+                    },
+                    "licensorName": {
+                      "type": "string"
+                    },
+                    "emailMasked": {
+                      "type": "string",
+                      "description": "The payee's email with the middle hidden."
+                    },
+                    "amountCents": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "currency": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "assetId",
+                    "offerId",
+                    "documentId",
+                    "licensorName",
+                    "emailMasked",
+                    "amountCents",
+                    "currency",
+                    "status"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "error": {
+                "type": "string"
+              },
+              "notSent": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "batchId",
+              "status",
+              "totalCents",
+              "currency",
+              "lines",
+              "createdAt"
+            ],
+            "additionalProperties": false
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LedgerEvent"
+            }
+          },
+          "chainValid": {
+            "type": "boolean"
+          },
+          "handoff": {
+            "description": "Present when the run was started with handoff: true.",
+            "type": "object",
+            "properties": {
+              "claimUrl": {
+                "type": "string",
+                "format": "uri"
+              },
+              "expiresAt": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "claimUrl",
+              "expiresAt"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "phase",
+          "createdAt",
+          "project",
+          "documents",
+          "candidates",
+          "events",
+          "chainValid"
+        ],
+        "additionalProperties": false
+      },
+      "RunSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "phase": {
+            "type": "string",
+            "enum": [
+              "created",
+              "extracting",
+              "proposing",
+              "verified",
+              "failed",
+              "approved",
+              "order_created",
+              "captured",
+              "settled",
+              "refunded"
+            ]
+          },
+          "runKind": {
+            "type": "string",
+            "enum": [
+              "demo",
+              "live"
+            ]
+          },
+          "scenarioId": {
+            "type": "string"
+          },
+          "rounds": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "totalCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "currency": {
+            "type": "string"
+          },
+          "naiveTotalCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "blocked": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "paid": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "createdAt",
+          "name",
+          "phase",
+          "blocked",
+          "paid"
+        ],
+        "additionalProperties": false
+      },
+      "Passport": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number",
+            "const": 1
+          },
+          "id": {
+            "type": "string"
+          },
+          "issuedAt": {
+            "type": "string"
+          },
+          "project": {
+            "$ref": "#/components/schemas/Project"
+          },
+          "bundle": {
+            "type": "object",
+            "properties": {
+              "offers": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Offer"
+                }
+              },
+              "totalCents": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "currency": {
+                "type": "string"
+              },
+              "digest": {
+                "type": "string"
+              },
+              "digestVersion": {
+                "type": "number",
+                "const": 2
+              }
+            },
+            "required": [
+              "offers",
+              "totalCents",
+              "currency",
+              "digest"
+            ],
+            "additionalProperties": false
+          },
+          "approval": {
+            "type": "object",
+            "properties": {
+              "approvedBy": {
+                "type": "string"
+              },
+              "approvedAt": {
+                "type": "string"
+              },
+              "bundleDigest": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "approvedBy",
+              "approvedAt",
+              "bundleDigest"
+            ],
+            "additionalProperties": false
+          },
+          "paypal": {
+            "type": "object",
+            "properties": {
+              "orderId": {
+                "type": "string"
+              },
+              "captureId": {
+                "type": "string"
+              },
+              "amount": {
+                "type": "object",
+                "properties": {
+                  "currency": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 3
+                  },
+                  "value": {
+                    "type": "string",
+                    "description": "Decimal amount as PayPal writes it, e.g. \"329.00\"."
+                  }
+                },
+                "required": [
+                  "currency",
+                  "value"
+                ],
+                "additionalProperties": false
+              },
+              "environment": {
+                "type": "string",
+                "enum": [
+                  "sandbox",
+                  "simulator"
+                ]
+              }
+            },
+            "required": [
+              "orderId",
+              "captureId",
+              "amount",
+              "environment"
+            ],
+            "additionalProperties": false
+          },
+          "ledger": {
+            "type": "object",
+            "properties": {
+              "events": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/LedgerEvent"
+                }
+              },
+              "head": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "events",
+              "head"
+            ],
+            "additionalProperties": false
+          },
+          "signature": {
+            "type": "object",
+            "properties": {
+              "algorithm": {
+                "type": "string",
+                "const": "HMAC-SHA256"
+              },
+              "value": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "algorithm",
+              "value"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "version",
+          "id",
+          "issuedAt",
+          "project",
+          "bundle",
+          "approval",
+          "paypal",
+          "ledger"
+        ],
+        "additionalProperties": {},
+        "description": "A self-contained record of one paid run. It can be re-checked from its own contents, with no server."
+      },
+      "PassportVerification": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "checks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "ok": {
+                  "type": "boolean"
+                },
+                "detail": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "label",
+                "ok",
+                "detail"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "signature": {
+            "type": "string",
+            "enum": [
+              "valid",
+              "invalid",
+              "unsigned",
+              "unavailable"
+            ],
+            "description": "Whether this server signed the passport. Only the server can check this."
+          }
+        },
+        "required": [
+          "ok",
+          "checks",
+          "signature"
+        ],
+        "additionalProperties": false
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "violations": {
+            "type": "array",
+            "items": {}
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "BriefReading": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "$ref": "#/components/schemas/Project"
+          },
+          "requiredAssetIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "found": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "What the text actually said."
+          },
+          "assumed": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Defaults applied because the text was silent."
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "local",
+              "model"
+            ]
+          }
+        },
+        "required": [
+          "project",
+          "requiredAssetIds",
+          "found",
+          "assumed",
+          "source"
+        ],
+        "additionalProperties": false
+      },
+      "Answer": {
+        "type": "object",
+        "properties": {
+          "answer": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "model",
+              "local"
+            ]
+          },
+          "citations": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Offer ids the answer refers to; each exists in the run."
+          }
+        },
+        "required": [
+          "answer",
+          "source",
+          "citations"
+        ],
+        "additionalProperties": false
+      },
+      "Health": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "demo",
+              "live"
+            ]
+          },
+          "paymentsMode": {
+            "type": "string"
+          },
+          "runs": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "ok",
+          "mode",
+          "paymentsMode",
+          "runs"
+        ],
+        "additionalProperties": false
+      },
+      "Config": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "demo",
+              "live"
+            ]
+          },
+          "model": {
+            "type": "string"
+          },
+          "paymentsEnabled": {
+            "type": "boolean"
+          },
+          "paymentsMode": {
+            "type": "string"
+          },
+          "assistant": {
+            "type": "boolean"
+          },
+          "intakeModel": {
+            "type": "boolean"
+          },
+          "passportSigned": {
+            "type": "boolean"
+          },
+          "appUrl": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "mode",
+          "paymentsEnabled",
+          "paymentsMode",
+          "assistant",
+          "intakeModel",
+          "passportSigned",
+          "appUrl"
+        ],
+        "additionalProperties": false
+      },
+      "Scenario": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "tagline": {
+            "type": "string"
+          },
+          "brief": {
+            "type": "string"
+          },
+          "project": {
+            "$ref": "#/components/schemas/Project"
+          },
+          "requiredAssetIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "showcases": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "documents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "assetId": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                },
+                "licensorName": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "assetId",
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "tagline",
+          "brief",
+          "project",
+          "requiredAssetIds",
+          "documents"
+        ],
+        "additionalProperties": false
+      },
+      "RunInput": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              },
+              "commercial": {
+                "type": "boolean"
+              },
+              "territories": {
+                "minItems": 1,
+                "maxItems": 250,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^(WORLD|[A-Z]{2})$"
+                }
+              },
+              "termMonths": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 1200
+              },
+              "budgetCents": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "currency": {
+                "type": "string"
+              },
+              "mediums": {
+                "maxItems": 20,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 40
+                }
+              },
+              "canCredit": {
+                "type": "boolean"
+              },
+              "needsSublicensing": {
+                "type": "boolean"
+              },
+              "requiresExclusive": {
+                "type": "boolean"
+              },
+              "endDate": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "commercial",
+              "territories",
+              "termMonths"
+            ]
+          },
+          "requiredAssetIds": {
+            "minItems": 1,
+            "maxItems": 12,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 55
+            }
+          },
+          "documents": {
+            "minItems": 1,
+            "maxItems": 12,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 55
+                },
+                "assetId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 55
+                },
+                "text": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 20000
+                },
+                "licensor": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    },
+                    "email": {
+                      "type": "string",
+                      "maxLength": 127,
+                      "pattern": "^[^\\s@]{1,64}@[^\\s@]{1,190}\\.[^\\s@]{2,}$"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "email"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "assetId",
+                "text"
+              ]
+            }
+          },
+          "brief": {
+            "type": "string",
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "project",
+          "requiredAssetIds",
+          "documents"
+        ],
+        "description": "Your own licences, read live by the model. Needs a server with a model; use scenarioId otherwise."
+      },
+      "ScenarioStart": {
+        "type": "object",
+        "properties": {
+          "scenarioId": {
+            "type": "string"
+          },
+          "handoff": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "scenarioId"
+        ],
+        "description": "Replay a built-in scenario from recorded model output."
+      },
+      "IntakeInput": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "text"
+        ]
+      },
+      "AskInput": {
+        "type": "object",
+        "properties": {
+          "question": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 400
+          }
+        },
+        "required": [
+          "question"
+        ]
+      },
+      "ApproveInput": {
+        "type": "object",
+        "properties": {
+          "approvedBy": {
+            "type": "string",
+            "description": "Who is approving this exact bundle."
+          }
+        },
+        "required": [
+          "approvedBy"
+        ]
+      },
+      "ClaimInput": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "The one-time token from the claim link an agent was given."
+          }
+        },
+        "required": [
+          "token"
+        ]
+      }
+    }
+  }
+}

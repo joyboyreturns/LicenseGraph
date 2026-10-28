@@ -36,7 +36,7 @@ Indie game studios, podcast networks, small agencies, filmmakers and freelancers
 - **Orders API (Sandbox):** create order, buyer approval, capture; idempotent request ids with stable, bounded keys and concurrent-request protection. Orders are created only through a gate that re-verifies the bundle and requires a human approval for exactly that bundle.
 - **Payouts API (Sandbox):** after capture, each licensor is paid the price of their licence in one batch; payout status is tracked to completion, and a payout problem never undoes the captured payment. Submission retries retain the original batch identity; partial recipient failures require reconciliation.
 - **Refunds API (Sandbox):** if no creator could be paid, the buyer is refunded in full. Offered only when it is certain nobody was paid, so a refund can never double-spend; recorded in the ledger.
-- **Agentic commerce:** an AI agent initiates the purchase by proposing the bundle; deterministic verification and a human approval stand between the proposal and the money.
+- **Agentic commerce:** an AI agent initiates the purchase by proposing the bundle; deterministic verification and a human approval stand between the proposal and the money. The whole flow is also an OpenAPI 3.1 API (`/api/openapi.json`, generated from the server's own schemas and checked by tests), so other agents and tools can integrate without reading the code.
 - Everything runs against the PayPal **Sandbox**; no real payments are made. A clearly labelled offline payment simulator lets anyone run the whole flow without a PayPal account.
 
 ## How AI is used

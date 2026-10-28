@@ -71,6 +71,12 @@ LICENSEGRAPH_URL=http://localhost:3000 npx tsx scripts/mcp-server.ts
 # in an MCP client: { "command": "npx", "args": ["tsx", "scripts/mcp-server.ts"], "env": { "LICENSEGRAPH_URL": "http://localhost:3000" } }
 ```
 
+## HTTP API (OpenAPI)
+
+Everything the pages do goes through a plain JSON API, described by an OpenAPI 3.1 document: served live at `/api/openapi.json` and committed as [`docs/openapi.json`](docs/openapi.json) for importing into API tooling (SDK generators, Postman, a docs portal). It is generated from the same zod schemas the server validates with, and `tests/openapi.test.ts` fails if a route is missing from it, if the committed copy is stale, or if a real response no longer matches its published schema. After changing the API, run `npm run openapi`.
+
+Money-moving calls (`approve`, `pay`, `capture`, `payouts`, `refund`) need the `lg_owner` cookie of the browser that started or claimed the run; an agent-started run (`handoff: true`) cannot be approved until a person claims it.
+
 ## How PayPal is used
 
 - **Orders API (Sandbox):** create order, buyer approval, capture, with stable, bounded idempotency keys and coalesced concurrent requests. Orders are created only through a gate that re-verifies the bundle and requires a human approval for exactly that bundle.
@@ -159,7 +165,7 @@ Audit results and the remaining submission work are in [`docs/AUDIT.md`](docs/AU
 
 ## Documents
 
-[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) · [`docs/PLAN.md`](docs/PLAN.md) · [`docs/DEPLOY.md`](docs/DEPLOY.md) · [`docs/DEVPOST.md`](docs/DEVPOST.md) · [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md)
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) · [`docs/PLAN.md`](docs/PLAN.md) · [`docs/DEPLOY.md`](docs/DEPLOY.md) · [`docs/DEVPOST.md`](docs/DEVPOST.md) · [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md) · [`docs/openapi.json`](docs/openapi.json)
 
 ## Licence
 
