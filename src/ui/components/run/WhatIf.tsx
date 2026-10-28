@@ -3,7 +3,8 @@
 import { RotateCcw } from "lucide-react";
 import { useId, useMemo, useState, type FormEvent } from "react";
 import type { LicenseOffer, Project } from "@/src/core/types";
-import { whatIf, type ProjectChange } from "@/src/core/whatif";
+import { negotiationOutlook } from "@/src/core/negotiation";
+import { applyChange, whatIf, type ProjectChange } from "@/src/core/whatif";
 import { EU_COUNTRIES } from "@/src/intake/brief";
 import { readChange } from "@/src/intake/change";
 import type { Catalog } from "@/src/ui/lib/catalog";
@@ -55,6 +56,12 @@ export function WhatIf({ project, requiredAssetIds, candidates, currency, runDat
   const [typed, setTyped] = useState("");
   const [heard, setHeard] = useState<string[] | null>(null);
   const result = useMemo(() => whatIf(project, toChange(state), requiredAssetIds, candidates, currency, { today: runDate }), [project, state, requiredAssetIds, candidates, currency, runDate]);
+
+  // When nothing covers the changed brief: what a yes from every licensor would cost, at the prices already quoted.
+  const outlook = useMemo(
+    () => (result.totalCents === undefined && result.uncoveredAssets.length ? negotiationOutlook(applyChange(project, toChange(state)), requiredAssetIds, candidates, currency, { today: runDate }) : undefined),
+    [result, project, state, requiredAssetIds, candidates, currency, runDate],
+  );
 
   const places = [...PLACES, ...project.territories.filter((t) => !PLACES.some((p) => p.codes.includes(t))).map((t) => ({ code: t, label: t, codes: [t] }))];
   const placeOn = (p: (typeof places)[number]) => p.codes.every((c) => state.territories.includes(c));
@@ -178,6 +185,12 @@ export function WhatIf({ project, requiredAssetIds, candidates, currency, runDat
           <>
             <span className="eyebrow">No licence covers this brief</span>
             <span className={styles.delta}>Nothing read from your licences fits for: {result.uncoveredAssets.map(assetLabel).join(", ")}.</span>
+            {outlook && (
+              <span className={styles.delta} data-testid="what-if-outlook">
+                If every licensor agreed to those changes at the prices they quoted, it would cost {money(outlook.totalCents)}
+                {outlook.headroomCents !== undefined && (outlook.headroomCents >= 0 ? `, ${money(outlook.headroomCents)} under your budget` : `, ${money(-outlook.headroomCents)} over your budget`)}. A best case, not an offer.
+              </span>
+            )}
             {result.gaps.map((g) => (
               <div key={g.assetId}>
                 <p className="small" style={{ margin: "4px 0" }}>

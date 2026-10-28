@@ -41,6 +41,8 @@ test("what-if re-prices the brief in the browser with the same exact numbers the
   await panel.getByLabel("We need exclusivity").check({ force: true });
   await expect(result).toContainText("No licence covers this brief");
   await expect(result).toContainText("Ask the licensor to:");
+  // And what a yes to all of it would cost, from the same exact check.
+  await expect(panel.getByTestId("what-if-outlook")).toContainText("If every licensor agreed to those changes at the prices they quoted, it would cost $");
   expect(errors).toEqual([]);
 });
 
