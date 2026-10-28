@@ -43,10 +43,12 @@ export async function runAgentSession(rpc: Rpc, data: AgentRunData, onStep: (s: 
   const plan = cheapest.plans?.find((p: { currency: string }) => p.currency === data.currency) ?? cheapest.plans?.[0];
   if (plan) {
     const top = cheapest.requirementCosts?.items?.[0];
+    const levers: { savingCents: number }[] = cheapest.savingLevers ?? [];
+    const saving = levers.reduce((n, l) => n + l.savingCents, 0);
     onStep({
       tool: "cheapest_compliant_bundle",
       intent: "What is the cheapest bundle that meets every requirement?",
-      result: `${money(plan.totalCents)} across ${plan.offerIds.length} licences, proven minimal${top && top.extraCents > 0 ? `. The costliest requirement is ${top.label.toLowerCase()}, adding ${money(top.extraCents)}` : ""}.`,
+      result: `${money(plan.totalCents)} across ${plan.offerIds.length} licences, proven minimal${top && top.extraCents > 0 ? `. The costliest requirement is ${top.label.toLowerCase()}, adding ${money(top.extraCents)}` : ""}${levers.length ? `. Asking ${levers.length} licensor${levers.length === 1 ? "" : "s"} to change terms could save up to ${money(saving)} (a best case, not an offer)` : ""}.`,
       raw: cheapest,
     });
   } else {

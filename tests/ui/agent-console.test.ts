@@ -24,6 +24,7 @@ describe("runAgentSession", () => {
     const steps = await run();
     expect(steps.map((s) => s.tool)).toEqual(["tools/list", "cheapest_compliant_bundle", "what_if_brief", "licence_end_dates"]);
     expect(steps[1]!.result).toContain("$329.00 across 3 licences, proven minimal");
+    expect(steps[1]!.result).toContain("could save up to $35.00 (a best case, not an offer)");
     expect(steps[2]!.intent).toBe("What if it were not for commercial use?");
     expect(steps[2]!.result).toMatch(/^\$294\.00, \$35\.00 less than the brief as written/);
     expect(steps[3]!.result).toMatch(/calendar reminder file/);
