@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { startScenario } from "./helpers";
+import { approveAndCreateOrder, payInSimulator, startScenario } from "./helpers";
 
 const SCENARIOS = [
   { title: "Documentary promo", total: "$329.00", rounds: 2 },
@@ -70,4 +70,24 @@ test("Exclusive theme tune: simulating the licensors saying yes starts a new run
   await page.waitForURL(firstUrl);
   await expect(page.getByRole("heading", { name: "No compliant bundle" })).toBeVisible();
   expect(errors).toEqual([]);
+});
+
+test("a purchase that came out of a negotiation carries the negotiation in its passport", async ({ page }) => {
+  await page.goto("/");
+  await page.locator("article", { hasText: "Exclusive theme tune" }).getByRole("button", { name: /Run this scenario/ }).click();
+  await page.waitForURL(/\/run\//);
+  await page.getByRole("button", { name: "Skip to result" }).first().click();
+  await page.getByRole("button", { name: "Simulate the licensors agreeing" }).click();
+  await page.getByRole("button", { name: "Skip to result" }).first().click();
+  await expect(page.getByRole("button", { name: "Review and approve" })).toBeVisible();
+
+  await approveAndCreateOrder(page);
+  await payInSimulator(page);
+  await expect(page.getByText(/Every creator has been paid/i)).toBeVisible({ timeout: 30_000 });
+  await page.getByRole("link", { name: "View Licence Passport" }).first().click();
+  await page.waitForURL(/\/passport\//);
+  await expect(page.getByText(/All 9 checks passed in this browser/)).toBeVisible({ timeout: 30_000 });
+  // The first entry of the chained ledger says what this run answers, and the certificate says so.
+  await expect(page.getByRole("heading", { name: "Negotiation" })).toBeVisible();
+  await expect(page.getByText(/Answers an earlier run that had no compliant bundle, where 3 licensors were asked to change terms; 3 revised licences added/)).toBeVisible();
 });

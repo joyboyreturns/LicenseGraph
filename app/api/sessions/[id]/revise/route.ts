@@ -1,4 +1,4 @@
-import { reviseInput } from "@/src/app-logic/revision";
+import { recordRevision, reviseInput } from "@/src/app-logic/revision";
 import { createSession, runPipeline, SessionError, viewOf } from "@/src/app-logic/session";
 import { fail, forbidUnlessOwner, json, sessionOr404 } from "@/src/server/http";
 import { ownerCookie, ownerFor } from "@/src/server/owner";
@@ -41,6 +41,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const owner = ownerFor(req);
     const session = createSession(input);
     session.ownerId = owner.id;
+    recordRevision(session, from);
     rt.store.add(session);
     const deps = simulated ? rt.demoDeps : rt.deps;
     void runPipeline(session, deps).catch((e) => {

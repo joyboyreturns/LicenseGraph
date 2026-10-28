@@ -2,6 +2,7 @@
 
 import type { Passport } from "@/src/passport/passport";
 import { buildCatalog } from "@/src/ui/lib/catalog";
+import { eventTitle } from "@/src/ui/lib/event-text";
 import { assetLabel, dateTimeText, formatMoney, isSimulatedId, projectRequirements, shortHash, termsSummary } from "@/src/ui/lib/format";
 import { LogoMark } from "../Logo";
 import { AssetIcon } from "../bits";
@@ -24,6 +25,8 @@ export function Certificate({ passport: p, qrSrc, verifyUrl }: { passport: Passp
   const currency = p.bundle.currency;
   const simulated = isSimulatedId(p.paypal.captureId) || isSimulatedId(p.paypal.orderId);
   const reqs = projectRequirements(p.project, currency);
+  const answers = p.ledger.events.find((e) => e.kind === "answers_run");
+  const negotiation = answers ? `${eventTitle(answers)}.` : undefined;
   return (
     <article className={styles.cert} aria-labelledby="cert-title">
       <div className={styles.border} aria-hidden />
@@ -198,6 +201,17 @@ export function Certificate({ passport: p, qrSrc, verifyUrl }: { passport: Passp
           </ul>
         )}
       </section>
+
+      {negotiation && (
+        <section className={styles.section} aria-labelledby="cert-negotiation">
+          <h2 id="cert-negotiation" className={styles.h2}>
+            Negotiation
+          </h2>
+          <p className={styles.compare}>
+            This purchase followed a negotiation. {negotiation} The earlier run is recorded in the first entry of this passport&rsquo;s ledger, so it cannot be removed without breaking the hash chain.
+          </p>
+        </section>
+      )}
 
       <footer className={styles.foot}>
         <span>

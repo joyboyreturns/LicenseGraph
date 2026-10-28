@@ -1,5 +1,5 @@
 import { scenarioById } from "../demo/scenarios";
-import { SessionError, type SessionInput } from "./session";
+import { SessionError, viewOf, type Session, type SessionInput } from "./session";
 
 /**
  * A licensor's answer to a gap request, added to the run it answers. Either their revised licence text for
@@ -31,4 +31,19 @@ export function reviseInput(input: SessionInput, fromRunId: string, revision: Re
   const documents = [...input.documents.map((d) => ({ ...d })), ...added];
   if (documents.length > MAX_DOCS) throw new SessionError(`A run can read at most ${MAX_DOCS} licences.`);
   return { ...structuredClone(input), documents, meta: { ...input.meta, revisedFrom: fromRunId } };
+}
+
+/**
+ * Put the link to the earlier run into the new run's hash-chained ledger, as its first event, so the
+ * negotiation is part of the record that travels with the Licence Passport: what had failed, what was
+ * asked, and which revised licences were added.
+ */
+export function recordRevision(session: Session, from: Session) {
+  const before = new Set(from.input.documents.map((d) => d.id));
+  session.ledger.append("answers_run", {
+    fromRunId: from.id,
+    earlierOutcome: from.phase === "verified" ? "verified" : "no compliant bundle",
+    asked: (viewOf(from).analysis?.gaps ?? []).map((g) => ({ assetId: g.assetId, offerId: g.offerId, rules: g.asks.map((a) => a.rule) })),
+    addedDocumentIds: session.input.documents.filter((d) => !before.has(d.id)).map((d) => d.id),
+  });
 }
