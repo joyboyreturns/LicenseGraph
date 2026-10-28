@@ -1,5 +1,7 @@
 # LicenseGraph
 
+[![CI](https://github.com/joyboyreturns/licensegraph/actions/workflows/ci.yml/badge.svg)](https://github.com/joyboyreturns/licensegraph/actions/workflows/ci.yml)
+
 > **AI moves at machine speed. Creator rights and payments should too.**
 
 LicenseGraph turns a pile of licence documents into a **verified, approved, paid-for licence bundle**, and pays the creators. An AI agent reads the licences and proposes the cheapest bundle; a **deterministic rules engine** (plain code, not AI) checks every proposal against your project and rejects what breaks it; a **human approves** exactly what was verified; **PayPal** settles the order and pays each licensor through **PayPal Payouts**. At the end you get a **Licence Passport**: a shareable, QR-coded record that anyone can re-verify in their own browser.
