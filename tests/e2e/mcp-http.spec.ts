@@ -41,6 +41,11 @@ test("an agent can re-check a Licence Passport over MCP before relying on a lice
     expect(result).toMatchObject({ ok: true, verified: true, failedChecks: [] });
     expect(result.checks).toHaveLength(9);
     expect(result.passportUrl).toContain(`/passport/${id}`);
+
+    // The status tool hands the agent one receipt link per creator, to pass on to the person.
+    const status = JSON.parse(((await client.callTool({ name: "get_purchase_status", arguments: { runId: id } })).content as { text: string }[])[0]!.text);
+    expect(status.creatorReceipts.map((r: { assetId: string }) => r.assetId).sort()).toEqual(["image", "song", "voiceover"]);
+    expect(status.creatorReceipts[0].url).toMatch(new RegExp(`/passport/${id}/receipt/[a-z]+$`));
   } finally {
     await client.close();
   }

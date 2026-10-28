@@ -49,7 +49,7 @@ export function createLicenseGraphServer(app: AppClient): McpServer {
 
   server.registerTool(
     "get_purchase_status",
-    { description: "Progress of a purchase you started: phase, verified bundle, who approved, PayPal capture, creator payouts and the Licence Passport link once paid.", inputSchema: { runId: startPurchaseInput.shape.requiredAssetIds.element.describe("The runId returned by start_licence_purchase.") } },
+    { description: "Progress of a purchase you started: phase, verified bundle, who approved, PayPal capture, creator payouts, the Licence Passport link and a printable receipt link per creator once paid.", inputSchema: { runId: startPurchaseInput.shape.requiredAssetIds.element.describe("The runId returned by start_licence_purchase.") } },
     async ({ runId }) => text(await purchaseStatus(app, runId)),
   );
 

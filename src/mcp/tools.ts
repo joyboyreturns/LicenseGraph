@@ -240,5 +240,7 @@ export async function purchaseStatus(app: AppClient, runId: string) {
     mandate: ((e) => (e ? { status: e.payload.status as string, capCents: e.payload.maxTotalCents as number, totalCents: e.payload.totalCents as number, currency: e.payload.currency as string } : null))((body.events as { kind: string; payload: Record<string, unknown> }[] | undefined)?.find((x) => x.kind === "mandate_checked")),
     ledgerIntact: body.chainValid as boolean,
     passportUrl: body.capture ? `${app.baseUrl.replace(/\/$/, "")}/passport/${runId}` : null,
+    // Once paid, a printable receipt per creator, which the person can forward to each licensor.
+    creatorReceipts: body.capture && body.bundle ? (body.bundle.offers as LicenseOffer[]).map((o) => ({ assetId: o.assetId, url: `${app.baseUrl.replace(/\/$/, "")}/passport/${runId}/receipt/${encodeURIComponent(o.assetId)}` })) : [],
   };
 }

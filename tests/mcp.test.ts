@@ -127,7 +127,7 @@ describe("start_licence_purchase", () => {
       await new Promise((r) => setTimeout(r, 20));
       status = await purchaseStatus(app, started.runId);
     }
-    expect(status).toMatchObject({ ok: true, phase: "verified", awaitingPerson: true, ledgerIntact: true, payment: null, passportUrl: null });
+    expect(status).toMatchObject({ ok: true, phase: "verified", awaitingPerson: true, ledgerIntact: true, payment: null, passportUrl: null, creatorReceipts: [] });
     expect(status.ok && status.bundle).toMatchObject({ totalCents: 32_900, currency: "USD" });
 
     // The agent has no owner cookie and no token: approving is refused.
