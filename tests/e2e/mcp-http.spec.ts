@@ -50,3 +50,28 @@ test("an agent can re-check a Licence Passport over MCP before relying on a lice
     await client.close();
   }
 });
+
+test("an agent can find the MCP endpoint without being told: llms.txt, the server card, robots and the sitemap", async ({ request, baseURL }) => {
+  const llms = await request.get("/llms.txt");
+  expect(llms.status()).toBe(200);
+  expect(llms.headers()["content-type"]).toContain("text/plain");
+  const text = await llms.text();
+  expect(text).toContain(`${new URL("/api/mcp", baseURL).href}`);
+  expect(text).toContain("- verify_licence_passport:");
+
+  const card = await (await request.get("/.well-known/mcp.json")).json();
+  expect(card.transport).toMatchObject({ type: "streamable-http", url: new URL("/api/mcp", baseURL).href });
+  // The card lists what the live endpoint really offers.
+  const client = new Client({ name: "e2e-agent", version: "1" });
+  await client.connect(new StreamableHTTPClientTransport(new URL(card.transport.url)));
+  try {
+    expect(card.tools.map((t: { name: string }) => t.name)).toEqual((await client.listTools()).tools.map((t) => t.name));
+  } finally {
+    await client.close();
+  }
+
+  const robots = await (await request.get("/robots.txt")).text();
+  expect(robots).toContain("Disallow: /run/");
+  expect(robots).toContain("Sitemap:");
+  expect(await (await request.get("/sitemap.xml")).text()).toContain("/agents");
+});
