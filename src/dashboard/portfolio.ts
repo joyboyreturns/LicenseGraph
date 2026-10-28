@@ -1,4 +1,5 @@
 import type { SessionView } from "../app-logic/session";
+import { licenceEnd } from "../core/renewals";
 import { buildDashboardData } from "./data";
 
 type Row = Record<string, string | number | null>;
@@ -24,6 +25,7 @@ export function buildPortfolioData(views: SessionView[]) {
   const payouts: Row[] = [];
   const events: Row[] = [];
   const requirements: Row[] = [];
+  const licences: Row[] = [];
 
   for (const v of views) {
     const t = buildDashboardData(v);
@@ -52,6 +54,27 @@ export function buildPortfolioData(views: SessionView[]) {
     // Dollar columns again hold dollar runs only; a run in another currency keeps its own figures out of the sums.
     for (const r of t.requirements) requirements.push({ ...r, extraCost: currency === "USD" ? (r.extraCost ?? null) : null, costWithout: currency === "USD" ? (r.costWithout ?? null) : null, currency, runId: v.id, run: runLabel(v) });
     for (const e of t.events) events.push({ ...e, runId: v.id, run: runLabel(v) });
+    // When each bought licence stops covering the project, counted from the day the payment was captured.
+    const boughtOn = v.capture ? v.events.find((e) => e.kind === "captured")?.at.slice(0, 10) : undefined;
+    if (boughtOn && v.bundle) {
+      const licensorOf = new Map(v.documents.map((d) => [d.id, d.licensorName]));
+      for (const o of v.bundle.offers) {
+        const end = licenceEnd(o, boughtOn);
+        licences.push({
+          licenceId: `${v.id}:${o.id}`,
+          runId: v.id,
+          run: runLabel(v),
+          licensor: licensorOf.get(o.evidence[0]?.documentId ?? "") ?? "Unnamed licensor",
+          asset: o.assetId,
+          price: o.currency === "USD" ? dollars(o.priceCents) : null,
+          currency: o.currency,
+          boughtOn,
+          endsOn: end.endsOn ?? "Perpetual",
+          endsYear: end.endsOn ? Number(end.endsOn.slice(0, 4)) : null,
+          cover: end.perpetual ? "Perpetual" : end.endsOn ? "Ends" : "End not stated",
+        });
+      }
+    }
     for (const l of v.payouts?.lines ?? []) {
       payouts.push({ payoutId: `${v.id}:${l.offerId}`, runId: v.id, run: runLabel(v), licensor: l.licensorName, asset: l.assetId, amount: l.currency === "USD" ? dollars(l.amountCents) : null, currency: l.currency, amountLocal: dollars(l.amountCents), status: l.status });
     }
@@ -59,7 +82,7 @@ export function buildPortfolioData(views: SessionView[]) {
 
   return {
     description:
-      "LicenseGraph portfolio across projects. 'runs' has one row per licensing run (what the verified bundle cost, what a price-only purchase would have cost, how many licences the rules blocked, whether it was paid). 'offers' has every licence offer extracted from uploaded licences with its terms and whether it was chosen or rejected. 'violations' lists each rule the verifier found broken. 'requirements' shows what each requirement of each brief adds to the cheapest compliant bundle. 'payouts' lists the creators paid through PayPal Payouts. 'events' is the tamper-evident ledger. Dollar columns (Verified total, Price-only total, Compliance premium, Amount) include only runs settled in US dollars; a run in another currency shows its amount in the 'Local' column and its currency, and is never converted or added into a dollar total.",
+      "LicenseGraph portfolio across projects. 'runs' has one row per licensing run (what the verified bundle cost, what a price-only purchase would have cost, how many licences the rules blocked, whether it was paid). 'offers' has every licence offer extracted from uploaded licences with its terms and whether it was chosen or rejected. 'violations' lists each rule the verifier found broken. 'requirements' shows what each requirement of each brief adds to the cheapest compliant bundle. 'payouts' lists the creators paid through PayPal Payouts. 'licences' says when each bought licence stops covering its project (or that it is perpetual). 'events' is the tamper-evident ledger. Dollar columns (Verified total, Price-only total, Compliance premium, Amount) include only runs settled in US dollars; a run in another currency shows its amount in the 'Local' column and its currency, and is never converted or added into a dollar total.",
     sources: [
       {
         id: "runs",
@@ -94,6 +117,13 @@ export function buildPortfolioData(views: SessionView[]) {
         fields: [text("payoutId", "Payout"), text("runId", "Run id"), text("run", "Project"), text("licensor", "Creator"), text("asset", "Asset"), money("amount", "Amount"), decimal("amountLocal", "Amount (own currency)"), text("currency", "Currency"), text("status", "Status")],
       },
       {
+        id: "licences",
+        name: "Licence end dates",
+        description: "When each bought licence stops covering its project, counted from the day of purchase.",
+        data: licences,
+        fields: [text("licenceId", "Licence"), text("runId", "Run id"), text("run", "Project"), text("licensor", "Licensor"), text("asset", "Asset"), money("price", "Price"), text("currency", "Currency"), text("boughtOn", "Bought on"), text("endsOn", "Covered until"), whole("endsYear", "Ends in year"), text("cover", "Cover")],
+      },
+      {
         id: "requirements",
         name: "Requirement costs",
         description: "What each requirement of each brief adds to that run's cheapest compliant bundle. Dollar runs only in the cost columns.",
@@ -112,6 +142,7 @@ export function buildPortfolioData(views: SessionView[]) {
       { id: "run-offers", source: { tableId: "runs", fieldId: "runId" }, target: { tableId: "offers", fieldId: "runId" }, type: "one-to-many" as const },
       { id: "run-violations", source: { tableId: "runs", fieldId: "runId" }, target: { tableId: "violations", fieldId: "runId" }, type: "one-to-many" as const },
       { id: "run-payouts", source: { tableId: "runs", fieldId: "runId" }, target: { tableId: "payouts", fieldId: "runId" }, type: "one-to-many" as const },
+      { id: "run-licences", source: { tableId: "runs", fieldId: "runId" }, target: { tableId: "licences", fieldId: "runId" }, type: "one-to-many" as const },
       { id: "run-requirements", source: { tableId: "runs", fieldId: "runId" }, target: { tableId: "requirements", fieldId: "runId" }, type: "one-to-many" as const },
       { id: "run-events", source: { tableId: "runs", fieldId: "runId" }, target: { tableId: "events", fieldId: "runId" }, type: "one-to-many" as const },
     ],

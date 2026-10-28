@@ -53,7 +53,7 @@ Two further answers come from the same rules engine, with no model involved:
 
 **What if the project changed?** Under the compliance summary, a panel lets you change the brief (where it is shown, how long, which media, whether it is commercial, credit, sublicensing, exclusivity) (by controls, or by typing a sentence such as "only Canada for 6 months, no exclusivity", read on your device) and see the new cheapest compliant bundle instantly, which asset's licence would change, and the delta against your brief. If no licence can cover the changed brief it says which asset and what to ask the licensor for. It re-runs the same exact cost check in the browser on the offers already read, so there is no model call and no estimate, and nothing on the run changes. Tests compare it against an exhaustive search of every bundle for random changes (`src/core/whatif.ts`).
 
-Both are also tables in AG Studio (`requirements`, `gaps`), so the dashboard and its assistant can chart and filter them across runs.
+Both are also tables in AG Studio (`requirements`, `gaps`), and the portfolio has a `licences` table of when each bought licence ends, so the dashboard and its assistant can chart and filter them across runs.
 
 The dashboards also include a **custom Studio widget**, the *rule matrix* (`app/dashboard/rule-matrix.tsx`): a heat grid of which rule rejected which asset, across every run on the portfolio page. It is a real Studio widget type, not a chart in disguise. It appears in the widget menu, takes its fields through the edit panel, and follows the page's filters and cross-filtering. The grouping logic is plain code with unit tests (`src/dashboard/rule-matrix.ts`).
 

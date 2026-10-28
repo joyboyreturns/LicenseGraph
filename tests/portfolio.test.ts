@@ -27,7 +27,7 @@ describe("buildPortfolioData", () => {
     const views = [await run("documentary", true), await run("game-trailer", false), await run("podcast", true)];
     const def = buildPortfolioData(views);
 
-    expect(def.sources.map((s) => s.id)).toEqual(["runs", "offers", "violations", "payouts", "requirements", "events"]);
+    expect(def.sources.map((s) => s.id)).toEqual(["runs", "offers", "violations", "payouts", "licences", "requirements", "events"]);
     const runs = def.sources[0]!.data;
     expect(runs.map((r) => [r.run, r.status, r.paid, r.rounds])).toEqual([["Harbour documentary promo", "captured", "Paid", 2], ["Neon Drift launch trailer", "verified", "Not paid", 3], ["Signal & Noise podcast network", "captured", "Paid", 2]]);
     expect(runs[1]).toMatchObject({ verifiedTotal: 2170, priceOnlyTotal: 220, compliancePremium: 1950, blockedLicences: 3, source: "Replayed demo" });
@@ -43,6 +43,18 @@ describe("buildPortfolioData", () => {
       ["Harbour documentary promo", "SoundHarbor Music", 200], ["Harbour documentary promo", "HistoryVault Archive", 80], ["Harbour documentary promo", "TypeForge Studio", 49],
       ["Signal & Noise podcast network", "Tapeloop", 340], ["Signal & Noise podcast network", "Greyscale Lane", 140], ["Signal & Noise podcast network", "Marlow Voice", 210],
     ]);
+  });
+
+  it("lists when each bought licence ends, only for paid runs, and calls a perpetual licence perpetual", async () => {
+    const views = [await run("podcast", true), await run("game-trailer", false)];
+    const licences = buildPortfolioData(views).sources.find((x) => x.id === "licences")!.data;
+    expect(licences.every((l) => l.run === "Signal & Noise podcast network")).toBe(true); // the unpaid run has nothing bought
+    const by = Object.fromEntries(licences.map((l) => [l.asset as string, l]));
+    // Bought on the day the payment was captured; the podcast licences are 36 months, and the cover art is perpetual.
+    const bought = String(by.song!.boughtOn);
+    expect(bought).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(by.song).toMatchObject({ licensor: "Tapeloop", price: 340, cover: "Ends", endsYear: Number(bought.slice(0, 4)) + 3 });
+    expect(by.image).toMatchObject({ licensor: "Greyscale Lane", endsOn: "Perpetual", endsYear: null, cover: "Perpetual" });
   });
 
   it("is consistent: every row has every declared field, and relationships point at real fields", async () => {
