@@ -1,6 +1,6 @@
 /**
  * LicenseGraph as an MCP server: lets an AI agent check licence bundles, find the cheapest compliant
- * one, and start a purchase that only a person can approve.
+ * one, explore what a change of scope would cost, and start a purchase that only a person can approve.
  *
  *   LICENSEGRAPH_URL=http://localhost:3000 npx tsx scripts/mcp-server.ts
  *
@@ -9,7 +9,7 @@
  */
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { checkBundle, checkBundleInput, cheapestBundle, cheapestBundleInput, purchaseStatus, startPurchase, startPurchaseInput } from "../src/mcp/tools";
+import { checkBundle, checkBundleInput, cheapestBundle, cheapestBundleInput, purchaseStatus, startPurchase, startPurchaseInput, whatIfBrief, whatIfInput } from "../src/mcp/tools";
 
 const app = { baseUrl: process.env.LICENSEGRAPH_URL ?? "http://localhost:3000" };
 const text = (value: unknown) => ({ content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }] });
@@ -26,6 +26,12 @@ server.registerTool(
   "cheapest_compliant_bundle",
   { description: "From a set of licence offers, find the exact minimum cost of a bundle that satisfies the project, what each requirement adds to that cost, and, where an asset has no compliant offer, the nearest offer and what to ask the licensor to change.", inputSchema: cheapestBundleInput.shape },
   async (input) => text(cheapestBundle(input)),
+);
+
+server.registerTool(
+  "what_if_brief",
+  { description: "Ask what the purchase would cost if the brief changed: a different territory, term, media, or a requirement dropped or added. Returns the exact cheapest compliant total for the changed brief, the difference from the brief as written, which asset's licence would change, and for any asset nothing covers, what to ask the licensor to change. Use it to negotiate scope with exact figures before buying.", inputSchema: whatIfInput.shape },
+  async (input) => text(whatIfBrief(input)),
 );
 
 server.registerTool(

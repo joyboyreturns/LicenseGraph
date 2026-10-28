@@ -7,7 +7,7 @@ import { greedyProposer } from "../src/agent/greedy";
 import { SessionStore } from "../src/app-logic/session";
 import { demoModel } from "../src/demo/mock-model";
 import { scenarioById } from "../src/demo/scenarios";
-import { checkBundle, cheapestBundle, purchaseStatus, startPurchase, type AppClient } from "../src/mcp/tools";
+import { checkBundle, cheapestBundle, purchaseStatus, startPurchase, whatIfBrief, whatIfInput, type AppClient } from "../src/mcp/tools";
 import type { Runtime } from "../src/server/runtime";
 import { runExample } from "./mcp-fixtures";
 
@@ -58,6 +58,43 @@ describe("cheapest_compliant_bundle", () => {
     expect(r.requirementCosts).toBeNull();
     expect(r.gapRequests.length).toBe(requiredAssetIds.length);
     expect(r.gapRequests[0]!.asks.map((a) => a.rule)).toContain("exclusivity");
+  });
+});
+
+describe("what_if_brief", () => {
+  it("with no change, says the brief costs what the cheapest bundle costs", () => {
+    const r = whatIfBrief({ project, requiredAssetIds, offers, change: {} });
+    expect(r).toMatchObject({ currency: "USD", baselineCents: 32_900, totalCents: 32_900, deltaCents: 0, shifts: [], uncoveredAssets: [] });
+  });
+
+  it("prices a change exactly: dropping commercial use saves what the requirement costs", () => {
+    const r = whatIfBrief({ project, requiredAssetIds, offers, change: { commercial: false } });
+    expect(r.deltaCents).toBe(-3_500);
+    expect(r.totalCents).toBe(29_400);
+    expect(r.shifts).toHaveLength(1);
+  });
+
+  it("agrees with cheapest_compliant_bundle on the brief it is asked about", () => {
+    const changed = { ...project, termMonths: 36 };
+    const viaWhatIf = whatIfBrief({ project, requiredAssetIds, offers, change: { termMonths: 36 } }).totalCents;
+    const viaCheapest = cheapestBundle({ project: changed, requiredAssetIds, offers }).plans[0]?.totalCents;
+    expect(viaWhatIf).toBe(viaCheapest);
+  });
+
+  it("says what to ask for when the changed brief has no licence", () => {
+    const r = whatIfBrief({ project, requiredAssetIds, offers, change: { requiresExclusive: true } });
+    expect(r.totalCents).toBeUndefined();
+    expect(r.uncoveredAssets.length).toBe(requiredAssetIds.length);
+    expect(r.gaps[0]!.asks.map((a) => a.rule)).toContain("exclusivity");
+  });
+
+  it("validates what an agent sends", () => {
+    const base = { project, requiredAssetIds, offers };
+    expect(whatIfInput.safeParse({ ...base, change: { territories: ["us", "ca"], termMonths: 24 } }).success).toBe(true);
+    expect(whatIfInput.parse({ ...base, change: { territories: ["us"] } }).change.territories).toEqual(["US"]);
+    for (const change of [{ termMonths: 0 }, { termMonths: 1.5 }, { territories: [] }, { territories: ["United States"] }, { commercial: "yes" }]) {
+      expect(whatIfInput.safeParse({ ...base, change }).success, JSON.stringify(change)).toBe(false);
+    }
   });
 });
 

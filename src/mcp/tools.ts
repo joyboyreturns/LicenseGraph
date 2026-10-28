@@ -3,6 +3,7 @@ import { gapRequests, requirementCosts } from "../core/insights";
 import { isIsoDate } from "../core/dates";
 import { minimumCompliantCost } from "../core/optimizer";
 import { verifyBundle } from "../core/rules";
+import { whatIf } from "../core/whatif";
 import type { LicenseOffer, Project } from "../core/types";
 
 /**
@@ -80,6 +81,34 @@ export function cheapestBundle(input: z.infer<typeof cheapestBundleInput>) {
     requirementCosts: requirementCosts(project, input.requiredAssetIds, candidates, options) ?? null,
     gapRequests: gapRequests(project, input.requiredAssetIds, candidates, options),
   };
+}
+
+/** The parts of a brief an agent may change when asking "what if". Anything left out keeps the brief's own value. */
+export const projectChangeSchema = z
+  .object({
+    commercial: z.boolean().describe("Whether the project earns or promotes money."),
+    territories: z.array(territory).min(1).max(250).describe('Where it would be released: ["WORLD"] or country codes.'),
+    termMonths: z.number().int().safe().positive().max(1200).describe("How many months the assets would be needed."),
+    mediums: z.array(z.string().trim().toLowerCase().min(1).max(40)).max(20).describe("Media used. An empty list means the project does not constrain media."),
+    canCredit: z.boolean().describe("False if the project cannot credit creators."),
+    needsSublicensing: z.boolean(),
+    requiresExclusive: z.boolean(),
+  })
+  .partial();
+
+export const whatIfInput = cheapestBundleInput.extend({
+  change: projectChangeSchema.describe("What to change in the brief."),
+  currency: z.string().length(3).toUpperCase().optional().describe("The currency to compare in; the project's own, or USD, if omitted."),
+});
+
+/**
+ * "What if the brief changed?" The exact cheapest compliant bundle for the changed brief, the difference
+ * from the brief as written, which asset's licence would change, and for assets nothing covers, what to
+ * ask the licensor for. Same code as the what-if panel; nothing is estimated.
+ */
+export function whatIfBrief(input: z.infer<typeof whatIfInput>) {
+  const project = input.project as Project;
+  return whatIf(project, input.change, input.requiredAssetIds, input.offers as LicenseOffer[], input.currency ?? project.currency ?? "USD", { today: today() });
 }
 
 export const startPurchaseInput = z.object({ project: projectSchema, requiredAssetIds: z.array(textId).min(1).max(12), documents: z.array(documentSchema).min(1).max(12) });
