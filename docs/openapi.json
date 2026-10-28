@@ -2486,6 +2486,10 @@
           "scenarioId": {
             "type": "string"
           },
+          "revisedFrom": {
+            "description": "The run this one answers, when a licensor's revised licence was added.",
+            "type": "string"
+          },
           "rounds": {
             "type": "integer",
             "minimum": -9007199254740991,

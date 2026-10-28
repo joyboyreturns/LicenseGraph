@@ -238,6 +238,14 @@ function Portfolio() {
                         <div className={styles.sub}>
                           {r.runKind === "live" ? <Radio aria-hidden /> : <History aria-hidden />}
                           {r.runKind === "live" ? "Live model" : "Replayed scenario"} · {relativeTime(r.createdAt, now)}
+                          {r.revisedFrom && (
+                            <>
+                              {" · "}
+                              <Link prefetch={false} href={`/run/${r.revisedFrom}`}>
+                                revision of an earlier run
+                              </Link>
+                            </>
+                          )}
                         </div>
                       </td>
                       <td>

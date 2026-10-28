@@ -425,6 +425,9 @@ describe("answering a gap request", () => {
     expect(next.events[0]).toMatchObject({ seq: 1, kind: "answers_run", payload: { fromRunId: id, earlierOutcome: "no compliant bundle", addedDocumentIds: ["pod-song-exclusive", "pod-art-exclusive", "pod-voice-exclusive"] } });
     expect(next.events[0].payload.asked.map((a: { assetId: string; rules: string[] }) => [a.assetId, a.rules])).toEqual([["song", ["exclusivity"]], ["image", ["exclusivity"]], ["voiceover", ["exclusivity"]]]);
     expect(next.bundle.totalCents).toBe(52_000 + 26_000 + 38_000);
+    const listed = (await body(await listSessions(get()))).runs as { id: string; revisedFrom?: string }[];
+    expect(listed.find((r) => r.id === created.id)?.revisedFrom).toBe(id);
+    expect(listed.find((r) => r.id === id)?.revisedFrom).toBeUndefined();
     expect(next.bundle.offers.map((o: { id: string }) => o.id).sort()).toEqual(["offer-pod-art-exclusive", "offer-pod-song-exclusive", "offer-pod-voice-exclusive"]);
 
     expect((await body(await getSession(new Request("http://app"), ctx(id)))).phase).toBe("failed");

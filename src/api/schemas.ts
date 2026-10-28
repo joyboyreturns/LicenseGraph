@@ -79,6 +79,7 @@ export const RunSummary = z
     phase,
     runKind: z.enum(["demo", "live"]).optional(),
     scenarioId: z.string().optional(),
+    revisedFrom: z.string().optional().describe("The run this one answers, when a licensor's revised licence was added."),
     rounds: z.number().int().optional(),
     totalCents: z.number().int().optional(),
     currency: z.string().optional(),

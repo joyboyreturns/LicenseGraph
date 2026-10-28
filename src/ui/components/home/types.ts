@@ -18,6 +18,8 @@ export interface RunSummary {
   phase: string;
   runKind?: string;
   scenarioId?: string;
+  /** The run this one answers, when a licensor's revised licence was added. */
+  revisedFrom?: string;
   rounds?: number;
   totalCents?: number;
   currency?: string;
