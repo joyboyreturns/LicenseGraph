@@ -4,6 +4,7 @@ import { Bot, FileSearch, Lock, UserCheck } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import type { SessionView } from "@/src/app-logic/session";
 import { checkMandate } from "@/src/core/mandate";
+import { finePrint } from "@/src/core/fine-print";
 import type { Catalog } from "@/src/ui/lib/catalog";
 import { assetLabel, formatMoney, termsSummary } from "@/src/ui/lib/format";
 import { AssetIcon, Spinner, storageGet, storageSet } from "../bits";
@@ -67,6 +68,28 @@ export function BundleTable({ view, catalog, onSelectOffer }: { view: SessionVie
   );
 }
 
+/** Clauses the rules engine does not check, quoted from the bought licences, so "verified" is not read as "nothing else to read". */
+function FinePrint({ view, catalog }: { view: SessionView; catalog: Catalog }) {
+  const rows = (view.bundle?.offers ?? []).flatMap((o) => {
+    const info = catalog.offer(o.id);
+    const doc = info?.documentId ? catalog.docs.get(info.documentId) : undefined;
+    return doc ? finePrint(doc.text).map((f) => ({ ...f, licensor: info!.licensor, key: `${o.id}-${f.sentence}` })) : [];
+  });
+  if (!rows.length) return null;
+  return (
+    <div className={styles.finePrint} data-testid="fine-print">
+      <h3 className={styles.finePrintTitle}>Also in these licences, not checked by the rules engine</h3>
+      <ul>
+        {rows.map((r) => (
+          <li key={r.key}>
+            <b>{r.licensor}</b> · {r.label}: <q>{r.sentence}</q>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 /** What the agent said its person allowed it to spend, checked against the verified total. Informs the approval; never replaces it. */
 function MandateNote({ view }: { view: SessionView }) {
   const mandate = view.meta?.mandate;
@@ -115,6 +138,7 @@ export function ApprovalPanel({ view, catalog, onApprove, busy, onSelectOffer }:
         </div>
       </div>
       <BundleTable view={view} catalog={catalog} onSelectOffer={onSelectOffer} />
+      <FinePrint view={view} catalog={catalog} />
       <MandateNote view={view} />
       {view.payoutBlockedAssets && (
         <p className={styles.lockNote} role="note" data-tone="warn">

@@ -166,6 +166,29 @@
   margin-top: 3px;
 }
 
+.finePrint {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--bg-sunk);
+  font-size: 13px;
+  color: var(--ink);
+}
+.finePrintTitle {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 650;
+}
+.finePrint ul {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+}
+.finePrint q {
+  color: var(--muted);
+}
+
 /* Settlement */
 .approvedLine {
   display: flex;

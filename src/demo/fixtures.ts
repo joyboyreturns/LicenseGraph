@@ -22,7 +22,8 @@ Track: "Morning Tide"
 Licence fee: USD 200.00.
 Grant: The Licensee may use the Track in commercial productions, including advertising and paid distribution.
 Territory: Worldwide.
-Term: This licence is valid for 24 months from the date of purchase.`,
+Term: This licence is valid for 24 months from the date of purchase.
+SoundHarbor may terminate this licence if the Licensee breaches it.`,
     },
     expected: { priceCents: 20_000, currency: "USD", terms: { commercialUse: true, territories: ["WORLD"], termMonths: 24 } },
     quotes: {
@@ -150,7 +151,8 @@ Territory: Worldwide.
 Term: 24 months from purchase, and in any case ending on 31 December 2027.
 No credit line is required.
 The Licensee may sublicense the image to its clients.
-This licence is non-exclusive.`,
+This licence is non-exclusive.
+The image may not be used to train machine learning models.`,
     },
     expected: {
       priceCents: 8_000,

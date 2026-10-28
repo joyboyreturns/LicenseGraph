@@ -33,6 +33,13 @@ test("an agent can start a purchase, but only a person who takes control can app
   await page.getByRole("button", { name: "Skip to result" }).first().click();
   await expect(page.getByRole("button", { name: "Review and approve" })).toBeVisible();
 
+  // Clauses the engine does not check are quoted for the person to read, from the licences that were bought.
+  const fine = page.getByTestId("fine-print");
+  await expect(fine).toContainText("Also in these licences, not checked by the rules engine");
+  await expect(fine).toContainText("SoundHarbor Music");
+  await expect(fine).toContainText("may terminate this licence if the Licensee breaches it.");
+  await expect(fine).toContainText("train machine learning models");
+
   // The cap the agent was given is checked against the verified $329.00 and shown beside the approval.
   await page.getByRole("button", { name: "Review and approve" }).click();
   await expect(page.getByTestId("mandate-note")).toContainText("Over the agent's mandate by $29.00");
