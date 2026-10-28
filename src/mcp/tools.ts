@@ -17,6 +17,9 @@ import type { LicenseOffer, Project } from "../core/types";
 
 const territory = z.string().trim().toUpperCase().regex(/^(WORLD|[A-Z]{2})$/, 'Use "WORLD" or an ISO 3166-1 alpha-2 country code');
 const textId = z.string().trim().min(1).max(55);
+/** Caps on what one call may carry, so a public endpoint cannot be handed an unbounded amount of work. */
+const MAX_OFFERS = 200;
+const MAX_ASSETS = 50;
 
 export const projectSchema = z.object({
   name: z.string().trim().min(1).max(120),
@@ -39,16 +42,16 @@ export const offerSchema = z.object({
   currency: z.string().length(3).toUpperCase(),
   terms: z.object({
     commercialUse: z.boolean(),
-    territories: z.array(territory).min(1),
+    territories: z.array(territory).min(1).max(250),
     termMonths: z.union([z.number().int().safe().positive(), z.literal("perpetual")]),
-    mediums: z.union([z.array(z.string().toLowerCase()), z.literal("ALL")]).optional(),
+    mediums: z.union([z.array(z.string().toLowerCase().max(40)).max(20), z.literal("ALL")]).optional(),
     attributionRequired: z.boolean().optional(),
     sublicensing: z.boolean().optional(),
     exclusive: z.boolean().optional(),
     fixedEndDate: z.string().refine(isIsoDate).optional(),
     offerValidUntil: z.string().refine(isIsoDate).optional(),
   }),
-  evidence: z.array(z.object({ documentId: z.string().min(1), quote: z.string().min(1), field: z.string().optional() })).min(1).describe("Quotes from the licence text that support the terms."),
+  evidence: z.array(z.object({ documentId: z.string().min(1).max(55), quote: z.string().min(1).max(2000), field: z.string().max(40).optional() })).min(1).max(20).describe("Quotes from the licence text that support the terms."),
 });
 
 export const documentSchema = z.object({
@@ -60,8 +63,8 @@ export const documentSchema = z.object({
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-export const checkBundleInput = z.object({ project: projectSchema, requiredAssetIds: z.array(textId).min(1), offers: z.array(offerSchema).min(1), chosenOfferIds: z.array(textId).min(1) });
-export const cheapestBundleInput = z.object({ project: projectSchema, requiredAssetIds: z.array(textId).min(1), offers: z.array(offerSchema).min(1) });
+export const checkBundleInput = z.object({ project: projectSchema, requiredAssetIds: z.array(textId).min(1).max(MAX_ASSETS), offers: z.array(offerSchema).min(1).max(MAX_OFFERS), chosenOfferIds: z.array(textId).min(1).max(MAX_ASSETS) });
+export const cheapestBundleInput = z.object({ project: projectSchema, requiredAssetIds: z.array(textId).min(1).max(MAX_ASSETS), offers: z.array(offerSchema).min(1).max(MAX_OFFERS) });
 
 /** The rules engine's verdict on one proposed bundle. Same code that gates payment in the app. */
 export function checkBundle(input: z.infer<typeof checkBundleInput>) {
@@ -117,8 +120,8 @@ export function whatIfBrief(input: z.infer<typeof whatIfInput>) {
 }
 
 export const licenceEndDatesInput = z.object({
-  offers: z.array(offerSchema).min(1),
-  offerIds: z.array(textId).min(1).optional().describe("Only these offers (the ones bought). All offers if omitted."),
+  offers: z.array(offerSchema).min(1).max(MAX_OFFERS),
+  offerIds: z.array(textId).min(1).max(MAX_OFFERS).optional().describe("Only these offers (the ones bought). All offers if omitted."),
   boughtOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("The day of purchase, YYYY-MM-DD. Today if omitted."),
   projectName: z.string().trim().min(1).max(120).optional(),
 });

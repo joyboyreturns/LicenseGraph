@@ -7,7 +7,7 @@ import { greedyProposer } from "../src/agent/greedy";
 import { SessionStore } from "../src/app-logic/session";
 import { demoModel } from "../src/demo/mock-model";
 import { scenarioById } from "../src/demo/scenarios";
-import { checkBundle, cheapestBundle, licenceEndDates, licenceFinePrint, purchasePlaybook, purchaseStatus, startPurchase, whatIfBrief, whatIfInput, type AppClient } from "../src/mcp/tools";
+import { checkBundleInput, cheapestBundleInput, licenceEndDatesInput, checkBundle, cheapestBundle, licenceEndDates, licenceFinePrint, purchasePlaybook, purchaseStatus, startPurchase, whatIfBrief, whatIfInput, type AppClient } from "../src/mcp/tools";
 import type { Runtime } from "../src/server/runtime";
 import { runExample } from "./mcp-fixtures";
 
@@ -203,5 +203,25 @@ describe("licence_fine_print", () => {
       ],
     });
     expect(r.documents.map((d) => [d.id, d.clauses.map((c) => c.topic)])).toEqual([["a", ["termination", "ai"]], ["b", []]]);
+  });
+});
+
+describe("input caps on a public endpoint", () => {
+  const one = offers[0]!;
+  const copies = (n: number) => Array.from({ length: n }, (_, i) => ({ ...one, id: `o${i}` }));
+
+  it("accepts the sizes a real purchase uses and refuses an unbounded amount of work", () => {
+    expect(cheapestBundleInput.safeParse({ project, requiredAssetIds, offers: copies(200) }).success).toBe(true);
+    expect(cheapestBundleInput.safeParse({ project, requiredAssetIds, offers: copies(201) }).success).toBe(false);
+    expect(cheapestBundleInput.safeParse({ project, requiredAssetIds: Array.from({ length: 51 }, (_, i) => `a${i}`), offers: copies(1) }).success).toBe(false);
+    expect(checkBundleInput.safeParse({ project, requiredAssetIds, offers: copies(1), chosenOfferIds: Array.from({ length: 51 }, (_, i) => `o${i}`) }).success).toBe(false);
+    expect(licenceEndDatesInput.safeParse({ offers: copies(201) }).success).toBe(false);
+  });
+
+  it("refuses an offer that carries oversized evidence or lists", () => {
+    const quote = (n: number) => ({ ...one, evidence: [{ documentId: "d", quote: "x".repeat(n) }] });
+    expect(cheapestBundleInput.safeParse({ project, requiredAssetIds, offers: [quote(2000)] }).success).toBe(true);
+    expect(cheapestBundleInput.safeParse({ project, requiredAssetIds, offers: [quote(2001)] }).success).toBe(false);
+    expect(cheapestBundleInput.safeParse({ project, requiredAssetIds, offers: [{ ...one, evidence: Array.from({ length: 21 }, () => ({ documentId: "d", quote: "q" })) }] }).success).toBe(false);
   });
 });

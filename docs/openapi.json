@@ -1551,6 +1551,7 @@
               },
               "territories": {
                 "minItems": 1,
+                "maxItems": 250,
                 "type": "array",
                 "items": {
                   "type": "string",
@@ -1573,9 +1574,11 @@
               "mediums": {
                 "anyOf": [
                   {
+                    "maxItems": 20,
                     "type": "array",
                     "items": {
-                      "type": "string"
+                      "type": "string",
+                      "maxLength": 40
                     }
                   },
                   {
@@ -1609,20 +1612,24 @@
           },
           "evidence": {
             "minItems": 1,
+            "maxItems": 20,
             "type": "array",
             "items": {
               "type": "object",
               "properties": {
                 "documentId": {
                   "type": "string",
-                  "minLength": 1
+                  "minLength": 1,
+                  "maxLength": 55
                 },
                 "quote": {
                   "type": "string",
-                  "minLength": 1
+                  "minLength": 1,
+                  "maxLength": 2000
                 },
                 "field": {
-                  "type": "string"
+                  "type": "string",
+                  "maxLength": 40
                 }
               },
               "required": [
