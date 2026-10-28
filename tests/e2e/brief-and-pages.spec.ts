@@ -78,3 +78,14 @@ test("the no-bundle run, with its outlook and licensor messages, and the passpor
   await expect(page.getByRole("heading", { name: "Negotiation" })).toBeVisible();
   expect(await overflow()).toBeLessThanOrEqual(0);
 });
+
+test("a shared link carries a preview card: the page names an image, and the image is a real PNG", async ({ page, request }) => {
+  await page.goto("/");
+  const og = await page.locator('meta[property="og:image"]').getAttribute("content");
+  expect(og).toMatch(/\/opengraph-image/);
+  const res = await request.get(new URL(og!).pathname + new URL(og!).search);
+  expect(res.status()).toBe(200);
+  expect(res.headers()["content-type"]).toBe("image/png");
+  expect((await res.body()).subarray(0, 4).toString("hex")).toBe("89504e47");
+  await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute("content", "summary_large_image");
+});

@@ -51,7 +51,7 @@ export const metadata: Metadata = {
     title: "LicenseGraph: AI moves at machine speed. Creator rights and payments should too.",
     description,
   },
-  twitter: { card: "summary", title: "LicenseGraph", description },
+  twitter: { card: "summary_large_image", title: "LicenseGraph", description },
 };
 
 export const viewport: Viewport = {
