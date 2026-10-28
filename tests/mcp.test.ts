@@ -7,7 +7,7 @@ import { greedyProposer } from "../src/agent/greedy";
 import { SessionStore } from "../src/app-logic/session";
 import { demoModel } from "../src/demo/mock-model";
 import { scenarioById } from "../src/demo/scenarios";
-import { checkBundle, cheapestBundle, licenceEndDates, purchasePlaybook, purchaseStatus, startPurchase, whatIfBrief, whatIfInput, type AppClient } from "../src/mcp/tools";
+import { checkBundle, cheapestBundle, licenceEndDates, licenceFinePrint, purchasePlaybook, purchaseStatus, startPurchase, whatIfBrief, whatIfInput, type AppClient } from "../src/mcp/tools";
 import type { Runtime } from "../src/server/runtime";
 import { runExample } from "./mcp-fixtures";
 
@@ -183,7 +183,7 @@ describe("licence_end_dates", () => {
 describe("buy_licences prompt", () => {
   it("names every tool in the order they are used, and keeps approval and payment with the person", () => {
     const text = purchasePlaybook("A podcast theme, US only, 12 months");
-    const order = ["cheapest_compliant_bundle", "what_if_brief", "licence_end_dates", "start_licence_purchase", "get_purchase_status"].map((t) => text.indexOf(t));
+    const order = ["cheapest_compliant_bundle", "what_if_brief", "licence_fine_print", "licence_end_dates", "start_licence_purchase", "get_purchase_status"].map((t) => text.indexOf(t));
     expect(order.every((i) => i >= 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
     expect(text).toContain("A podcast theme, US only, 12 months");
@@ -191,5 +191,17 @@ describe("buy_licences prompt", () => {
   });
   it("asks for the brief when none is given", () => {
     expect(purchasePlaybook()).toMatch(/Start by getting the brief/);
+  });
+});
+
+describe("licence_fine_print", () => {
+  it("quotes the clauses the rules engine does not check, per licence, and nothing for a plain one", () => {
+    const r = licenceFinePrint({
+      documents: [
+        { id: "a", text: "Licence fee: USD 90.00.\nThe Licensor may terminate this licence if the Licensee breaches it.\nThe Work may not be used to train any machine learning model." },
+        { id: "b", text: "Licence fee: USD 90.00.\nTerritory: Worldwide." },
+      ],
+    });
+    expect(r.documents.map((d) => [d.id, d.clauses.map((c) => c.topic)])).toEqual([["a", ["termination", "ai"]], ["b", []]]);
   });
 });

@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { checkBundle, checkBundleInput, cheapestBundle, cheapestBundleInput, licenceEndDates, licenceEndDatesInput, purchasePlaybook, purchaseStatus, startPurchase, startPurchaseInput, whatIfBrief, whatIfInput, type AppClient } from "./tools";
+import { checkBundle, checkBundleInput, cheapestBundle, cheapestBundleInput, licenceEndDates, licenceEndDatesInput, licenceFinePrint, licenceFinePrintInput, purchasePlaybook, purchaseStatus, startPurchase, startPurchaseInput, whatIfBrief, whatIfInput, type AppClient } from "./tools";
 
 const text = (value: unknown) => ({ content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }] });
 
@@ -33,6 +33,12 @@ export function createLicenseGraphServer(app: AppClient): McpServer {
     "licence_end_dates",
     { description: "When each licence stops covering the project, counted from the day of purchase, soonest first (a perpetual licence has no end). Also returns an iCalendar file with a reminder 30 days before each end, so licences are renewed before the project is exposed.", inputSchema: licenceEndDatesInput.shape },
     async (input) => text(licenceEndDates(input)),
+  );
+
+  server.registerTool(
+    "licence_fine_print",
+    { description: "The clauses in each licence that the rules engine does not check (a licence that can be ended early, a ban on training AI, limits on resale, liability, reporting duties, changes to the work), quoted word for word. Show these to the person before they approve: a bundle can pass every rule and still contain a clause they would not accept.", inputSchema: licenceFinePrintInput.shape },
+    async (input) => text(licenceFinePrint(input)),
   );
 
   server.registerTool(

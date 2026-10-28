@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { finePrint } from "../core/fine-print";
 import { gapRequests, requirementCosts } from "../core/insights";
 import { negotiationOutlook } from "../core/negotiation";
 import { buildIcs, licenceEnds } from "../core/renewals";
@@ -135,6 +136,19 @@ export function licenceEndDates(input: z.infer<typeof licenceEndDatesInput>) {
   return { boughtOn, ends, calendar: buildIcs(input.projectName ?? "Licence project", items, `${boughtOn.replace(/-/g, "")}T000000Z`) };
 }
 
+export const licenceFinePrintInput = z.object({
+  documents: z.array(z.object({ id: textId, text: z.string().min(1).max(20_000) })).min(1).max(12),
+});
+
+/**
+ * The clauses in each licence that the rules engine does not check (termination, AI training, resale, liability,
+ * reporting, changes to the work), quoted word for word. An agent should put these in front of the person before
+ * they approve: a bundle that passes the rules can still contain a clause the person would not accept.
+ */
+export function licenceFinePrint(input: z.infer<typeof licenceFinePrintInput>) {
+  return { documents: input.documents.map((d) => ({ id: d.id, clauses: finePrint(d.text, 6) })) };
+}
+
 /**
  * The order an agent should work in, as a prompt an MCP client can offer. It only names the tools and what each
  * is for; every figure still comes from the tools, and nothing is approved or paid by the agent.
@@ -146,7 +160,7 @@ export function purchasePlaybook(brief?: string): string {
     "1. Read each licence into an offer: the price, and each term it states, with the exact sentence it came from. A term the licence does not state stays blank; a blank is not a yes.",
     "2. Call cheapest_compliant_bundle. It gives the exact minimum cost, what each requirement adds to it, and, where an asset has no compliant offer, the closest offer and what to ask its licensor to change.",
     "3. If nothing can be bought, read gapRequests and ifLicensorsAgree. Tell the person plainly: what blocks each asset, what to ask each licensor, the best-case total if they all said yes, and how far each price could rise before the budget breaks. Call what_if_brief to price a smaller scope (a different territory, a shorter term, one requirement dropped). Do not offer to proceed with a bundle the tools did not verify.",
-    "4. If a bundle exists, call licence_end_dates so the person knows when each licence runs out, then start_licence_purchase with the raw licence texts and, if the person gave you a spending limit, that limit as the mandate. LicenseGraph re-reads the licences, re-verifies the bundle itself and checks its total against your mandate for the person to see.",
+    "4. If a bundle exists, call licence_fine_print on the licence texts and tell the person any clause it returns, then call licence_end_dates so the person knows when each licence runs out, then start_licence_purchase with the raw licence texts and, if the person gave you a spending limit, that limit as the mandate. LicenseGraph re-reads the licences, re-verifies the bundle itself and checks its total against your mandate for the person to see.",
     "5. Give the person the claim link. Only they can approve and pay; you cannot, and you must not say a payment happened until get_purchase_status shows it.",
     "6. Report the Licence Passport link once the purchase is paid.",
   ].join("\n\n");
