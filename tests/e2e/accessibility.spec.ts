@@ -1,11 +1,7 @@
-import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
+import { accessibilityViolations } from "./helpers";
 
-/** Automated WCAG 2 A and AA checks. They find a part of what an audit would, so a pass is a floor, not a certificate. */
-async function violations(page: Page) {
-  const { violations } = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
-  return violations.map((v) => `${v.id} (${v.impact}): ${v.nodes.slice(0, 3).map((n) => n.target.join(" ")).join(" | ")}`);
-}
+const violations = accessibilityViolations;
 
 /** With reduced motion the replay is already at its end, and "Skip to result" is disabled; otherwise press it. */
 async function toResult(page: Page) {

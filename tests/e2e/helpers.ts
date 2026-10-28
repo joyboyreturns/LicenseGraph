@@ -1,4 +1,11 @@
+import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page } from "@playwright/test";
+
+/** Automated WCAG 2 A and AA checks. They find a part of what an audit would, so a pass is a floor, not a certificate. */
+export async function accessibilityViolations(page: Page) {
+  const { violations } = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
+  return violations.map((v) => `${v.id} (${v.impact}): ${v.nodes.slice(0, 3).map((n) => n.target.join(" ")).join(" | ")}`);
+}
 
 /** Start a built-in scenario from the home page and land on its run page. */
 export async function startScenario(page: Page, title: string) {

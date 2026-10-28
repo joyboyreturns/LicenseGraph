@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { readFileSync } from "node:fs";
-import { approveAndCreateOrder, payInSimulator, startScenario } from "./helpers";
+import { accessibilityViolations, approveAndCreateOrder, payInSimulator, startScenario } from "./helpers";
 
 test("a scenario goes from licences to a verified, paid and independently checkable passport", async ({ page }) => {
   const errors: string[] = [];
@@ -24,12 +24,14 @@ test("a scenario goes from licences to a verified, paid and independently checka
   await payInSimulator(page);
   await expect(page.getByText(/Every creator has been paid/i)).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText("2170.00 USD captured").first()).toBeVisible();
+  expect(await accessibilityViolations(page)).toEqual([]); // the paid run, with the payout table
 
   // The passport re-checks itself in the browser.
   await page.getByRole("link", { name: "View Licence Passport" }).first().click();
   await page.waitForURL(/\/passport\//);
   await expect(page.getByText(/All 9 checks passed in this browser/)).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText("SIMULATED").first()).toBeVisible();
+  expect(await accessibilityViolations(page)).toEqual([]);
 
   // The downloaded file verifies on its own; a tampered copy does not.
   const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("link", { name: "Download JSON" }).click()]);
