@@ -59,6 +59,14 @@ describe("cheapest_compliant_bundle", () => {
     expect(r.gapRequests.length).toBe(requiredAssetIds.length);
     expect(r.gapRequests[0]!.asks.map((a) => a.rule)).toContain("exclusivity");
   });
+
+  it("prices a yes to every ask, and says nothing about it when something already passes", () => {
+    const blocked = cheapestBundle({ project: { ...project, requiresExclusive: true }, requiredAssetIds, offers });
+    expect(blocked.ifLicensorsAgree).toMatchObject({ currency: "USD", asked: expect.arrayContaining(requiredAssetIds) });
+    expect(blocked.ifLicensorsAgree!.assets).toHaveLength(requiredAssetIds.length);
+    expect(blocked.ifLicensorsAgree!.totalCents).toBeGreaterThan(0);
+    expect(cheapestBundle({ project, requiredAssetIds, offers }).ifLicensorsAgree).toBeNull();
+  });
 });
 
 describe("what_if_brief", () => {

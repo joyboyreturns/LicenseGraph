@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { gapRequests, requirementCosts } from "../core/insights";
+import { negotiationOutlook } from "../core/negotiation";
 import { isIsoDate } from "../core/dates";
 import { minimumCompliantCost } from "../core/optimizer";
 import { verifyBundle } from "../core/rules";
@@ -80,6 +81,8 @@ export function cheapestBundle(input: z.infer<typeof cheapestBundleInput>) {
     uncoveredAssets: frontier.uncoveredAssets,
     requirementCosts: requirementCosts(project, input.requiredAssetIds, candidates, options) ?? null,
     gapRequests: gapRequests(project, input.requiredAssetIds, candidates, options),
+    // Best case if every licensor agreed to every ask at its quoted price, and how much each asset could rise before the budget breaks. Not an offer.
+    ifLicensorsAgree: negotiationOutlook(project, input.requiredAssetIds, candidates, project.currency ?? "USD", options) ?? null,
   };
 }
 
