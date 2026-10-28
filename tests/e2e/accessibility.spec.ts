@@ -47,5 +47,17 @@ for (const scheme of ["light", "dark"] as const) {
       await expect(page.getByTestId("negotiation-outlook")).toBeVisible();
       expect(await violations(page)).toEqual([]);
     });
+
+    test("the portfolio dashboard, with its custom widgets drawn, has none", async ({ page }) => {
+      const id = await runOf(page, "podcast");
+      await page.request.post(`/api/sessions/${id}/approve`, { data: { approvedBy: "Kiran" } });
+      const paid = await (await page.request.post(`/api/sessions/${id}/pay`)).json();
+      await page.request.post(`/api/simulator/orders/${paid.order.id}`);
+      await page.request.post(`/api/sessions/${id}/capture`);
+      await page.goto("/dashboard?portfolio=1");
+      await expect(page.getByRole("img", { name: /^Where the/ })).toBeVisible({ timeout: 30_000 });
+      await expect(page.getByRole("list", { name: "Licence end dates" })).toBeVisible();
+      expect(await violations(page)).toEqual([]);
+    });
   });
 }
