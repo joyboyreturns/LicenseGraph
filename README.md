@@ -42,11 +42,38 @@ Anyone who ships creative work (a game trailer, a podcast, a promo film) ends up
 
 The run page computes the exact cheapest compliant bundle from the uploaded offers, separately in each currency. It independently checks whether the agent found that minimum and shows the precise budget shortfall when no affordable bundle exists. All rights requirements stay in force. The method uses the current rules' independence between assets; every result is rechecked by the same rules engine, and property tests compare it with exhaustive enumeration.
 
+## What each requirement costs, and what to ask for
+
+Two further answers come from the same rules engine, with no model involved:
+
+- **Requirement costs.** For every requirement the brief declares (media, commercial use, territory, term, credit, sublicensing, exclusivity) the run page shows what that requirement adds to the cheapest compliant bundle, by re-running the cost check with only that requirement dropped. A requirement that the cheapest licences already meet is shown as costing nothing. Tests compare every figure with an exhaustive search of all bundles through the real verifier.
+- **Gap requests.** When no offer for an asset passes, the run no longer ends in a dead end: it finds the closest offer for each blocked asset, lists the exact terms to ask the licensor to change (territory, term, missing media, credit, and so on) and drafts the message, ready to copy. Revised terms are verified again before anything is bought.
+
+Both are also tables in AG Studio (`requirements`, `gaps`), so the dashboard and its assistant can chart and filter them across runs.
+
+## Agents can shop, only people can spend (MCP)
+
+`scripts/mcp-server.ts` exposes LicenseGraph as a [Model Context Protocol](https://modelcontextprotocol.io) server over stdio, so any MCP-capable AI agent can use it:
+
+| Tool | What it does |
+| --- | --- |
+| `check_licence_bundle` | The rules engine's verdict on a proposed bundle, with every violation |
+| `cheapest_compliant_bundle` | Exact minimum cost, what each requirement adds, and what to ask for where nothing passes |
+| `start_licence_purchase` | Reads raw licence texts, proposes and verifies a bundle, and returns a claim link for a person |
+| `get_purchase_status` | Verified bundle, approval, PayPal capture, creator payouts and the Licence Passport link |
+
+The agent cannot approve or pay. A run started this way belongs to an owner id no browser holds, so approving and paying are refused until a person opens the claim link and clicks to take control. The link carries a one-time token stored only as a hash; opening it (or a chat app previewing it) changes nothing, and the handover is recorded in the hash-chained ledger and shown in the Licence Passport.
+
+```bash
+LICENSEGRAPH_URL=http://localhost:3000 npx tsx scripts/mcp-server.ts
+# in an MCP client: { "command": "npx", "args": ["tsx", "scripts/mcp-server.ts"], "env": { "LICENSEGRAPH_URL": "http://localhost:3000" } }
+```
+
 ## How PayPal is used
 
 - **Orders API (Sandbox):** create order, buyer approval, capture, with stable, bounded idempotency keys and coalesced concurrent requests. Orders are created only through a gate that re-verifies the bundle and requires a human approval for exactly that bundle.
 - **Payouts API (Sandbox):** after capture, each licensor is paid the price of their licence in one batch. Payout status is tracked per recipient. A batch is settled only when every creator payment succeeds; uncertain submissions reuse the same batch key when retried.
-- **Agentic commerce:** the AI agent initiates the purchase by proposing the bundle. Deterministic verification and a human approval stand between that proposal and any money moving.
+- **Agentic commerce:** an AI agent, ours or any MCP client, initiates the purchase. Deterministic verification and a human who has explicitly taken control stand between that proposal and any money moving; PayPal executes the payment and the payouts.
 
 ## How AI is used
 

@@ -23,6 +23,7 @@ export function buildPortfolioData(views: SessionView[]) {
   const violations: Row[] = [];
   const payouts: Row[] = [];
   const events: Row[] = [];
+  const requirements: Row[] = [];
 
   for (const v of views) {
     const t = buildDashboardData(v);
@@ -48,6 +49,8 @@ export function buildPortfolioData(views: SessionView[]) {
     });
     for (const o of t.offers) offers.push({ ...o, runId: v.id, run: runLabel(v) });
     for (const x of t.violations) violations.push({ ...x, runId: v.id, run: runLabel(v) });
+    // Dollar columns again hold dollar runs only; a run in another currency keeps its own figures out of the sums.
+    for (const r of t.requirements) requirements.push({ ...r, extraCost: currency === "USD" ? (r.extraCost ?? null) : null, costWithout: currency === "USD" ? (r.costWithout ?? null) : null, currency, runId: v.id, run: runLabel(v) });
     for (const e of t.events) events.push({ ...e, runId: v.id, run: runLabel(v) });
     for (const l of v.payouts?.lines ?? []) {
       payouts.push({ payoutId: `${v.id}:${l.offerId}`, runId: v.id, run: runLabel(v), licensor: l.licensorName, asset: l.assetId, amount: l.currency === "USD" ? dollars(l.amountCents) : null, currency: l.currency, amountLocal: dollars(l.amountCents), status: l.status });
@@ -56,7 +59,7 @@ export function buildPortfolioData(views: SessionView[]) {
 
   return {
     description:
-      "LicenseGraph portfolio across projects. 'runs' has one row per licensing run (what the verified bundle cost, what a price-only purchase would have cost, how many licences the rules blocked, whether it was paid). 'offers' has every licence offer extracted from uploaded licences with its terms and whether it was chosen or rejected. 'violations' lists each rule the verifier found broken. 'payouts' lists the creators paid through PayPal Payouts. 'events' is the tamper-evident ledger. Dollar columns (Verified total, Price-only total, Compliance premium, Amount) include only runs settled in US dollars; a run in another currency shows its amount in the 'Local' column and its currency, and is never converted or added into a dollar total.",
+      "LicenseGraph portfolio across projects. 'runs' has one row per licensing run (what the verified bundle cost, what a price-only purchase would have cost, how many licences the rules blocked, whether it was paid). 'offers' has every licence offer extracted from uploaded licences with its terms and whether it was chosen or rejected. 'violations' lists each rule the verifier found broken. 'requirements' shows what each requirement of each brief adds to the cheapest compliant bundle. 'payouts' lists the creators paid through PayPal Payouts. 'events' is the tamper-evident ledger. Dollar columns (Verified total, Price-only total, Compliance premium, Amount) include only runs settled in US dollars; a run in another currency shows its amount in the 'Local' column and its currency, and is never converted or added into a dollar total.",
     sources: [
       {
         id: "runs",
@@ -91,6 +94,13 @@ export function buildPortfolioData(views: SessionView[]) {
         fields: [text("payoutId", "Payout"), text("runId", "Run id"), text("run", "Project"), text("licensor", "Creator"), text("asset", "Asset"), money("amount", "Amount"), decimal("amountLocal", "Amount (own currency)"), text("currency", "Currency"), text("status", "Status")],
       },
       {
+        id: "requirements",
+        name: "Requirement costs",
+        description: "What each requirement of each brief adds to that run's cheapest compliant bundle. Dollar runs only in the cost columns.",
+        data: requirements,
+        fields: [text("runId", "Run id"), text("run", "Project"), text("requirementId", "Rule"), text("requirement", "Requirement"), text("value", "Your brief says"), money("extraCost", "Adds to the cost"), money("costWithout", "Cost without it"), text("impact", "Impact"), text("currency", "Currency")],
+      },
+      {
         id: "events",
         name: "Ledger events",
         description: "The hash-chained ledger of everything that happened across runs.",
@@ -102,6 +112,7 @@ export function buildPortfolioData(views: SessionView[]) {
       { id: "run-offers", source: { tableId: "runs", fieldId: "runId" }, target: { tableId: "offers", fieldId: "runId" }, type: "one-to-many" as const },
       { id: "run-violations", source: { tableId: "runs", fieldId: "runId" }, target: { tableId: "violations", fieldId: "runId" }, type: "one-to-many" as const },
       { id: "run-payouts", source: { tableId: "runs", fieldId: "runId" }, target: { tableId: "payouts", fieldId: "runId" }, type: "one-to-many" as const },
+      { id: "run-requirements", source: { tableId: "runs", fieldId: "runId" }, target: { tableId: "requirements", fieldId: "runId" }, type: "one-to-many" as const },
       { id: "run-events", source: { tableId: "runs", fieldId: "runId" }, target: { tableId: "events", fieldId: "runId" }, type: "one-to-many" as const },
     ],
   };
@@ -127,6 +138,11 @@ export const PORTFOLIO_INITIAL_STATE = {
           type: "bar-chart-grouped",
           dataMapping: { categoryKey: [{ id: "violations.rule" }], valueKey: [{ id: "violations.violationId", aggregation: "count" }] },
           format: { title: { enabled: true, text: "Rules that rejected proposals" } },
+        },
+        requirementCost: {
+          type: "bar-chart-grouped",
+          dataMapping: { categoryKey: [{ id: "requirements.requirement" }], valueKey: [{ id: "requirements.extraCost", aggregation: "sum" }] },
+          format: { title: { enabled: true, text: "What each requirement adds to the cost" } },
         },
         offerStatus: {
           type: "donut-chart",
@@ -154,11 +170,12 @@ export const PORTFOLIO_INITIAL_STATE = {
         blocked: { xTrack: 3, yTrack: 0, xSpan: 3, ySpan: 3 },
         creators: { xTrack: 6, yTrack: 0, xSpan: 3, ySpan: 3 },
         offerStatus: { xTrack: 9, yTrack: 0, xSpan: 3, ySpan: 6 },
-        priceVsVerified: { xTrack: 0, yTrack: 3, xSpan: 5, ySpan: 5 },
-        byRule: { xTrack: 5, yTrack: 3, xSpan: 4, ySpan: 5 },
-        runsGrid: { xTrack: 0, yTrack: 8, xSpan: 12, ySpan: 5 },
-        payoutsGrid: { xTrack: 0, yTrack: 13, xSpan: 6, ySpan: 5 },
-        offersGrid: { xTrack: 0, yTrack: 18, xSpan: 12, ySpan: 6 },
+        priceVsVerified: { xTrack: 0, yTrack: 3, xSpan: 5, ySpan: 8 },
+        byRule: { xTrack: 5, yTrack: 3, xSpan: 4, ySpan: 8 },
+        requirementCost: { xTrack: 9, yTrack: 6, xSpan: 3, ySpan: 5 },
+        runsGrid: { xTrack: 0, yTrack: 11, xSpan: 12, ySpan: 5 },
+        payoutsGrid: { xTrack: 0, yTrack: 16, xSpan: 6, ySpan: 5 },
+        offersGrid: { xTrack: 0, yTrack: 21, xSpan: 12, ySpan: 6 },
       },
     },
   ],

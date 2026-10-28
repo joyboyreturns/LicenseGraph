@@ -114,6 +114,27 @@ describe("optional terms", () => {
   });
 });
 
+describe("evidence given as a map", () => {
+  const f = fixtures[0]!;
+
+  it("is repaired into a list, and every quote is still located in the source", async () => {
+    const reply = JSON.parse(cannedReply(f));
+    const asMap: Record<string, string[]> = {};
+    for (const e of reply.evidence as { field: string; quote: string }[]) (asMap[e.field] ??= []).push(e.quote);
+    const result = await extractOffer(replying(JSON.stringify({ ...reply, evidence: asMap })), f.doc, { attempts: 1 });
+    expect(result.problems).toEqual([]);
+    expect(result.offer?.evidence.map((e) => e.field).sort()).toEqual(reply.evidence.map((e: { field: string }) => e.field).sort());
+    for (const e of result.offer!.evidence) expect(f.doc.text.slice(e.start, e.end).replace(/\s+/g, " ")).toBe(e.quote.replace(/\s+/g, " "));
+  });
+
+  it("still rejects an invented quote given in map form", async () => {
+    const reply = JSON.parse(cannedReply(f));
+    const result = await extractOffer(replying(JSON.stringify({ ...reply, evidence: { price: "A price nobody wrote", commercialUse: "x", territories: "y", term: "z" } })), f.doc, { attempts: 1 });
+    expect(result.offer).toBeUndefined();
+    expect(result.problems.join(" ")).toMatch(/not found in the document/);
+  });
+});
+
 describe("territory codes", () => {
   const f = fixtures[0]!;
   const withTerritories = (territories: unknown) => JSON.stringify({ ...JSON.parse(cannedReply(f)), territories });

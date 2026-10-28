@@ -11,6 +11,7 @@ export const KIND_LABEL: Record<LedgerKind, string> = {
   rejected: "Rules engine rejected",
   verified: "Rules engine verified",
   proposal_error: "Proposal unusable",
+  handed_over: "Run handed to a person",
   approved: "Human approved",
   order_created: "PayPal order created",
   captured: "Payment captured",
@@ -24,7 +25,7 @@ export const KIND_LABEL: Record<LedgerKind, string> = {
 export function eventActor(kind: LedgerKind | string): "agent" | "engine" | "human" | "payment" {
   if (kind === "extracted" || kind === "extraction_failed" || kind === "proposed" || kind === "revised" || kind === "proposal_error") return "agent";
   if (kind === "rejected" || kind === "verified") return "engine";
-  if (kind === "approved") return "human";
+  if (kind === "approved" || kind === "handed_over") return "human";
   return "payment";
 }
 
@@ -49,6 +50,8 @@ export function eventTitle(e: Pick<LedgerEvent, "kind" | "payload">, catalog?: P
       return `${round}rules engine verified the bundle${typeof p.totalCents === "number" ? `, ${formatMoney(p.totalCents)}` : ""}`;
     case "proposal_error":
       return `${round}proposal could not be used`;
+    case "handed_over":
+      return "A person took control of this run started by an agent";
     case "approved":
       return `Approved by ${String(p.approvedBy ?? "a person")}`;
     case "order_created":

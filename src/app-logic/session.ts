@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { runProposeVerifyLoop, type LoopResult, type Proposer } from "../agent/loop";
 import { analyzeRun, type RunAnalysis } from "../core/analysis";
 import type { LicenseOffer, Project } from "../core/types";
@@ -21,7 +21,7 @@ export interface SessionInput {
   requiredAssetIds: string[];
   documents: SourceDocument[];
   /** Where the run came from, for display. */
-  meta?: { scenarioId?: string; brief?: string; /** "demo" replays recorded model output; "live" calls the model. */ runKind?: "demo" | "live" };
+  meta?: { scenarioId?: string; brief?: string; /** "demo" replays recorded model output; "live" calls the model. */ runKind?: "demo" | "live"; /** Started by an AI agent through the API; a person must take control before anything can be approved or paid. */ startedBy?: "agent" };
 }
 
 export interface Session {
@@ -42,6 +42,8 @@ export interface Session {
   order?: CreatedOrder;
   capture?: CapturedOrder;
   payouts?: PayoutSummary;
+  /** Present until a person takes over an agent-started run: only a hash of the one-time claim token is kept. */
+  claim?: { tokenHash: string; expiresAt: string };
   /** Which payment backend took this run's order, so the passport can say so truthfully. */
   paymentsMode?: "paypal-sandbox" | "simulator";
   /** Epoch ms of the last payout status check, to avoid hammering PayPal. Not persisted. */
@@ -93,6 +95,38 @@ export function createSession(input: SessionInput, ledger: Ledger = new Ledger()
 }
 
 const touch = (s: Session) => s.onChange?.();
+
+const CLAIM_TTL_MS = 24 * 60 * 60 * 1000;
+const hashToken = (token: string) => createHash("sha256").update(token).digest("hex");
+
+/**
+ * Hand an agent-started run to people. The run gets an owner id no browser holds, so neither the agent
+ * nor anyone else can approve or pay it, and a one-time token that is returned once and stored only as
+ * a hash. Whoever presents the token (by a deliberate click, not a link preview) becomes the owner.
+ */
+export function reserveForPerson(session: Session, now: Date = new Date()): { token: string; expiresAt: string } {
+  const token = randomBytes(24).toString("base64url");
+  const expiresAt = new Date(now.getTime() + CLAIM_TTL_MS).toISOString();
+  session.ownerId = `agent-${randomUUID()}`;
+  session.claim = { tokenHash: hashToken(token), expiresAt };
+  session.input.meta = { ...session.input.meta, startedBy: "agent" };
+  touch(session);
+  return { token, expiresAt };
+}
+
+/** A person takes control of an agent-started run. The token works once; success is written to the ledger. */
+export function claimSession(session: Session, token: string, ownerId: string, now: Date = new Date()): void {
+  const claim = session.claim;
+  if (!claim) throw new SessionError("This run is not waiting for a person to take control.");
+  if (Date.parse(claim.expiresAt) < now.getTime()) throw new SessionError("This link has expired. Ask the agent to start the purchase again.");
+  const given = Buffer.from(hashToken(token));
+  const expected = Buffer.from(claim.tokenHash);
+  if (given.length !== expected.length || !timingSafeEqual(given, expected)) throw new SessionError("This link is not valid.");
+  session.ownerId = ownerId;
+  session.claim = undefined;
+  touch(session);
+  session.ledger.append("handed_over", { startedBy: "agent" });
+}
 
 // Join duplicate requests while an external operation is pending. A rejected request releases
 // the lock so the owner can retry with the same durable PayPal idempotency key.
@@ -289,6 +323,8 @@ export interface SessionView {
   phase: Phase;
   createdAt: string;
   failure?: string;
+  /** An agent started this run and no person has taken control yet, so it cannot be approved or paid. */
+  awaitingPerson?: boolean;
   project: Project;
   meta?: SessionInput["meta"];
   /** Source licence text, so the UI can highlight the quotes that back each term. */
@@ -317,6 +353,7 @@ export function viewOf(session: Session): SessionView {
     phase: session.phase,
     createdAt: session.createdAt,
     failure: session.failure,
+    awaitingPerson: session.claim ? true : undefined,
     project: session.input.project,
     meta: session.input.meta,
     documents: session.input.documents.map((d) => ({ id: d.id, assetId: d.assetId, text: d.text, licensorName: d.licensor?.name })),

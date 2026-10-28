@@ -1,5 +1,6 @@
 import { evaluateOffer, type RuleResult, type VerifyOptions } from "./rules";
 import type { Cents, LicenseOffer, Project } from "./types";
+import { gapRequests, requirementCosts, type GapRequest, type RequirementCosts } from "./insights";
 import { minimumCompliantCost, type CostFrontier } from "./optimizer";
 
 export interface OfferEvaluation {
@@ -27,6 +28,10 @@ export interface AssetAnalysis {
 
 export interface RunAnalysis {
   optimization: CostFrontier;
+  /** What each declared requirement adds to the minimum compliant cost. Absent when no complete compliant bundle exists. */
+  requirementCosts?: RequirementCosts;
+  /** Assets with no compliant offer: the nearest offer and what to ask the licensor to change. */
+  gaps: GapRequest[];
   evaluations: OfferEvaluation[];
   assets: AssetAnalysis[];
   /** Total of the cheapest offer per asset: what shopping on price alone would cost. */
@@ -74,6 +79,8 @@ export function analyzeRun(input: { project: Project; requiredAssetIds: string[]
   const chosenTotalCents = assets.reduce((n, a) => n + (a.chosenCents ?? 0), 0);
   return {
     optimization: minimumCompliantCost(project, requiredAssetIds, candidates, options),
+    requirementCosts: requirementCosts(project, requiredAssetIds, candidates, options),
+    gaps: gapRequests(project, requiredAssetIds, candidates, options),
     evaluations,
     assets,
     naiveTotalCents,

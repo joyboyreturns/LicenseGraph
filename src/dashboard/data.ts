@@ -1,5 +1,6 @@
 import type { SessionView } from "../app-logic/session";
-import type { LicenseOffer, LicenseTerms, Violation } from "../core/types";
+import type { LicenseOffer, LicenseTerms, RuleId, Violation } from "../core/types";
+import { projectRequirements } from "../ui/lib/format";
 
 type Row = Record<string, string | number | null>;
 
@@ -8,7 +9,16 @@ export interface DashboardTables {
   offers: Row[];
   violations: Row[];
   events: Row[];
+  /** What each declared requirement adds to the cheapest compliant bundle. */
+  requirements: Row[];
+  /** Assets with no compliant offer: the nearest offer and each change to ask for. */
+  gaps: Row[];
 }
+
+const REQUIREMENT_KEY: Partial<Record<RuleId, string>> = { "commercial-use": "commercial", territory: "territory", term: "term", medium: "media", attribution: "credit", sublicensing: "sublicensing", exclusivity: "exclusive" };
+
+/** The currency a run's prices are in. */
+export const viewCurrency = (view: SessionView) => view.bundle?.currency ?? view.project.currency ?? view.candidates[0]?.currency ?? "USD";
 
 const dollars = (cents: number) => cents / 100;
 const yesNo = (v: boolean | undefined, yes: string, no: string) => (v === undefined ? "Not stated" : v ? yes : no);
@@ -96,6 +106,20 @@ export function buildDashboardData(view: SessionView): DashboardTables {
     };
   });
 
+  const costs = view.analysis?.requirementCosts;
+  const stated = new Map(projectRequirements(view.project, costs?.currency).map((r) => [r.key, r.value]));
+  const requirements: Row[] = (costs?.items ?? []).map((i) => ({
+    requirementId: i.rule,
+    requirement: i.label,
+    value: stated.get(REQUIREMENT_KEY[i.rule] ?? "") ?? "",
+    extraCost: dollars(i.extraCents),
+    costWithout: dollars(i.withoutCents),
+    impact: i.extraCents === 0 ? "Costs nothing" : "Adds cost",
+  }));
+  const gaps: Row[] = (view.analysis?.gaps ?? []).flatMap((g) =>
+    g.asks.map((a, n) => ({ gapId: `${g.offerId}:${a.rule}:${n}`, asset: g.assetId, offerId: g.offerId, offerPrice: dollars(g.priceCents), rule: a.rule, ask: a.ask })),
+  );
+
   const events: Row[] = view.events.map((e) => ({
     seq: e.seq,
     kind: e.kind,
@@ -105,7 +129,7 @@ export function buildDashboardData(view: SessionView): DashboardTables {
     hash: e.hash.slice(0, 12),
   }));
 
-  return { assets, offers, violations, events };
+  return { assets, offers, violations, events, requirements, gaps };
 }
 
 const text = (id: string, name: string) => ({ id, name, format: "textFormat" as const });
@@ -116,8 +140,9 @@ const whole = (id: string, name: string) => ({ id, name, format: "integerFormat"
 export function buildStudioData(view: SessionView) {
   const t = buildDashboardData(view);
   return {
+    currency: viewCurrency(view),
     description:
-      "LicenseGraph run for one project. 'assets' are the creative assets the project needs, 'offers' are the licence offers extracted from uploaded licences (each linked to quotes in the source text), 'violations' are the rules the verifier found broken when it rejected a proposed bundle, and 'events' is the tamper-evident ledger of every step. Prices are in US dollars.",
+      `LicenseGraph run for one project. 'assets' are the creative assets the project needs, 'offers' are the licence offers extracted from uploaded licences (each linked to quotes in the source text), 'violations' are the rules the verifier found broken when it rejected a proposed bundle, 'requirements' is what each requirement of the brief adds to the cheapest compliant bundle, 'gaps' lists what to ask a licensor to change when no offer for an asset passes, and 'events' is the tamper-evident ledger of every step. Prices are in ${viewCurrency(view)}.`,
     sources: [
       {
         id: "assets",
@@ -143,6 +168,20 @@ export function buildStudioData(view: SessionView) {
         description: "Each rule the verifier found broken when it rejected a proposed bundle.",
         data: t.violations,
         fields: [text("violationId", "Violation"), whole("round", "Round"), text("offerId", "Offer"), text("asset", "Asset"), text("rule", "Rule"), text("message", "Message")],
+      },
+      {
+        id: "requirements",
+        name: "Requirement costs",
+        description: "One row per declared requirement: what keeping it adds to the cheapest compliant bundle, computed exactly by re-running the cost check without it.",
+        data: t.requirements,
+        fields: [text("requirementId", "Rule"), text("requirement", "Requirement"), text("value", "Your brief says"), money("extraCost", "Adds to the cost"), money("costWithout", "Cost without it"), text("impact", "Impact")],
+      },
+      {
+        id: "gaps",
+        name: "Gap requests",
+        description: "When no offer for an asset passes the rules: the nearest offer and each change to ask the licensor for.",
+        data: t.gaps,
+        fields: [text("gapId", "Request"), text("asset", "Asset"), text("offerId", "Nearest offer"), money("offerPrice", "Its price"), text("rule", "Rule"), text("ask", "What to ask for")],
       },
       {
         id: "events",

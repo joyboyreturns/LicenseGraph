@@ -2,17 +2,19 @@
 
 import { Ban, ShieldCheck } from "lucide-react";
 import type { RunAnalysis } from "@/src/core/analysis";
+import type { Project } from "@/src/core/types";
 import type { Catalog } from "@/src/ui/lib/catalog";
 import { assetLabel, formatMoney, pluralise } from "@/src/ui/lib/format";
 import { AssetIcon } from "../bits";
 import styles from "./ComplianceSummary.module.css";
+import { RequirementCosts } from "./RequirementCosts";
 
 /**
  * The honest comparison: what shopping on price alone would have cost, which of those licences the
  * project could not have used and why, and what the verified bundle costs. Every figure is a price
  * read from an uploaded licence.
  */
-export function ComplianceSummary({ analysis, catalog, currency, verified }: { analysis: RunAnalysis; catalog: Catalog; currency: string; verified: boolean }) {
+export function ComplianceSummary({ analysis, catalog, currency, verified, project }: { analysis: RunAnalysis; catalog: Catalog; currency: string; verified: boolean; project: Project }) {
   const blocked = analysis.blockedPurchases;
   const max = Math.max(1, ...analysis.assets.flatMap((a) => [a.cheapestCents, a.chosenCents ?? 0]));
   const m = (c: number) => formatMoney(c, currency);
@@ -54,6 +56,8 @@ export function ComplianceSummary({ analysis, catalog, currency, verified }: { a
           {!analysis.optimization.plans.length && <p className={styles.reasons}>{analysis.optimization.uncoveredAssets.length ? <>No compliant offer for: {analysis.optimization.uncoveredAssets.map(assetLabel).join(", ")}. Add or renegotiate those licences.</> : <>No complete bundle shares one currency. Obtain offers in a common currency.</>}</p>}
         </div>
       )}
+
+      {analysis.requirementCosts && analysis.requirementCosts.items.length > 0 && <RequirementCosts costs={analysis.requirementCosts} project={project} />}
 
       {blocked.length > 0 && (
         <div className={styles.blocked}>

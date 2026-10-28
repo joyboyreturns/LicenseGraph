@@ -43,6 +43,17 @@ const territory = z
   .transform((t) => (t === "WORLDWIDE" ? "WORLD" : t))
   .pipe(z.string().regex(/^(WORLD|[A-Z]{2})$/, 'Expected "WORLD" or an ISO 3166-1 alpha-2 country code'));
 
+/**
+ * Some models answer with {"price": "quote", "term": ["quote", "quote"]} instead of a list of {field, quote}.
+ * The shape is repaired; the quotes are still located in the source text one by one, so nothing is trusted more.
+ */
+function evidenceAsList(v: unknown): unknown {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return v;
+  return Object.entries(v as Record<string, unknown>).flatMap(([field, quote]) =>
+    (Array.isArray(quote) ? quote : [quote]).filter((q): q is string => typeof q === "string").map((q) => ({ field, quote: q })),
+  );
+}
+
 const modelOutput = z.object({
   priceCents: z.number().int().safe().positive(),
   currency: z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/),
@@ -59,7 +70,7 @@ const modelOutput = z.object({
   exclusive: z.boolean().nullish(),
   fixedEndDate: isoDate.nullish(),
   offerValidUntil: isoDate.nullish(),
-  evidence: z.array(z.object({ field: evidenceField, quote: z.string().min(1) })),
+  evidence: z.preprocess(evidenceAsList, z.array(z.object({ field: evidenceField, quote: z.string().min(1) }))),
 });
 
 type ModelOutput = z.infer<typeof modelOutput>;

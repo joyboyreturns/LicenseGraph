@@ -25,12 +25,22 @@ const initialState: AgReportState = {
         offerPrices: {
           type: "column-chart-grouped",
           dataMapping: { categoryKey: [{ id: "offers.asset" }], valueKey: [{ id: "offers.price", aggregation: "sum" }], legendKey: [{ id: "offers.status" }] },
-          format: { title: { enabled: true, text: "Offer prices by asset (USD)" } },
+          format: { title: { enabled: true, text: "Offer prices by asset" } },
         },
         violationsByRule: {
           type: "bar-chart-grouped",
           dataMapping: { categoryKey: [{ id: "violations.rule" }], valueKey: [{ id: "violations.violationId", aggregation: "count" }] },
           format: { title: { enabled: true, text: "Rules that rejected a proposal" } },
+        },
+        requirementCost: {
+          type: "bar-chart-grouped",
+          dataMapping: { categoryKey: [{ id: "requirements.requirement" }], valueKey: [{ id: "requirements.extraCost", aggregation: "sum" }] },
+          format: { title: { enabled: true, text: "What each requirement adds to the cost" } },
+        },
+        gapRequests: {
+          type: "grid",
+          dataMapping: { cols: ["gaps.asset", "gaps.offerId", "gaps.rule", "gaps.ask"].map((id) => ({ id })) },
+          format: { title: { enabled: true, text: "Gap requests: what to ask each licensor" } },
         },
         rights: {
           type: "grid",
@@ -49,8 +59,10 @@ const initialState: AgReportState = {
         spend: { xTrack: 0, yTrack: 0, xSpan: 3, ySpan: 3 },
         offerPrices: { xTrack: 3, yTrack: 0, xSpan: 5, ySpan: 5 },
         violationsByRule: { xTrack: 8, yTrack: 0, xSpan: 4, ySpan: 5 },
-        rights: { xTrack: 0, yTrack: 5, xSpan: 12, ySpan: 6 },
-        ledger: { xTrack: 0, yTrack: 11, xSpan: 12, ySpan: 6 },
+        requirementCost: { xTrack: 0, yTrack: 5, xSpan: 6, ySpan: 5 },
+        gapRequests: { xTrack: 6, yTrack: 5, xSpan: 6, ySpan: 5 },
+        rights: { xTrack: 0, yTrack: 10, xSpan: 12, ySpan: 6 },
+        ledger: { xTrack: 0, yTrack: 16, xSpan: 12, ySpan: 6 },
       },
     },
   ],
@@ -58,7 +70,7 @@ const initialState: AgReportState = {
 
 const INSTRUCTIONS = [
   "You build dashboard views for a licence-rights tool called LicenseGraph.",
-  "The data describes one run: assets, licence offers (with their terms), rule violations and a ledger of events. All prices are US dollars.",
+  "The data describes one run: assets, licence offers (with their terms), rule violations, what each requirement adds to the cost, gap requests for licensors, and a ledger of events. All prices are in the run's own currency.",
   "The data schema is below. Fields are written table.field, for example offers.price.",
   "To build something, call create_chart, create_table or create_kpi straight away. Prefer a chart for comparisons and a table only when asked for one.",
   "Only say you added something if the tool reported success. If a tool returns an error, fix the arguments and call it again.",
@@ -86,7 +98,6 @@ const PORTFOLIO_PROMPT_STARTERS = [
   { label: "Terms we keep missing", prompt: "Add a chart counting offers by their attribution status." },
 ];
 
-const USD = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 
 type StudioProps = { assistant: boolean } & ({ view: SessionView; portfolio?: undefined } | { portfolio: SessionView[]; view?: undefined });
 
@@ -96,8 +107,9 @@ export default function Studio(props: StudioProps) {
   const [mode, setMode] = useState<"view" | "edit">("view");
   const data = useMemo(() => {
     const def = props.portfolio ? buildPortfolioData(props.portfolio) : buildStudioData(props.view);
-    // Money fields are in dollars; show them with a currency symbol.
-    for (const source of def.sources) for (const f of source.fields) if (f.format === "currencyFormat") Object.assign(f, { formatOptions: { format: USD } });
+    // Money fields are in major units of the run's own currency (dollars for the portfolio); show them with its symbol.
+    const money = new Intl.NumberFormat("en-US", { style: "currency", currency: (def as { currency?: string }).currency ?? "USD" });
+    for (const source of def.sources) for (const f of source.fields) if (f.format === "currencyFormat") Object.assign(f, { formatOptions: { format: money } });
     return def;
   }, [props.portfolio, props.view]);
   // The assistant talks to our server route, which holds the gateway key and fixes the (free) model.

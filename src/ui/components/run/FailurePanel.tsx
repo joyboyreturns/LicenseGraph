@@ -10,6 +10,7 @@ import { assetLabel } from "@/src/ui/lib/format";
 import { buildStory } from "@/src/ui/lib/rounds";
 import { ruleName, violationText } from "@/src/ui/lib/rule-text";
 import { Spinner } from "../bits";
+import { GapRequests } from "./GapRequests";
 import { useStartScenario } from "../useStartScenario";
 import styles from "./Panels.module.css";
 
@@ -60,6 +61,7 @@ export function FailurePanel({ view, catalog }: { view: SessionView; catalog: Ca
           </ul>
         </div>
       )}
+      <GapRequests view={view} catalog={catalog} />
       <div>
         <p className="eyebrow" style={{ marginBottom: 8 }}>
           Try a built-in scenario

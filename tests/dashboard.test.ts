@@ -59,15 +59,51 @@ describe("buildDashboardData", () => {
 });
 
 describe("buildStudioData", () => {
-  it("defines four tables linked by relationships that point at real fields", async () => {
+  it("defines its tables linked by relationships that point at real fields", async () => {
     const def = buildStudioData((await finishedView()).view);
     const fields = Object.fromEntries(def.sources.map((s) => [s.id, new Set(s.fields.map((f) => f.id))]));
 
-    expect(def.sources.map((s) => s.id)).toEqual(["assets", "offers", "violations", "events"]);
+    expect(def.sources.map((s) => s.id)).toEqual(["assets", "offers", "violations", "requirements", "gaps", "events"]);
     for (const r of def.relationships) {
       expect(fields[r.source.tableId]!.has(r.source.fieldId)).toBe(true);
       expect(fields[r.target.tableId]!.has(r.target.fieldId)).toBe(true);
     }
     for (const s of def.sources) for (const row of s.data) for (const f of s.fields) expect(f.id in row).toBe(true);
+  });
+});
+
+describe("requirement costs and gap requests in the dashboard data", () => {
+  it("lists what each declared requirement adds, in the run's currency", async () => {
+    const { view } = await finishedView();
+    const t = buildDashboardData(view);
+    const commercial = t.requirements.find((r) => r.requirementId === "commercial-use")!;
+    expect(commercial).toMatchObject({ requirement: "Commercial use", value: "Commercial", extraCost: 35, costWithout: 294, impact: "Adds cost" });
+    expect(t.requirements.find((r) => r.requirementId === "territory")).toMatchObject({ extraCost: 0, impact: "Costs nothing" });
+    expect(t.gaps).toEqual([]);
+
+    const def = buildStudioData(view);
+    expect(def.currency).toBe("USD");
+    expect(def.sources.map((x) => x.id)).toEqual(["assets", "offers", "violations", "requirements", "gaps", "events"]);
+    expect(def.sources.find((x) => x.id === "requirements")!.data).toEqual(t.requirements);
+  });
+
+  it("turns a dead-end run into one row per change to ask a licensor for", async () => {
+    const s = createSession({ project: { ...sampleProject, requiresExclusive: true }, requiredAssetIds: [...sampleRequiredAssets], documents: sampleDocuments.map((d) => ({ ...d })) });
+    await runPipeline(s, { model: demoModel, proposer: greedyProposer, today: () => "2026-11-05" });
+    const view = viewOf(s);
+    expect(view.phase).toBe("failed");
+    const t = buildDashboardData(view);
+    expect(t.requirements).toEqual([]);
+    expect(t.gaps.length).toBeGreaterThanOrEqual(sampleRequiredAssets.length);
+    expect(t.gaps.every((g) => typeof g.ask === "string" && String(g.gapId).includes(String(g.offerId)))).toBe(true);
+    expect(t.gaps.map((g) => g.rule)).toContain("exclusivity");
+  });
+
+  it("labels a euro run's prices as euros, not dollars", async () => {
+    const { view } = await finishedView();
+    const eur = { ...view, project: { ...view.project, currency: "EUR" }, bundle: { ...view.bundle!, currency: "EUR" } };
+    const def = buildStudioData(eur);
+    expect(def.currency).toBe("EUR");
+    expect(def.description).toContain("Prices are in EUR");
   });
 });

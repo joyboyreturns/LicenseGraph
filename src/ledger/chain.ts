@@ -10,6 +10,7 @@ export type LedgerKind =
   | "revised"
   | "verified"
   | "proposal_error"
+  | "handed_over"
   | "approved"
   | "order_created"
   | "captured"

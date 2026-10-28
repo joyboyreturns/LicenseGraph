@@ -1,4 +1,4 @@
-import { createSession, runPipeline, SessionError, viewOf, type SessionInput } from "@/src/app-logic/session";
+import { createSession, reserveForPerson, runPipeline, SessionError, viewOf, type SessionInput } from "@/src/app-logic/session";
 import { scenarioById } from "@/src/demo/scenarios";
 import { fail, json } from "@/src/server/http";
 import { ownerCookie, ownerFor, readOwner } from "@/src/server/owner";
@@ -38,7 +38,7 @@ const inputSchema = z.object({
   brief: z.string().max(2000).optional(),
 });
 
-type Body = { scenarioId?: unknown; brief?: unknown } & Partial<SessionInput>;
+type Body = { scenarioId?: unknown; brief?: unknown; handoff?: unknown } & Partial<SessionInput>;
 
 function parse(body: Body | null): SessionInput {
   const parsed = inputSchema.safeParse(body);
@@ -70,6 +70,8 @@ export async function POST(req: Request) {
     const owner = ownerFor(req);
     const session = createSession(input);
     session.ownerId = owner.id;
+    // An agent starting a purchase for a person: nobody can approve or pay until a person takes control with the one-time link.
+    const handoff = body?.handoff === true ? reserveForPerson(session) : undefined;
     rt.store.add(session);
     const deps = scenario ? rt.demoDeps : rt.deps;
     // Runs in the background; the page polls the session. Failures are recorded on the session.
@@ -78,8 +80,8 @@ export async function POST(req: Request) {
       session.failure = e instanceof Error ? e.message : "The run failed.";
       session.onChange?.();
     });
-    const res = json(viewOf(session), 201);
-    if (owner.isNew) res.headers.append("Set-Cookie", ownerCookie(owner.id, rt.appUrl.startsWith("https:")));
+    const res = json({ ...viewOf(session), ...(handoff ? { handoff: { claimUrl: `${rt.appUrl}/claim/${session.id}?token=${handoff.token}`, expiresAt: handoff.expiresAt } } : {}) }, 201);
+    if (owner.isNew && !handoff) res.headers.append("Set-Cookie", ownerCookie(owner.id, rt.appUrl.startsWith("https:")));
     return res;
   } catch (e) {
     return fail(e);

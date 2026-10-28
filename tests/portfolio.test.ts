@@ -27,7 +27,7 @@ describe("buildPortfolioData", () => {
     const views = [await run("documentary", true), await run("game-trailer", false), await run("podcast", true)];
     const def = buildPortfolioData(views);
 
-    expect(def.sources.map((s) => s.id)).toEqual(["runs", "offers", "violations", "payouts", "events"]);
+    expect(def.sources.map((s) => s.id)).toEqual(["runs", "offers", "violations", "payouts", "requirements", "events"]);
     const runs = def.sources[0]!.data;
     expect(runs.map((r) => [r.run, r.status, r.paid, r.rounds])).toEqual([["Harbour documentary promo", "captured", "Paid", 2], ["Neon Drift launch trailer", "verified", "Not paid", 3], ["Signal & Noise podcast network", "captured", "Paid", 2]]);
     expect(runs[1]).toMatchObject({ verifiedTotal: 2170, priceOnlyTotal: 220, compliancePremium: 1950, blockedLicences: 3, source: "Replayed demo" });

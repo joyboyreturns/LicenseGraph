@@ -320,7 +320,7 @@ function Theatre({ view, accept, refresh }: { view: SessionView; accept: (v: Ses
               </h2>
               <span className="small muted">Every figure is a price from an uploaded licence</span>
             </div>
-            <ComplianceSummary analysis={view.analysis} catalog={catalog} currency={currency} verified={Boolean(view.bundle)} />
+            <ComplianceSummary analysis={view.analysis} catalog={catalog} currency={currency} verified={Boolean(view.bundle)} project={view.project} />
           </section>
         )}
         {!live && (
