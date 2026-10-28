@@ -120,7 +120,7 @@ export function AgentConsole() {
               <div className={styles.stepBody}>
                 <p className={styles.intent}>Here the agent stops.</p>
                 <p className={styles.result}>
-                  To buy, it would call <code>start_licence_purchase</code>, which returns a claim link for a person. Only they can approve and pay; the agent cannot.
+                  To buy, it would call <code>start_licence_purchase</code>, which returns a claim link for a person. It can pass the spending cap the person gave it, which is checked against the verified total and shown next to the Approve button. Only the person can approve and pay; the agent cannot.
                   {runId && (
                     <>
                       {" "}
