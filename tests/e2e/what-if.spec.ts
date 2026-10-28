@@ -137,3 +137,42 @@ test("the panel's choices live in the address, so a what-if can be shared and re
   await panel.getByRole("button", { name: "Back to my brief" }).click();
   await expect.poll(() => new URL(page.url()).searchParams.get("whatif")).toBeNull();
 });
+
+test("a what-if can be made real: the same licences are checked against the changed brief as a new run that can be bought", async ({ page }) => {
+  const started = await page.request.post("/api/sessions", { data: { scenarioId: "documentary" } });
+  const { id } = await started.json();
+  await expect.poll(async () => (await (await page.request.get(`/api/sessions/${id}`)).json()).phase, { timeout: 30_000 }).toBe("verified");
+
+  await page.goto(`/run/${id}`);
+  const panel = page.getByRole("region", { name: "What if the project changed?" });
+  await expect(panel).toBeVisible({ timeout: 30_000 });
+  // Nothing to start while the brief is as written.
+  await expect(page.getByTestId("what-if-start")).toHaveCount(0);
+
+  await panel.getByLabel("Commercial use").uncheck({ force: true });
+  await expect(panel.getByRole("status")).toContainText("$294.00");
+  await panel.getByRole("button", { name: "Check my licences against this brief" }).click();
+  await page.waitForURL((url) => /\/run\//.test(url.pathname) && !url.pathname.endsWith(id));
+
+  await expect(page.getByRole("link", { name: "Brief changed from an earlier run" })).toHaveAttribute("href", `/run/${id}`);
+  await page.getByRole("button", { name: "Skip to result" }).first().click();
+  await expect(page.getByRole("button", { name: "Review and approve" })).toBeVisible();
+  await expect(page.getByTestId("what-if-start")).toHaveCount(0); // it is the brief now, so there is nothing left to change
+  await expect(page.getByText("$294.00").first()).toBeVisible();
+
+  // Bought, it carries the change in its passport: what was different, and what the earlier run cost.
+  const newId = page.url().split("/run/")[1]!.split(/[?#]/)[0]!;
+  await page.request.post(`/api/sessions/${newId}/approve`, { data: { approvedBy: "Kiran" } });
+  const paid = await (await page.request.post(`/api/sessions/${newId}/pay`)).json();
+  await page.request.post(`/api/simulator/orders/${paid.order.id}`);
+  await page.request.post(`/api/sessions/${newId}/capture`);
+  await page.goto(`/passport/${newId}`);
+  await expect(page.getByText(/All 9 checks passed in this browser/)).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole("heading", { name: "Changed brief" })).toBeVisible();
+  await expect(page.getByText(/The brief was changed from an earlier run: not commercial; the same licences were checked against it\. The earlier run's bundle cost \$329\.00; this one cost \$294\.00\./)).toBeVisible();
+
+  // The run it came from is exactly as it was.
+  const first = await (await page.request.get(`/api/sessions/${id}`)).json();
+  expect(first.project.commercial).toBe(true);
+  expect(first.bundle.totalCents).toBe(32_900);
+});

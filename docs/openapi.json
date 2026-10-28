@@ -449,6 +449,94 @@
         }
       }
     },
+    "/api/sessions/{id}/rebrief": {
+      "post": {
+        "operationId": "rebriefRun",
+        "tags": [
+          "Runs"
+        ],
+        "summary": "Check the same licences against a changed brief",
+        "description": "Makes a what-if real: starts a new run on the licences this run already read (nothing is read again) against the changed brief (`meta.rebriefedFrom` names this run). The earlier run is unchanged. Nothing is bought: only a bundle that passes the rules for the changed brief can be approved and paid.",
+        "security": [
+          {
+            "ownerCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The run id."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RebriefInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new run, started.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Run"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The run is not finished, already has a payment, or the change is invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "This run belongs to another browser.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such run.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many runs in progress.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/sessions/{id}/pay": {
       "post": {
         "operationId": "startPayment",
@@ -1675,6 +1763,7 @@
               "proposal_error",
               "handed_over",
               "answers_run",
+              "brief_changed",
               "mandate_checked",
               "approved",
               "order_created",
@@ -1778,6 +1867,10 @@
               },
               "revisedFrom": {
                 "description": "The run whose gap requests this one answers, with a licensor's revised licence added.",
+                "type": "string"
+              },
+              "rebriefedFrom": {
+                "description": "The run whose brief this one changed: the same licences, checked against a different brief.",
                 "type": "string"
               }
             },
@@ -2217,6 +2310,10 @@
               },
               "revisedFrom": {
                 "description": "The run whose gap requests this one answers, with a licensor's revised licence added.",
+                "type": "string"
+              },
+              "rebriefedFrom": {
+                "description": "The run whose brief this one changed: the same licences, checked against a different brief.",
                 "type": "string"
               }
             },
@@ -3411,6 +3508,54 @@
           }
         ],
         "description": "A licensor's answer to a gap request."
+      },
+      "RebriefInput": {
+        "type": "object",
+        "properties": {
+          "change": {
+            "type": "object",
+            "properties": {
+              "commercial": {
+                "type": "boolean"
+              },
+              "territories": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "[\"WORLD\"] or country codes."
+              },
+              "termMonths": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "mediums": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "An empty list means the project does not constrain media."
+              },
+              "canCredit": {
+                "type": "boolean"
+              },
+              "needsSublicensing": {
+                "type": "boolean"
+              },
+              "requiresExclusive": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false,
+            "description": "What to change in the brief. At least one field."
+          }
+        },
+        "required": [
+          "change"
+        ],
+        "additionalProperties": false,
+        "description": "A what-if made real: the same licences, checked against a changed brief."
       }
     }
   }

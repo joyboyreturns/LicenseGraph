@@ -217,6 +217,7 @@ function Theatre({ view, accept, refresh }: { view: SessionView; accept: (v: Ses
         elapsedMs={elapsedMs}
         live={live}
         revisedFrom={view.meta?.revisedFrom}
+        rebriefedFrom={view.meta?.rebriefedFrom}
         scenarioTitle={view.meta?.scenarioId ? (SCENARIO_TITLES[view.meta.scenarioId] ?? view.meta.scenarioId) : undefined}
         actions={
           <>
@@ -351,7 +352,7 @@ function Theatre({ view, accept, refresh }: { view: SessionView; accept: (v: Ses
               </h2>
               <span className="small muted">Exact figures, re-checked here. Nothing is bought or changed.</span>
             </div>
-            <WhatIf project={view.project} requiredAssetIds={view.analysis.assets.map((a) => a.assetId)} candidates={view.candidates} currency={currency} runDate={view.runDate} catalog={catalog} />
+            <WhatIf project={view.project} requiredAssetIds={view.analysis.assets.map((a) => a.assetId)} candidates={view.candidates} currency={currency} runDate={view.runDate} catalog={catalog} runId={!view.order && !view.capture && !view.awaitingPerson && (view.phase === "verified" || view.phase === "failed") ? view.id : undefined} />
           </section>
         )}
         {!live && (

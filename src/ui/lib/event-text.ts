@@ -13,6 +13,7 @@ export const KIND_LABEL: Record<LedgerKind, string> = {
   proposal_error: "Proposal unusable",
   handed_over: "Run handed to a person",
   answers_run: "Answers an earlier run",
+  brief_changed: "Brief changed",
   mandate_checked: "Checked against the agent's spending mandate",
   approved: "Human approved",
   order_created: "PayPal order created",
@@ -29,7 +30,7 @@ export const KIND_LABEL: Record<LedgerKind, string> = {
 export function eventActor(kind: LedgerKind | string): "agent" | "engine" | "human" | "payment" {
   if (kind === "extracted" || kind === "extraction_failed" || kind === "proposed" || kind === "revised" || kind === "proposal_error") return "agent";
   if (kind === "rejected" || kind === "verified" || kind === "mandate_checked") return "engine";
-  if (kind === "approved" || kind === "handed_over" || kind === "answers_run") return "human";
+  if (kind === "approved" || kind === "handed_over" || kind === "answers_run" || kind === "brief_changed") return "human";
   return "payment";
 }
 
@@ -56,6 +57,10 @@ export function eventTitle(e: Pick<LedgerEvent, "kind" | "payload">, catalog?: P
       return `${round}proposal could not be used`;
     case "handed_over":
       return "A person took control of this run started by an agent";
+    case "brief_changed": {
+      const changes = Array.isArray(p.described) ? (p.described as string[]) : [];
+      return `The brief was changed from an earlier run${changes.length ? `: ${changes.join("; ")}` : ""}; the same licences were checked against it`;
+    }
     case "answers_run": {
       const asked = count(p.asked);
       return `Answers an earlier run that ${p.earlierOutcome === "verified" ? "had a verified bundle" : "had no compliant bundle"}${asked ? `, where ${pluralise(asked, "licensor")} ${asked === 1 ? "was" : "were"} asked to change terms` : ""}; ${pluralise(count(p.addedDocumentIds), "revised licence")} added`;

@@ -7,7 +7,7 @@ import { formatElapsed, phaseInfo, runKindLabel } from "@/src/ui/lib/format";
 import { STEPS, type RunState, type StepStatus } from "@/src/ui/lib/replay";
 import styles from "./RunHeader.module.css";
 
-export function RunHeader({ name, runKind, phase, elapsedMs, live, actions, scenarioTitle, revisedFrom }: { name: string; runKind?: string; phase: string; elapsedMs: number; live: boolean; actions?: ReactNode; scenarioTitle?: string; revisedFrom?: string }) {
+export function RunHeader({ name, runKind, phase, elapsedMs, live, actions, scenarioTitle, revisedFrom, rebriefedFrom }: { name: string; runKind?: string; phase: string; elapsedMs: number; live: boolean; actions?: ReactNode; scenarioTitle?: string; revisedFrom?: string; rebriefedFrom?: string }) {
   const kind = runKindLabel(runKind);
   const p = phaseInfo(phase);
   return (
@@ -32,6 +32,11 @@ export function RunHeader({ name, runKind, phase, elapsedMs, live, actions, scen
           {revisedFrom && (
             <Link prefetch={false} className="chip tone-agent" href={`/run/${revisedFrom}`} title="This run checks a licensor's revised licence. The run it answers is unchanged.">
               <GitBranch aria-hidden /> Revision of an earlier run
+            </Link>
+          )}
+          {rebriefedFrom && (
+            <Link prefetch={false} className="chip tone-agent" href={`/run/${rebriefedFrom}`} title="The same licences, checked against a changed brief. The run it came from is unchanged.">
+              <GitBranch aria-hidden /> Brief changed from an earlier run
             </Link>
           )}
           <span className={styles.kindNote}>{kind.long}</span>

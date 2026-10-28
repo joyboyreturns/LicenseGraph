@@ -7,6 +7,21 @@ const MAX_DOCS = 12;
 const MAX_TEXT = 20_000;
 const EMAIL = /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/;
 const textId = z.string().trim().min(1).max(55);
+/** The body of POST /api/sessions/{id}/rebrief: what to change in the brief, then check the same licences against it. */
+export const rebriefInputSchema = z.object({
+  change: z
+    .object({
+      commercial: z.boolean(),
+      territories: z.array(z.string().trim().toUpperCase().regex(/^(WORLD|[A-Z]{2})$/)).min(1).max(250),
+      termMonths: z.number().int().safe().positive().max(1200),
+      mediums: z.array(z.string().trim().toLowerCase().min(1).max(40)).max(20),
+      canCredit: z.boolean(),
+      needsSublicensing: z.boolean(),
+      requiresExclusive: z.boolean(),
+    })
+    .partial()
+    .refine((c) => Object.keys(c).length > 0, "Say what to change."),
+});
 /** The body of POST /api/sessions/{id}/revise: one licensor's revised licence, or (demo scenarios) their simulated replies. */
 export const reviseInputSchema = z.union([
   z.object({ simulate: z.literal(true) }),

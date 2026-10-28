@@ -1,6 +1,7 @@
 "use client";
 
-import { Link2, RotateCcw } from "lucide-react";
+import { ArrowRight, Link2, RotateCcw } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useEffect, useId, useMemo, useState, type FormEvent } from "react";
 import type { LicenseOffer, Project } from "@/src/core/types";
 import { negotiationOutlook } from "@/src/core/negotiation";
@@ -9,6 +10,7 @@ import { EU_COUNTRIES } from "@/src/intake/brief";
 import { readChange } from "@/src/intake/change";
 import type { Catalog } from "@/src/ui/lib/catalog";
 import { assetLabel, formatMoney, mediumName, termText } from "@/src/ui/lib/format";
+import { api, errorMessage } from "@/src/ui/lib/api";
 import { decodeWhatIf, encodeWhatIf, WHATIF_PARAM, type WhatIfState } from "@/src/ui/lib/whatif-link";
 import { CopyButton } from "../bits";
 import styles from "./WhatIf.module.css";
@@ -38,13 +40,27 @@ const stateOf = (p: Project): State => ({
 const sameSet = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((x) => b.includes(x));
 const toChange = (s: State): ProjectChange => ({ commercial: s.commercial, territories: s.territories, termMonths: s.termMonths, mediums: s.mediums, canCredit: !s.cannotCredit, needsSublicensing: s.sublicensing, requiresExclusive: s.exclusive });
 
+/** Only what differs from the brief, which is what a new run is asked to change. */
+const diffChange = (s: State, b: State): ProjectChange => ({
+  ...(s.commercial !== b.commercial ? { commercial: s.commercial } : {}),
+  ...(!sameSet(s.territories, b.territories) ? { territories: s.territories } : {}),
+  ...(s.termMonths !== b.termMonths ? { termMonths: s.termMonths } : {}),
+  ...(!sameSet(s.mediums, b.mediums) ? { mediums: s.mediums } : {}),
+  ...(s.cannotCredit !== b.cannotCredit ? { canCredit: !s.cannotCredit } : {}),
+  ...(s.sublicensing !== b.sublicensing ? { needsSublicensing: s.sublicensing } : {}),
+  ...(s.exclusive !== b.exclusive ? { requiresExclusive: s.exclusive } : {}),
+});
+
 /**
  * Change the brief and see what it would cost. Each figure is the same exact cost check the run used,
  * re-run in this browser on the offers already read from the licences: nothing is estimated, no model
  * is asked, and nothing is bought or changed on the run.
  */
-export function WhatIf({ project, requiredAssetIds, candidates, currency, runDate, catalog }: { project: Project; requiredAssetIds: string[]; candidates: LicenseOffer[]; currency: string; runDate?: string; catalog: Catalog }) {
+export function WhatIf({ project, requiredAssetIds, candidates, currency, runDate, catalog, runId }: { project: Project; requiredAssetIds: string[]; candidates: LicenseOffer[]; currency: string; runDate?: string; catalog: Catalog; /** Set where this brief can be turned into a new run: the run is the caller's and has no payment. */ runId?: string }) {
   const id = useId();
+  const router = useRouter();
+  const [starting, setStarting] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
   const brief = useMemo(() => stateOf(project), [project]);
   // A link can carry a scenario: it is read once, checked, and applied on top of the brief.
   const [state, setState] = useState<State>(() => (typeof window === "undefined" ? brief : decodeWhatIf(new URLSearchParams(window.location.search).get(WHATIF_PARAM), brief)));
@@ -214,6 +230,35 @@ export function WhatIf({ project, requiredAssetIds, candidates, currency, runDat
           </>
         )}
       </div>
+
+      {changed && runId && result.totalCents !== undefined && (
+        <div className={styles.resetRow} data-testid="what-if-start">
+          <button
+            type="button"
+            className="btn btn-sm btn-primary"
+            disabled={starting}
+            onClick={async () => {
+              setStarting(true);
+              setStartError(null);
+              try {
+                const created = await api<{ id: string }>(`/api/sessions/${encodeURIComponent(runId)}/rebrief`, { method: "POST", json: { change: diffChange(state, brief) } });
+                router.push(`/run/${created.id}`);
+              } catch (e) {
+                setStartError(errorMessage(e));
+                setStarting(false);
+              }
+            }}
+          >
+            <ArrowRight aria-hidden /> Check my licences against this brief
+          </button>
+          <span className="small muted">Starts a new run. Nothing is read again, and this run stays as it is.</span>
+          {startError && (
+            <p className="callout tone-bad" role="alert">
+              {startError}
+            </p>
+          )}
+        </div>
+      )}
 
       {changed && (
         <div className={styles.resetRow}>

@@ -33,6 +33,19 @@ export function applyChange(project: Project, change: ProjectChange): Project {
   return next;
 }
 
+/** A change to the brief in plain words, one phrase per thing changed, for the ledger and the run's header. */
+export function describeChange(change: ProjectChange): string[] {
+  const out: string[] = [];
+  if (change.commercial !== undefined) out.push(change.commercial ? "commercial use" : "not commercial");
+  if (change.territories?.length) out.push(`shown in ${change.territories.join(", ")}`);
+  if (change.termMonths !== undefined) out.push(`${change.termMonths} month${change.termMonths === 1 ? "" : "s"}`);
+  if (change.mediums !== undefined) out.push(change.mediums.length ? `media: ${change.mediums.join(", ")}` : "no media constraint");
+  if (change.canCredit !== undefined) out.push(change.canCredit ? "can credit creators" : "cannot credit creators");
+  if (change.needsSublicensing !== undefined) out.push(change.needsSublicensing ? "needs sublicensing" : "no sublicensing needed");
+  if (change.requiresExclusive !== undefined) out.push(change.requiresExclusive ? "needs exclusivity" : "exclusivity not needed");
+  return out;
+}
+
 export interface AssetShift {
   assetId: string;
   fromOfferId?: string;

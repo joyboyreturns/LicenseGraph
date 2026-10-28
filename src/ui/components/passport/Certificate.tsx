@@ -37,6 +37,7 @@ export function Certificate({ passport: p, qrSrc, verifyUrl }: { passport: Passp
     const bought = p.bundle.offers.find((o) => o.assetId === a.assetId);
     return bought && typeof a.priceCents === "number" ? [{ assetId: a.assetId, asked: a.rules.map(ruleName).join(", "), before: a.priceCents, after: bought.priceCents, currency: bought.currency }] : [];
   });
+  const rebrief = p.ledger.events.find((e) => e.kind === "brief_changed");
   const mandate = p.ledger.events.find((e) => e.kind === "mandate_checked");
   return (
     <article className={styles.cert} aria-labelledby="cert-title">
@@ -248,6 +249,18 @@ export function Certificate({ passport: p, qrSrc, verifyUrl }: { passport: Passp
               ))}
             </ul>
           )}
+        </section>
+      )}
+
+      {rebrief && (
+        <section className={styles.section} aria-labelledby="cert-rebrief">
+          <h2 id="cert-rebrief" className={styles.h2}>
+            Changed brief
+          </h2>
+          <p className={styles.compare}>
+            {eventTitle(rebrief)}
+            {typeof rebrief.payload.earlierTotalCents === "number" ? `. The earlier run's bundle cost ${formatMoney(rebrief.payload.earlierTotalCents, p.bundle.currency)}; this one cost ${formatMoney(p.bundle.totalCents, p.bundle.currency)}.` : "."} The earlier run is recorded in the first entry of this passport&rsquo;s ledger.
+          </p>
         </section>
       )}
 

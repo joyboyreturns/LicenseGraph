@@ -22,10 +22,26 @@ const ReviseInput = z
     z.object({ assetId: z.string(), text: z.string().describe("The licensor's revised licence, as text."), licensor: z.object({ name: z.string(), email: z.string().optional() }).optional() }),
   ])
   .meta({ id: "ReviseInput", description: "A licensor's answer to a gap request." });
+const RebriefInput = z
+  .object({
+    change: z
+      .object({
+        commercial: z.boolean(),
+        territories: z.array(z.string()).describe('["WORLD"] or country codes.'),
+        termMonths: z.number().int(),
+        mediums: z.array(z.string()).describe("An empty list means the project does not constrain media."),
+        canCredit: z.boolean(),
+        needsSublicensing: z.boolean(),
+        requiresExclusive: z.boolean(),
+      })
+      .partial()
+      .describe("What to change in the brief. At least one field."),
+  })
+  .meta({ id: "RebriefInput", description: "A what-if made real: the same licences, checked against a changed brief." });
 const RunId = z.object({ id: z.string() });
 
 const registry = z.registry<{ id?: string }>();
-for (const s of [S.Project, S.Offer, S.LedgerEvent, S.SessionView, S.RunCreated, S.RunSummary, S.Passport, S.PassportVerification, S.ApiError, S.BriefReading, S.Answer, S.Health, S.Config, S.Scenario, RunInput, ScenarioStart, IntakeInput, AskInput, ApproveInput, ClaimInput, ReviseInput]) {
+for (const s of [S.Project, S.Offer, S.LedgerEvent, S.SessionView, S.RunCreated, S.RunSummary, S.Passport, S.PassportVerification, S.ApiError, S.BriefReading, S.Answer, S.Health, S.Config, S.Scenario, RunInput, ScenarioStart, IntakeInput, AskInput, ApproveInput, ClaimInput, ReviseInput, RebriefInput]) {
   registry.add(s, z.globalRegistry.get(s) ?? {});
 }
 
@@ -104,6 +120,9 @@ export function buildOpenApi(serverUrl = "http://localhost:3000"): Json {
       },
       "/api/sessions/{id}/revise": {
         post: { operationId: "reviseRun", tags: ["Runs"], summary: "Answer a gap request with a licensor's revised licence", description: "Adds the revised licence to what the run read and checks everything again as a new run (`meta.revisedFrom` names this one). The earlier run is unchanged. Nothing is bought: only a bundle that passes the rules can be approved and paid.", security: owner, parameters: [idParam], requestBody: body("ReviseInput"), responses: { ...ok("The new run, started.", ref("Run"), "201"), ...err(["400", "The run is not finished, already has a payment, or the revision is invalid."], ["403", "This run belongs to another browser."], ["404", "No such run."], ["429", "Too many runs in progress."]) } },
+      },
+      "/api/sessions/{id}/rebrief": {
+        post: { operationId: "rebriefRun", tags: ["Runs"], summary: "Check the same licences against a changed brief", description: "Makes a what-if real: starts a new run on the licences this run already read (nothing is read again) against the changed brief (`meta.rebriefedFrom` names this run). The earlier run is unchanged. Nothing is bought: only a bundle that passes the rules for the changed brief can be approved and paid.", security: owner, parameters: [idParam], requestBody: body("RebriefInput"), responses: { ...ok("The new run, started.", ref("Run"), "201"), ...err(["400", "The run is not finished, already has a payment, or the change is invalid."], ["403", "This run belongs to another browser."], ["404", "No such run."], ["429", "Too many runs in progress."]) } },
       },
       "/api/sessions/{id}/pay": {
         post: { operationId: "startPayment", tags: ["Runs"], summary: "Create the PayPal order", description: "Re-checks the approved bundle with the rules engine, then creates a PayPal order. The response carries `order.approveUrl` for the buyer.", security: owner, parameters: [idParam], responses: { ...ok("The run with its order.", ref("Run")), ...err(["403", "This run belongs to another browser."], ["404", "No such run."], ["409", "The rules engine refused the payment."], ["502", "PayPal refused or was unreachable."]) } },

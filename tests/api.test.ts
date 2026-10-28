@@ -11,6 +11,7 @@ import { GET as getScenarios } from "../app/api/scenarios/route";
 import { POST as postApprove } from "../app/api/sessions/[id]/approve/route";
 import { POST as postCapture } from "../app/api/sessions/[id]/capture/route";
 import { POST as postRevise } from "../app/api/sessions/[id]/revise/route";
+import { POST as postRebrief } from "../app/api/sessions/[id]/rebrief/route";
 import { POST as postPay } from "../app/api/sessions/[id]/pay/route";
 import { POST as postPayouts } from "../app/api/sessions/[id]/payouts/route";
 import { GET as getSession } from "../app/api/sessions/[id]/route";
@@ -409,6 +410,61 @@ describe("plain-English intake", () => {
   });
 });
 
+
+describe("making a what-if real: the same licences against a changed brief", () => {
+  const start = async (scenarioId: string) => (await body(await postSession(post("http://app/api/sessions", { scenarioId })))).id as string;
+
+  it("starts a new run that reads nothing again, verifies the cheaper bundle, links back, and leaves the first as it was", async () => {
+    install();
+    const id = await start("documentary");
+    const first = await waitFor(id, "verified");
+    expect(first.bundle.totalCents).toBe(32_900);
+
+    const res = await postRebrief(post("http://app", { change: { commercial: false } }), ctx(id));
+    expect(res.status).toBe(201);
+    const created = await body(res);
+    expect(created.id).not.toBe(id);
+    const next = await waitFor(created.id, "verified");
+    expect(next.project.commercial).toBe(false);
+    expect(next.meta.rebriefedFrom).toBe(id);
+    expect(next.meta.brief).toBeUndefined();
+    expect(next.bundle.totalCents).toBe(29_400);
+    // The first entry of the new ledger: what changed, and what the earlier run ended with.
+    expect(next.events[0]).toMatchObject({ seq: 1, kind: "brief_changed", payload: { fromRunId: id, earlierOutcome: "verified", earlierTotalCents: 32_900, change: { commercial: false }, described: ["not commercial"] } });
+    // Every licence was carried over from the first run, not read again.
+    expect(next.events.filter((e: { kind: string }) => e.kind === "extracted").every((e: { payload: { carriedFromRun?: string } }) => e.payload.carriedFromRun === id)).toBe(true);
+    expect(next.chainValid).toBe(true);
+
+    const again = await body(await getSession(get(), ctx(id)));
+    expect(again.project.commercial).toBe(true);
+    expect(again.bundle.totalCents).toBe(32_900);
+  });
+
+  it("refuses an empty or malformed change, a run still going, another browser's run, and a run with a payment", async () => {
+    install();
+    const id = await start("documentary");
+    await waitFor(id, "verified");
+    for (const change of [{}, { termMonths: 0 }, { territories: ["Nowhere"] }, { commercial: "yes" }]) {
+      expect((await postRebrief(post("http://app", { change }), ctx(id))).status, JSON.stringify(change)).toBe(400);
+    }
+    expect((await postRebrief(post("http://app", {}), ctx(id))).status).toBe(400);
+    expect((await postRebrief(post("http://app", { change: { commercial: false } }, "lg_owner=someone-else-0001"), ctx(id))).status).toBe(403);
+    expect((await postRebrief(post("http://app", { change: { commercial: false } }), ctx("no-such-run"))).status).toBe(404);
+
+    await postApprove(post("http://app", { approvedBy: "Kiran" }), ctx(id));
+    expect((await postRebrief(post("http://app", { change: { commercial: false } }), ctx(id))).status).toBe(400);
+  });
+
+  it("can turn a run with no bundle into one that can be bought, by dropping what blocked it", async () => {
+    install();
+    const id = await start("exclusive-theme");
+    await waitFor(id, "failed");
+    const created = await body(await postRebrief(post("http://app", { change: { requiresExclusive: false } }), ctx(id)));
+    const next = await waitFor(created.id, "verified");
+    expect(next.events[0]).toMatchObject({ kind: "brief_changed", payload: { earlierOutcome: "no compliant bundle", earlierTotalCents: null, described: ["exclusivity not needed"] } });
+    expect(next.bundle.totalCents).toBe(69_000);
+  });
+});
 
 describe("answering a gap request", () => {
   const start = async (scenarioId: string) => {

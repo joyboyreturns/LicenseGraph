@@ -23,7 +23,7 @@ export interface SessionInput {
   requiredAssetIds: string[];
   documents: SourceDocument[];
   /** Where the run came from, for display. */
-  meta?: { scenarioId?: string; brief?: string; /** "demo" replays recorded model output; "live" calls the model. */ runKind?: "demo" | "live"; /** Started by an AI agent through the API; a person must take control before anything can be approved or paid. */ startedBy?: "agent"; /** The run whose gap requests this one answers, with a licensor's revised licence added. */ revisedFrom?: string; /** The spending cap an agent says its person gave it. */ mandate?: Mandate };
+  meta?: { scenarioId?: string; brief?: string; /** "demo" replays recorded model output; "live" calls the model. */ runKind?: "demo" | "live"; /** Started by an AI agent through the API; a person must take control before anything can be approved or paid. */ startedBy?: "agent"; /** The run whose gap requests this one answers, with a licensor's revised licence added. */ revisedFrom?: string; /** The spending cap an agent says its person gave it. */ mandate?: Mandate; /** The run whose brief this one changed: the same licences, checked against a different brief. */ rebriefedFrom?: string };
 }
 
 export interface Session {

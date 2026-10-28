@@ -1,3 +1,4 @@
+import { applyChange, type ProjectChange } from "../core/whatif";
 import { scenarioById } from "../demo/scenarios";
 import { SessionError, viewOf, type Session, type SessionInput } from "./session";
 
@@ -45,5 +46,26 @@ export function recordRevision(session: Session, from: Session) {
     earlierOutcome: from.phase === "verified" ? "verified" : "no compliant bundle",
     asked: (viewOf(from).analysis?.gaps ?? []).map((g) => ({ assetId: g.assetId, offerId: g.offerId, priceCents: g.priceCents, currency: g.currency, rules: g.asks.map((a) => a.rule) })),
     addedDocumentIds: session.input.documents.filter((d) => !before.has(d.id)).map((d) => d.id),
+  });
+}
+
+/**
+ * The input for a run that checks the same licences against a changed brief (a what-if made real). Nothing the earlier
+ * run read is lost, and the earlier run is left exactly as it was.
+ */
+export function rebriefInput(input: SessionInput, fromRunId: string, change: ProjectChange): SessionInput {
+  // The brief text no longer describes it, and an agent's hand-over or spending cap belonged to the earlier run.
+  const { brief: _brief, startedBy: _agent, mandate: _mandate, ...meta } = input.meta ?? {};
+  return { ...structuredClone(input), project: applyChange(input.project, change), meta: { ...meta, rebriefedFrom: fromRunId } };
+}
+
+/** The first ledger event of a rebriefed run: what was different, and what the earlier run ended with. */
+export function recordRebrief(session: Session, from: Session, change: ProjectChange, described: string[]) {
+  session.ledger.append("brief_changed", {
+    fromRunId: from.id,
+    earlierOutcome: from.phase === "verified" ? "verified" : "no compliant bundle",
+    earlierTotalCents: from.loop?.status === "verified" ? viewOf(from).bundle?.totalCents ?? null : null,
+    change,
+    described,
   });
 }
