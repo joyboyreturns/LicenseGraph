@@ -1,6 +1,11 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
+import { greedyProposer } from "../src/agent/greedy";
+import { approveSession, createSession, runPipeline, type Deps } from "../src/app-logic/session";
 import { finePrint } from "../src/core/fine-print";
+import { demoModel } from "../src/demo/mock-model";
+import { scenarioById } from "../src/demo/scenarios";
+import { eventTitle } from "../src/ui/lib/event-text";
 import { fixtures } from "../src/demo/fixtures";
 
 describe("finePrint", () => {
@@ -37,5 +42,28 @@ Territory: Worldwide.`;
 
   it("reads every demo licence without error", () => {
     for (const f of fixtures) expect(Array.isArray(finePrint(f.doc.text))).toBe(true);
+  });
+});
+
+describe("the approval records what the approver was shown", () => {
+  const deps: Deps = { model: demoModel, proposer: greedyProposer, today: () => "2026-11-05" };
+  const approved = async (id: string) => {
+    const sc = scenarioById(id)!;
+    const s = createSession({ project: { ...sc.project }, requiredAssetIds: [...sc.requiredAssetIds], documents: sc.documents.map((d) => ({ ...d })) });
+    await runPipeline(s, deps);
+    approveSession(s, "Kiran");
+    return s.ledger.events().find((e) => e.kind === "approved")!;
+  };
+
+  it("counts the clauses from the bought licences, and says so in the ledger's own words", async () => {
+    const event = await approved("documentary");
+    expect(event.payload.finePrintShown).toBe(2);
+    expect(eventTitle(event)).toBe("Approved by Kiran, who was shown 2 clauses the rules engine does not check");
+  });
+
+  it("says nothing extra when the licences have no such clauses", async () => {
+    const event = await approved("podcast");
+    expect(event.payload.finePrintShown).toBe(0);
+    expect(eventTitle(event)).toBe("Approved by Kiran");
   });
 });

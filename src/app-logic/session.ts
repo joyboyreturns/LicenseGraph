@@ -14,6 +14,7 @@ import { paymentRequestId } from "../payments/request-id";
 import { isIsoDate } from "../core/dates";
 import { minimumCompliantCost } from "../core/optimizer";
 import { checkMandate, type Mandate } from "../core/mandate";
+import { finePrint } from "../core/fine-print";
 
 export type Phase = "created" | "extracting" | "proposing" | "verified" | "failed" | "approved" | "order_created" | "captured" | "settled" | "refunded";
 
@@ -252,6 +253,15 @@ export async function runPipeline(session: Session, deps: Deps, carried?: { from
   touch(session);
 }
 
+/** How many clauses outside the rules engine's checks the approval screen put in front of the person, counted from the bought licences' own text. */
+function finePrintShown(session: Session): number {
+  const byId = new Map(session.input.documents.map((d) => [d.id, d.text]));
+  return (session.loop?.bundle?.offers ?? []).reduce((n, o) => {
+    const text = byId.get(o.evidence[0]?.documentId ?? "");
+    return n + (text ? finePrint(text).length : 0);
+  }, 0);
+}
+
 /** An agent that stated a spending cap has the verified bundle checked against it; the result is written to the ledger for the person who approves. */
 function recordMandateCheck(session: Session): void {
   const mandate = session.input.meta?.mandate;
@@ -280,7 +290,7 @@ export function approveSession(session: Session, approvedBy: string): Approval {
   session.approval = approve(session.loop.bundle, approvedBy.trim());
   session.phase = "approved";
   touch(session);
-  session.ledger.append("approved", { approvedBy: session.approval.approvedBy, bundleDigest: session.approval.bundleDigest });
+  session.ledger.append("approved", { approvedBy: session.approval.approvedBy, bundleDigest: session.approval.bundleDigest, finePrintShown: finePrintShown(session) });
   return session.approval;
 }
 

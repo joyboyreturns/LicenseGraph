@@ -65,8 +65,10 @@ export function eventTitle(e: Pick<LedgerEvent, "kind" | "payload">, catalog?: P
       const [cap, total] = [formatMoney(Number(p.maxTotalCents), cur), formatMoney(Number(p.totalCents), cur)];
       return p.status === "within" ? `Within the agent's mandate: ${total} of ${cap}` : p.status === "over" ? `Over the agent's mandate: ${total} against a cap of ${cap}` : `The agent's mandate is in ${cur}, so ${total} could not be compared`;
     }
-    case "approved":
-      return `Approved by ${String(p.approvedBy ?? "a person")}`;
+    case "approved": {
+      const shown = typeof p.finePrintShown === "number" ? p.finePrintShown : 0;
+      return `Approved by ${String(p.approvedBy ?? "a person")}${shown ? `, who was shown ${pluralise(shown, "clause")} the rules engine does not check` : ""}`;
+    }
     case "order_created":
       return `Order ${String(p.orderId ?? "")} created`;
     case "captured":
