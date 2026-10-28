@@ -38,6 +38,13 @@ export async function runAgentSession(rpc: Rpc, data: AgentRunData, onStep: (s: 
   const listed = (await rpc("tools/list")).result?.tools?.map((t: { name: string }) => t.name) ?? [];
   onStep({ tool: "tools/list", intent: "What can I do here?", result: `${listed.length} tools: ${listed.join(", ")}.`, raw: listed });
 
+  // The rules are a resource: read them before arguing with a verdict. An older server without it is simply skipped.
+  const rules = (await rpc("resources/read", { uri: "licensegraph://rules" }).catch(() => undefined))?.result?.contents?.[0]?.text;
+  if (typeof rules === "string" && rules.includes("\n## ")) {
+    const count = rules.split("\n## ").length - 1;
+    onStep({ tool: "resources/read", intent: "What are the rules my work will be checked against?", result: `${count} rules, each with when it applies and what a licence that says nothing about it gets. Silence never passes.`, raw: rules });
+  }
+
   const base = { project: data.project, requiredAssetIds: data.requiredAssetIds, offers: data.candidates };
   const cheapest = toolResult(await rpc("tools/call", { name: "cheapest_compliant_bundle", arguments: base }));
   const plan = cheapest.plans?.find((p: { currency: string }) => p.currency === data.currency) ?? cheapest.plans?.[0];

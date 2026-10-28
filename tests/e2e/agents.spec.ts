@@ -16,6 +16,8 @@ test("the Agents page lists the tools live, and plays an agent session whose fig
   await page.getByRole("button", { name: "Run as an agent" }).click();
   const steps = page.getByRole("list", { name: "What the agent did" });
   await expect(steps.getByText("$329.00 across 3 licences, proven minimal")).toBeVisible({ timeout: 30_000 });
+  await expect(steps.getByText("What are the rules my work will be checked against?")).toBeVisible();
+  await expect(steps.getByText(/11 rules, each with when it applies/)).toBeVisible();
   await expect(steps.getByText("What if it were not for commercial use?")).toBeVisible();
   await expect(steps.getByText(/less than the brief as written/)).toBeVisible();
   await expect(steps.getByText("Here the agent stops.")).toBeVisible();
