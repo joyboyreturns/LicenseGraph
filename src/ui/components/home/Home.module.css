@@ -469,3 +469,18 @@
     grid-column: 2;
   }
 }
+
+.agentBand {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+  padding: clamp(20px, 3vw, 32px);
+  border-radius: 20px;
+  border: 1px solid var(--agent-line);
+  background: var(--agent-soft);
+}
+.agentBand > div {
+  max-width: 62ch;
+}

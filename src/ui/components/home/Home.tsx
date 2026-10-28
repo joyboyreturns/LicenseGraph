@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowRight, BadgeCheck, CreditCard, FileSearch, Play, Quote, Scale, Sparkles, UserCheck } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api } from "@/src/ui/lib/api";
 import { useConfig } from "../Providers";
@@ -121,6 +122,21 @@ export function Home() {
           <p className={styles.sectionLead}>LicenseGraph turns it into requirements the rules engine can check, and shows what it found in your words and what it assumed.</p>
         </div>
         <BriefWizard scenarios={scenarios ?? []} onStartScenario={start} starting={starting} />
+      </section>
+
+      <section className={`container ${styles.section}`} aria-labelledby="agents-title">
+        <div className={styles.agentBand}>
+          <div>
+            <p className="eyebrow">For agents</p>
+            <h2 id="agents-title" className="section-title">
+              Agents can shop. Only people can spend.
+            </h2>
+            <p className={styles.sectionLead}>Any AI agent can connect over the Model Context Protocol to check licences, find the exact cheapest bundle and start a purchase. Approval and payment need a person with the claim link, and PayPal moves the money.</p>
+          </div>
+          <Link prefetch={false} href="/agents" className="btn btn-primary btn-lg">
+            Connect an agent <ArrowRight aria-hidden />
+          </Link>
+        </div>
       </section>
 
       <RecentRuns />
