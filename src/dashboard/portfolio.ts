@@ -56,6 +56,7 @@ export function buildPortfolioData(views: SessionView[]) {
       paid: v.capture ? "Paid" : "Not paid",
       startedBy: v.meta?.startedBy === "agent" ? "AI agent" : "Person",
       mandate: mandateLabel(v),
+      origin: v.meta?.revisedFrom ? "After a licensor reply" : v.meta?.rebriefedFrom ? "Changed brief" : "Original",
     });
     for (const o of t.offers) offers.push({ ...o, runId: v.id, run: runLabel(v) });
     for (const x of t.violations) violations.push({ ...x, runId: v.id, run: runLabel(v) });
@@ -98,7 +99,7 @@ export function buildPortfolioData(views: SessionView[]) {
         name: "Runs",
         description: "One row per licensing run.",
         data: runs,
-        fields: [text("runId", "Run id"), text("run", "Project"), text("started", "Started"), text("source", "Source"), text("status", "Status"), whole("rounds", "Agent rounds"), text("currency", "Currency"), money("verifiedTotal", "Verified total"), decimal("verifiedTotalLocal", "Verified total (own currency)"), money("priceOnlyTotal", "Price-only total"), money("compliancePremium", "Compliance premium"), whole("blockedLicences", "Licences blocked"), text("paid", "Payment"), text("startedBy", "Started by"), text("mandate", "Agent mandate")],
+        fields: [text("runId", "Run id"), text("run", "Project"), text("started", "Started"), text("source", "Source"), text("status", "Status"), whole("rounds", "Agent rounds"), text("currency", "Currency"), money("verifiedTotal", "Verified total"), decimal("verifiedTotalLocal", "Verified total (own currency)"), money("priceOnlyTotal", "Price-only total"), money("compliancePremium", "Compliance premium"), whole("blockedLicences", "Licences blocked"), text("paid", "Payment"), text("startedBy", "Started by"), text("mandate", "Agent mandate"), text("origin", "How the run began")],
       },
       {
         id: "offers",

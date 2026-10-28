@@ -67,6 +67,18 @@ describe("buildPortfolioData", () => {
     expect(rows.map((r) => [r.startedBy, r.mandate])).toEqual([["Person", "None stated"], ["AI agent", "Over cap"]]);
   });
 
+  it("says how each run began: on its own, after a licensor replied, or from a changed brief", async () => {
+    const original = await run("documentary", false);
+    const revised = structuredClone(original);
+    revised.id = "revised-run";
+    revised.meta = { ...revised.meta, revisedFrom: original.id };
+    const rebriefed = structuredClone(original);
+    rebriefed.id = "rebriefed-run";
+    rebriefed.meta = { ...rebriefed.meta, rebriefedFrom: original.id };
+    const rows = buildPortfolioData([original, revised, rebriefed]).sources.find((x) => x.id === "runs")!.data;
+    expect(rows.map((r) => r.origin)).toEqual(["Original", "After a licensor reply", "Changed brief"]);
+  });
+
   it("is consistent: every row has every declared field, and relationships point at real fields", async () => {
     const def = buildPortfolioData([await run("game-trailer", true)]);
     const fields = Object.fromEntries(def.sources.map((s) => [s.id, new Set(s.fields.map((f) => f.id))]));
