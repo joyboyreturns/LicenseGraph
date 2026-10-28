@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { checkBundle, checkBundleInput, cheapestBundle, cheapestBundleInput, licenceEndDates, licenceEndDatesInput, licenceFinePrint, licenceFinePrintInput, purchasePlaybook, purchaseStatus, startPurchase, startPurchaseInput, whatIfBrief, whatIfInput, type AppClient } from "./tools";
+import { checkBundle, checkBundleInput, cheapestBundle, cheapestBundleInput, licenceEndDates, licenceEndDatesInput, licenceFinePrint, licenceFinePrintInput, purchasePlaybook, purchaseStatus, startPurchase, startPurchaseInput, verifyPassportTool, whatIfBrief, whatIfInput, type AppClient } from "./tools";
 
 const text = (value: unknown) => ({ content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }] });
 
@@ -51,6 +51,12 @@ export function createLicenseGraphServer(app: AppClient): McpServer {
     "get_purchase_status",
     { description: "Progress of a purchase you started: phase, verified bundle, who approved, PayPal capture, creator payouts and the Licence Passport link once paid.", inputSchema: { runId: startPurchaseInput.shape.requiredAssetIds.element.describe("The runId returned by start_licence_purchase.") } },
     async ({ runId }) => text(await purchaseStatus(app, runId)),
+  );
+
+  server.registerTool(
+    "verify_licence_passport",
+    { description: "Re-check the Licence Passport of a paid purchase: hash-chained ledger, approved bundle, every quote in the licence text, the rules engine on the exact terms, the PayPal capture and creator payouts, and the server's signature. Call it before treating a licence as cleared for use; report any failed check instead of assuming.", inputSchema: { runId: startPurchaseInput.shape.requiredAssetIds.element.describe("The runId of a paid purchase.") } },
+    async ({ runId }) => text(await verifyPassportTool(app, runId)),
   );
 
   server.registerPrompt(

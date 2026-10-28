@@ -20,3 +20,28 @@ test("an MCP client connects to the running server over HTTP, prices a purchase 
     await client.close();
   }
 });
+
+test("an agent can re-check a Licence Passport over MCP before relying on a licence, and is told when there is none yet", async ({ baseURL, request }) => {
+  const { id } = await (await request.post("/api/sessions", { data: { scenarioId: "podcast" } })).json();
+  await expect.poll(async () => (await (await request.get(`/api/sessions/${id}`)).json()).phase, { timeout: 30_000 }).toBe("verified");
+
+  const client = new Client({ name: "e2e-agent", version: "1" });
+  await client.connect(new StreamableHTTPClientTransport(new URL("/api/mcp", baseURL)));
+  const verify = async (runId: string) => JSON.parse(((await client.callTool({ name: "verify_licence_passport", arguments: { runId } })).content as { text: string }[])[0]!.text);
+  try {
+    // Verified but not paid: there is no passport to check, and the tool says so instead of inventing a result.
+    expect(await verify(id)).toMatchObject({ ok: false, error: expect.stringMatching(/paid|captured|payment/i) });
+
+    await request.post(`/api/sessions/${id}/approve`, { data: { approvedBy: "Kiran" } });
+    const paid = await (await request.post(`/api/sessions/${id}/pay`)).json();
+    await request.post(`/api/simulator/orders/${paid.order.id}`);
+    await request.post(`/api/sessions/${id}/capture`);
+
+    const result = await verify(id);
+    expect(result).toMatchObject({ ok: true, verified: true, failedChecks: [] });
+    expect(result.checks).toHaveLength(9);
+    expect(result.passportUrl).toContain(`/passport/${id}`);
+  } finally {
+    await client.close();
+  }
+});

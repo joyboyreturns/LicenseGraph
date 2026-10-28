@@ -76,6 +76,7 @@ A Licence Passport can be re-verified from a terminal, with no browser and no ru
 | `check_licence_bundle` | The rules engine's verdict on a proposed bundle, with every violation |
 | `cheapest_compliant_bundle` | Exact minimum cost, what each requirement adds, what to ask for where nothing passes, and the best-case total and per-asset price ceiling if every licensor agreed |
 | `what_if_brief` | The exact cost if the brief changed (territory, term, media, a requirement added or dropped), what shifts, and what to ask a licensor where nothing fits |
+| `verify_licence_passport` | Re-checks a paid purchase's Licence Passport on the server (hash chain, quotes, rules re-run, PayPal capture and payouts, signature), so an agent confirms a licence is cleared before relying on it |
 | `licence_fine_print` | The clauses in each licence the rules engine does not check (early termination, AI-training bans, resale limits, liability, reporting), quoted word for word, to show the person before they approve |
 | `licence_end_dates` | When each licence stops covering the project, from the day of purchase, with an iCalendar file holding a reminder 30 days before each end |
 | `start_licence_purchase` | Reads raw licence texts, proposes and verifies a bundle, and returns a claim link for a person |

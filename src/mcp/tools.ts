@@ -162,7 +162,7 @@ export function purchasePlaybook(brief?: string): string {
     "3. If nothing can be bought, read gapRequests and ifLicensorsAgree. Tell the person plainly: what blocks each asset, what to ask each licensor, the best-case total if they all said yes, and how far each price could rise before the budget breaks. Call what_if_brief to price a smaller scope (a different territory, a shorter term, one requirement dropped). Do not offer to proceed with a bundle the tools did not verify.",
     "4. If a bundle exists, call licence_fine_print on the licence texts and tell the person any clause it returns, then call licence_end_dates so the person knows when each licence runs out, then start_licence_purchase with the raw licence texts and, if the person gave you a spending limit, that limit as the mandate. LicenseGraph re-reads the licences, re-verifies the bundle itself and checks its total against your mandate for the person to see.",
     "5. Give the person the claim link. Only they can approve and pay; you cannot, and you must not say a payment happened until get_purchase_status shows it.",
-    "6. Report the Licence Passport link once the purchase is paid.",
+    "6. Once the purchase is paid, call verify_licence_passport and report the Licence Passport link with its result; if any check failed, say which and do not call the licences cleared.",
   ].join("\n\n");
 }
 
@@ -206,6 +206,18 @@ export async function startPurchase(app: AppClient, input: z.infer<typeof startP
     expiresAt: body.handoff.expiresAt as string,
     next: "Give claimUrl to the person you are buying for. They open it, take control, review the bundle and approve. Poll get_purchase_status for progress. You cannot approve or pay.",
   };
+}
+
+/**
+ * Re-check a Licence Passport on the server: the hash chain, the bundle digest, every quote, the rules engine on the
+ * exact terms, the payment and payouts, and whether this server signed it. An agent should call this before relying on
+ * a licence as cleared for use, and report any failed check rather than assume.
+ */
+export async function verifyPassportTool(app: AppClient, runId: string) {
+  const { status, body } = await call(app, `/api/passports/${encodeURIComponent(runId)}/verify`);
+  if (status !== 200) return { ok: false as const, error: body?.error ?? `The app answered ${status}.` };
+  const checks = (body.checks as { id: string; label: string; ok: boolean; detail: string }[]).map((c) => ({ id: c.id, label: c.label, ok: c.ok, detail: c.detail }));
+  return { ok: true as const, verified: Boolean(body.ok), failedChecks: checks.filter((c) => !c.ok).map((c) => c.id), signature: String(body.signature) as "valid" | "invalid" | "unsigned" | "unavailable", checks, passportUrl: `${app.baseUrl.replace(/\/$/, "")}/passport/${runId}` };
 }
 
 export async function purchaseStatus(app: AppClient, runId: string) {
