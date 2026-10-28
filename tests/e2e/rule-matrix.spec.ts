@@ -34,3 +34,24 @@ test("the portfolio dashboard has the rule matrix too, across every run", async 
   expect(errors).toEqual([]);
 });
 
+
+test("the custom licence timeline widget draws a bar for every licence a paid run bought, with its end date", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  const started = await page.request.post("/api/sessions", { data: { scenarioId: "podcast" } });
+  const { id } = await started.json();
+  await expect.poll(async () => (await (await page.request.get(`/api/sessions/${id}`)).json()).phase, { timeout: 30_000 }).toBe("verified");
+  await page.request.post(`/api/sessions/${id}/approve`, { data: { approvedBy: "Kiran" } });
+  const paid = await (await page.request.post(`/api/sessions/${id}/pay`)).json();
+  await page.request.post(`/api/simulator/orders/${paid.order.id}`);
+  await page.request.post(`/api/sessions/${id}/capture`);
+
+  await page.goto("/dashboard?portfolio=1");
+  const timeline = page.getByRole("list", { name: "Licence end dates" });
+  await expect(timeline).toBeVisible({ timeout: 30_000 });
+  // The podcast bundle has three licences: a 36 month song, perpetual cover art, and a 36 month voiceover.
+  await expect(timeline.getByRole("listitem")).toHaveCount(3);
+  await expect(timeline.getByRole("img", { name: /Tapeloop · song: .* to \d{4}-\d{2}-\d{2}, \d+ days left/ })).toBeVisible();
+  await expect(timeline.getByRole("img", { name: /Greyscale Lane · image: perpetual/ })).toBeVisible();
+  expect(errors).toEqual([]);
+});

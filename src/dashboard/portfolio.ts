@@ -62,6 +62,7 @@ export function buildPortfolioData(views: SessionView[]) {
         const end = licenceEnd(o, boughtOn);
         licences.push({
           licenceId: `${v.id}:${o.id}`,
+          label: `${licensorOf.get(o.evidence[0]?.documentId ?? "") ?? "Unnamed licensor"} · ${o.assetId}`,
           runId: v.id,
           run: runLabel(v),
           licensor: licensorOf.get(o.evidence[0]?.documentId ?? "") ?? "Unnamed licensor",
@@ -121,7 +122,7 @@ export function buildPortfolioData(views: SessionView[]) {
         name: "Licence end dates",
         description: "When each bought licence stops covering its project, counted from the day of purchase.",
         data: licences,
-        fields: [text("licenceId", "Licence"), text("runId", "Run id"), text("run", "Project"), text("licensor", "Licensor"), text("asset", "Asset"), money("price", "Price"), text("currency", "Currency"), text("boughtOn", "Bought on"), text("endsOn", "Covered until"), whole("endsYear", "Ends in year"), text("cover", "Cover")],
+        fields: [text("licenceId", "Licence"), text("label", "Licence name"), text("runId", "Run id"), text("run", "Project"), text("licensor", "Licensor"), text("asset", "Asset"), money("price", "Price"), text("currency", "Currency"), text("boughtOn", "Bought on"), text("endsOn", "Covered until"), whole("endsYear", "Ends in year"), text("cover", "Cover")],
       },
       {
         id: "requirements",
@@ -195,6 +196,11 @@ export const PORTFOLIO_INITIAL_STATE = {
           dataMapping: { cols: ["runs.run", "runs.source", "runs.status", "runs.rounds", "runs.verifiedTotal", "runs.priceOnlyTotal", "runs.blockedLicences", "runs.paid"].map((id) => ({ id })) },
           format: { title: { enabled: true, text: "Runs" } },
         },
+        licenceTimeline: {
+          type: "licence-timeline",
+          dataMapping: { label: [{ id: "licences.label" }], start: [{ id: "licences.boughtOn" }], end: [{ id: "licences.endsOn" }] },
+          format: { title: { enabled: true, text: "When each bought licence ends" } },
+        },
         licencesGrid: {
           type: "grid",
           dataMapping: { cols: ["licences.run", "licences.licensor", "licences.asset", "licences.price", "licences.boughtOn", "licences.endsOn", "licences.cover"].map((id) => ({ id })) },
@@ -218,7 +224,8 @@ export const PORTFOLIO_INITIAL_STATE = {
         payoutsGrid: { xTrack: 0, yTrack: 16, xSpan: 6, ySpan: 5 },
         ruleMatrix: { xTrack: 6, yTrack: 16, xSpan: 6, ySpan: 5 },
         offersGrid: { xTrack: 0, yTrack: 21, xSpan: 12, ySpan: 6 },
-        licencesGrid: { xTrack: 0, yTrack: 27, xSpan: 12, ySpan: 5 },
+        licenceTimeline: { xTrack: 0, yTrack: 27, xSpan: 12, ySpan: 5 },
+        licencesGrid: { xTrack: 0, yTrack: 32, xSpan: 12, ySpan: 5 },
       },
     },
   ],
