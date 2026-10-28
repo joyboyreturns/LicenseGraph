@@ -54,3 +54,27 @@ test("the mobile run shows the independent cost proof without horizontal overflo
   expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
   await proof.screenshot({ path: test.info().outputPath("mobile-cost-proof.png") });
 });
+
+test("the no-bundle run, with its outlook and licensor messages, and the passport fit a phone", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const overflow = () => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+
+  const started = await page.request.post("/api/sessions", { data: { scenarioId: "exclusive-theme" } });
+  const { id } = await started.json();
+  await expect.poll(async () => (await (await page.request.get(`/api/sessions/${id}`)).json()).phase, { timeout: 30_000 }).toBe("failed");
+  await page.goto(`/run/${id}`);
+  await expect(page.getByTestId("negotiation-outlook")).toBeVisible({ timeout: 30_000 });
+  expect(await overflow()).toBeLessThanOrEqual(0);
+
+  // A paid run's passport, with the licence end dates and the negotiation section.
+  const revised = await (await page.request.post(`/api/sessions/${id}/revise`, { data: { simulate: true } })).json();
+  await expect.poll(async () => (await (await page.request.get(`/api/sessions/${revised.id}`)).json()).phase, { timeout: 30_000 }).toBe("verified");
+  await page.request.post(`/api/sessions/${revised.id}/approve`, { data: { approvedBy: "Kiran" } });
+  const paid = await (await page.request.post(`/api/sessions/${revised.id}/pay`)).json();
+  await page.request.post(`/api/simulator/orders/${paid.order.id}`);
+  await page.request.post(`/api/sessions/${revised.id}/capture`);
+  await page.goto(`/passport/${revised.id}`);
+  await expect(page.getByRole("heading", { name: "When each licence ends" })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole("heading", { name: "Negotiation" })).toBeVisible();
+  expect(await overflow()).toBeLessThanOrEqual(0);
+});
