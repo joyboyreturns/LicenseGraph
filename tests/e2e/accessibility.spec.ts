@@ -74,6 +74,26 @@ for (const scheme of ["light", "dark"] as const) {
       expect(await violations(page), "run dashboard").toEqual([]);
     });
 
+    test("the agent claim page, the simulated checkout and the not-found page have none", async ({ page, browser }) => {
+      const agent = await browser.newContext();
+      const handed = await (await agent.request.post("/api/sessions", { data: { scenarioId: "documentary", handoff: true } })).json();
+      await page.goto(handed.handoff.claimUrl);
+      await expect(page.getByRole("heading", { name: /An agent started a purchase for you/ })).toBeVisible();
+      expect(await violations(page), "claim").toEqual([]);
+      await agent.close();
+
+      const id = await runOf(page, "podcast");
+      await page.request.post(`/api/sessions/${id}/approve`, { data: { approvedBy: "Kiran" } });
+      const order = await (await page.request.post(`/api/sessions/${id}/pay`)).json();
+      await page.goto(order.order.approveUrl);
+      await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
+      expect(await violations(page), "checkout").toEqual([]);
+
+      await page.goto("/no-such-page");
+      await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
+      expect(await violations(page), "not found").toEqual([]);
+    });
+
     test("a rebriefed run, with its comparison beside the run it came from, has none", async ({ page }) => {
       const first = await runOf(page, "documentary");
       const next = await (await page.request.post(`/api/sessions/${first}/rebrief`, { data: { change: { commercial: false } } })).json();

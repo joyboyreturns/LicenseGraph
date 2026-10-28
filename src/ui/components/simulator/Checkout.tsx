@@ -107,6 +107,7 @@ export function Checkout() {
 
         {load.status === "ready" && (
           <div className={styles.body}>
+            <h1 className="visually-hidden">Approve a simulated payment</h1>
             <div className={styles.merchant}>
               <LogoMark size={36} />
               <div>
