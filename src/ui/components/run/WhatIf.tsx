@@ -1,7 +1,7 @@
 "use client";
 
-import { RotateCcw } from "lucide-react";
-import { useId, useMemo, useState, type FormEvent } from "react";
+import { Link2, RotateCcw } from "lucide-react";
+import { useEffect, useId, useMemo, useState, type FormEvent } from "react";
 import type { LicenseOffer, Project } from "@/src/core/types";
 import { negotiationOutlook } from "@/src/core/negotiation";
 import { applyChange, whatIf, type ProjectChange } from "@/src/core/whatif";
@@ -9,6 +9,8 @@ import { EU_COUNTRIES } from "@/src/intake/brief";
 import { readChange } from "@/src/intake/change";
 import type { Catalog } from "@/src/ui/lib/catalog";
 import { assetLabel, formatMoney, mediumName, termText } from "@/src/ui/lib/format";
+import { decodeWhatIf, encodeWhatIf, WHATIF_PARAM, type WhatIfState } from "@/src/ui/lib/whatif-link";
+import { CopyButton } from "../bits";
 import styles from "./WhatIf.module.css";
 
 const MEDIA = ["web", "social", "broadcast", "print", "audio", "film", "app"];
@@ -21,15 +23,7 @@ const PLACES: { code: string; label: string; codes: string[] }[] = [
   { code: "AU", label: "Australia", codes: ["AU"] },
 ];
 
-interface State {
-  commercial: boolean;
-  territories: string[];
-  termMonths: number;
-  mediums: string[];
-  cannotCredit: boolean;
-  sublicensing: boolean;
-  exclusive: boolean;
-}
+type State = WhatIfState;
 
 const stateOf = (p: Project): State => ({
   commercial: p.commercial,
@@ -52,7 +46,16 @@ const toChange = (s: State): ProjectChange => ({ commercial: s.commercial, terri
 export function WhatIf({ project, requiredAssetIds, candidates, currency, runDate, catalog }: { project: Project; requiredAssetIds: string[]; candidates: LicenseOffer[]; currency: string; runDate?: string; catalog: Catalog }) {
   const id = useId();
   const brief = useMemo(() => stateOf(project), [project]);
-  const [state, setState] = useState<State>(brief);
+  // A link can carry a scenario: it is read once, checked, and applied on top of the brief.
+  const [state, setState] = useState<State>(() => (typeof window === "undefined" ? brief : decodeWhatIf(new URLSearchParams(window.location.search).get(WHATIF_PARAM), brief)));
+  const link = encodeWhatIf(state, brief);
+  useEffect(() => {
+    // Keep the address in step with the panel, so the page's own URL is always the link to share.
+    const url = new URL(window.location.href);
+    if (link) url.searchParams.set(WHATIF_PARAM, link);
+    else url.searchParams.delete(WHATIF_PARAM);
+    if (url.href !== window.location.href) window.history.replaceState(window.history.state, "", url);
+  }, [link]);
   const [typed, setTyped] = useState("");
   const [heard, setHeard] = useState<string[] | null>(null);
   const result = useMemo(() => whatIf(project, toChange(state), requiredAssetIds, candidates, currency, { today: runDate }), [project, state, requiredAssetIds, candidates, currency, runDate]);
@@ -213,9 +216,14 @@ export function WhatIf({ project, requiredAssetIds, candidates, currency, runDat
       </div>
 
       {changed && (
-        <button type="button" className={`btn btn-sm btn-ghost ${styles.reset}`} onClick={() => { setState(brief); setHeard(null); }}>
-          <RotateCcw aria-hidden /> Back to my brief
-        </button>
+        <div className={styles.resetRow}>
+          <button type="button" className={`btn btn-sm btn-ghost ${styles.reset}`} onClick={() => { setState(brief); setHeard(null); }}>
+            <RotateCcw aria-hidden /> Back to my brief
+          </button>
+          <CopyButton text={typeof window === "undefined" ? "" : window.location.href} label="Copy link to this what-if" announce="Link copied" className="btn btn-sm btn-ghost">
+            <Link2 aria-hidden /> Copy link to this what-if
+          </CopyButton>
+        </div>
       )}
     </div>
   );

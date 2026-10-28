@@ -102,3 +102,38 @@ test("a typed sentence changes the panel the same way the controls do, and says 
   await expect(panel.getByTestId("what-if-heard")).toContainText("Nothing to change was recognised");
   await expect(panel.getByLabel("How long you need it")).toHaveValue("6");
 });
+
+test("the panel's choices live in the address, so a what-if can be shared and reopened exactly", async ({ page }) => {
+  const started = await page.request.post("/api/sessions", { data: { scenarioId: "game-trailer" } });
+  const { id } = await started.json();
+  await expect.poll(async () => (await (await page.request.get(`/api/sessions/${id}`)).json()).phase, { timeout: 30_000 }).toBe("verified");
+
+  await page.goto(`/run/${id}`);
+  const panel = page.getByRole("region", { name: "What if the project changed?" });
+  await expect(panel).toBeVisible({ timeout: 30_000 });
+  expect(page.url()).not.toContain("whatif=");
+
+  await panel.getByLabel("How long you need it").fill("30");
+  await panel.getByLabel("We need exclusivity").check({ force: true });
+  await expect.poll(() => new URL(page.url()).searchParams.get("whatif")).toBe(JSON.stringify({ termMonths: 30, exclusive: true }));
+
+  // Opening the same address elsewhere shows the same scenario.
+  const shared = page.url();
+  const other = await page.context().newPage();
+  await other.goto(shared);
+  const reopened = other.getByRole("region", { name: "What if the project changed?" });
+  await expect(reopened.getByLabel("How long you need it")).toHaveValue("30", { timeout: 30_000 });
+  await expect(reopened.getByLabel("We need exclusivity")).toBeChecked();
+  await expect(reopened.getByRole("button", { name: "Back to my brief" })).toBeVisible();
+
+  // A hand-edited, invalid link is ignored rather than trusted.
+  const bad = await page.context().newPage();
+  await bad.goto(`/run/${id}?whatif=${encodeURIComponent('{"termMonths":-5,"mediums":["telepathy"]}')}`);
+  const badPanel = bad.getByRole("region", { name: "What if the project changed?" });
+  await expect(badPanel.getByRole("button", { name: "Back to my brief" })).toHaveCount(0, { timeout: 30_000 });
+  await expect(badPanel.getByLabel("How long you need it")).toHaveValue("24");
+
+  // Going back to the brief clears the address.
+  await panel.getByRole("button", { name: "Back to my brief" }).click();
+  await expect.poll(() => new URL(page.url()).searchParams.get("whatif")).toBeNull();
+});
