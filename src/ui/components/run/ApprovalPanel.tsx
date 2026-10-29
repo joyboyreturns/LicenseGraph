@@ -3,7 +3,7 @@
 import { Bot, FileSearch, Lock, UserCheck } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import type { SessionView } from "@/src/app-logic/session";
-import { checkMandate, mandateBreaches } from "@/src/core/mandate";
+import { cheapestWithinLimits, checkMandate, mandateBreaches } from "@/src/core/mandate";
 import { finePrint } from "@/src/core/fine-print";
 import type { Catalog } from "@/src/ui/lib/catalog";
 import { assetLabel, formatMoney, termsSummary } from "@/src/ui/lib/format";
@@ -123,6 +123,15 @@ function MandateNote({ view }: { view: SessionView }) {
         : `The agent's mandate (${cap}) is in ${mandate.currency} but this bundle is in ${bundle.currency}, so they cannot be compared.`;
   const licensorOf = new Map(view.documents.map((d) => [d.id, d.licensorName]));
   const breaches = mandateBreaches(mandate, bundle.offers.map((o) => ({ assetId: o.assetId, priceCents: o.priceCents, currency: o.currency, licensor: licensorOf.get(o.evidence[0]?.documentId ?? "") })));
+  // When a licence broke a limit, show what staying inside the limits would cost instead: the same exact search, over every licence that was read.
+  const inside = breaches.length
+    ? cheapestWithinLimits(view.project, view.analysis?.assets.map((a) => a.assetId) ?? [...new Set(bundle.offers.map((o) => o.assetId))], view.candidates, mandate, (offerId) => licensorOf.get(view.candidates.find((c) => c.id === offerId)?.evidence[0]?.documentId ?? ""), { today: view.runDate })
+    : undefined;
+  const insideText = !inside
+    ? undefined
+    : inside.plan
+      ? `Inside those limits the cheapest bundle is ${formatMoney(inside.plan.totalCents, inside.plan.currency)}${inside.plan.totalCents === bundle.totalCents ? ", the same price" : inside.plan.totalCents > bundle.totalCents ? `, ${formatMoney(inside.plan.totalCents - bundle.totalCents, inside.plan.currency)} more` : `, ${formatMoney(bundle.totalCents - inside.plan.totalCents, inside.plan.currency)} less`}: ${inside.plan.offerIds.map((id) => view.candidates.find((c) => c.id === id)).filter((o): o is NonNullable<typeof o> => Boolean(o)).map((o) => `${assetLabel(o.assetId).toLowerCase()} from ${licensorOf.get(o.evidence[0]?.documentId ?? "") ?? "an unnamed licensor"} at ${formatMoney(o.priceCents, o.currency)}`).join("; ")}. Nothing was changed: this is only for you to weigh before you approve.`
+      : `No bundle inside those limits covers ${inside.uncoveredAssets.map((a) => assetLabel(a).toLowerCase()).join(", ")}, so the agent could not have stayed within them.`;
   return (
     <div className={styles.lockNote} role="note" data-tone={check.status === "within" && !breaches.length ? undefined : "warn"} data-testid="mandate-note">
       <Bot aria-hidden />
@@ -137,6 +146,11 @@ function MandateNote({ view }: { view: SessionView }) {
               <li key={`${b.kind}-${b.assetId}`}>{b.detail}</li>
             ))}
           </ul>
+        )}
+        {insideText && (
+          <p style={{ margin: "6px 0 0" }} data-testid="mandate-inside">
+            {insideText}
+          </p>
         )}
       </div>
     </div>

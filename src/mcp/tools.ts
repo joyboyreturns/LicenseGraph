@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { finePrint } from "../core/fine-print";
 import { compareRuns, type RunOutcome } from "../core/compare";
+import { cheapestWithinLimits } from "../core/mandate";
 import { gapRequests, requirementCosts } from "../core/insights";
 import { negotiationOutlook, savingLevers } from "../core/negotiation";
 import { buildIcs, licenceEnds } from "../core/renewals";
@@ -89,37 +90,25 @@ export const cheapestBundleToolInput = cheapestBundleInput.extend({
   mandate: mandateLimitsSchema.optional().describe("Your spending mandate. When given, the answer also says what the cheapest compliant bundle is within it."),
 });
 
-const squashName = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
-
 /**
- * The cheapest compliant bundle among only the offers the mandate allows: offers above the per-licence cap or from an
- * avoided licensor are set aside (and listed with why), then the same exact search runs on the rest. Tells the agent
- * what staying inside the person's limits costs, before it starts a purchase.
+ * The cheapest compliant bundle among only the offers the mandate allows (see `cheapestWithinLimits`), with what staying
+ * inside the limits costs and whether it fits the total cap. Tells the agent before it starts a purchase.
  */
 function withinMandate(input: z.infer<typeof cheapestBundleToolInput>, project: Project, candidates: LicenseOffer[], unconstrainedTotal: number | undefined) {
   const m = input.mandate;
   if (!m) return undefined;
   const currency = project.currency ?? candidates[0]?.currency ?? "USD";
-  const avoided = new Set((m.avoidLicensors ?? []).map(squashName));
-  const setAside: { offerId: string; reason: string }[] = [];
-  const allowed = candidates.filter((o) => {
-    if (m.maxPerLicence !== undefined && o.currency === currency && o.priceCents > Math.round(m.maxPerLicence * 100)) {
-      setAside.push({ offerId: o.id, reason: "above the per-licence cap" });
-      return false;
-    }
-    const who = m.licensors?.[o.id];
-    if (who && avoided.has(squashName(who))) {
-      setAside.push({ offerId: o.id, reason: `from ${who}, a licensor to avoid` });
-      return false;
-    }
-    return true;
-  });
-  const frontier = minimumCompliantCost(project, input.requiredAssetIds, allowed, { today: today() });
-  const plan = frontier.plans[0] ?? null;
+  const found = cheapestWithinLimits(
+    project,
+    input.requiredAssetIds,
+    candidates,
+    { currency, ...(m.maxPerLicence !== undefined ? { maxPerLicenceCents: Math.round(m.maxPerLicence * 100) } : {}), avoidLicensors: m.avoidLicensors },
+    (offerId) => m.licensors?.[offerId],
+    { today: today() },
+  );
+  const plan = found.plan;
   return {
-    setAside,
-    plan,
-    uncoveredAssets: frontier.uncoveredAssets,
+    ...found,
     /** What staying inside the limits costs over the cheapest bundle with no limits; null when either has no bundle or the currencies differ. */
     extraCostCents: plan && unconstrainedTotal !== undefined && plan.currency === currency ? plan.totalCents - unconstrainedTotal : null,
     withinTotalCap: plan && m.maxSpend !== undefined && plan.currency === currency ? plan.totalCents <= Math.round(m.maxSpend * 100) : null,

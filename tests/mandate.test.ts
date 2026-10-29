@@ -1,6 +1,7 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { checkMandate, mandateBreaches } from "../src/core/mandate";
+import { cheapestWithinLimits, checkMandate, mandateBreaches } from "../src/core/mandate";
+import type { LicenseOffer, Project } from "../src/core/types";
 
 const cap = { maxTotalCents: 80_000, currency: "USD" };
 
@@ -60,5 +61,32 @@ describe("mandateBreaches", () => {
     expect(mandateBreaches({ ...cap, maxPerLicenceCents: 1 }, [{ assetId: "song", priceCents: 999_999, currency: "EUR" }])).toEqual([]);
     const both = mandateBreaches({ ...cap, maxPerLicenceCents: 10_000, avoidLicensors: ["SoundHarbor Music"] }, licences);
     expect(both.map((b) => b.kind)).toEqual(["per-licence-cap", "avoided-licensor"]);
+  });
+});
+
+describe("cheapestWithinLimits", () => {
+  const project: Project = { name: "P", commercial: true, territories: ["US"], termMonths: 12 };
+  const offer = (id: string, assetId: string, priceCents: number): LicenseOffer => ({ id, assetId, priceCents, currency: "USD", terms: { commercialUse: true, territories: ["WORLD"], termMonths: 24 }, evidence: [{ documentId: "d", quote: "q" }] });
+  const offers = [offer("song-a", "song", 20_000), offer("img-a", "image", 4_500), offer("img-b", "image", 9_000)];
+  const who: Record<string, string> = { "song-a": "SoundHarbor", "img-a": "PixelLeaf", "img-b": "Other Images" };
+  const limits = { currency: "USD" };
+
+  it("is the plain cheapest bundle when nothing is limited", () => {
+    const r = cheapestWithinLimits(project, ["song", "image"], offers, limits, (id) => who[id]);
+    expect(r.setAside).toEqual([]);
+    expect(r.plan).toMatchObject({ totalCents: 24_500, offerIds: ["img-a", "song-a"] });
+  });
+
+  it("sets aside an avoided licensor's offer and pays for the next best, saying why", () => {
+    const r = cheapestWithinLimits(project, ["song", "image"], offers, { ...limits, avoidLicensors: ["pixelleaf"] }, (id) => who[id]);
+    expect(r.setAside).toEqual([{ offerId: "img-a", reason: "from PixelLeaf, a licensor to avoid" }]);
+    expect(r.plan).toMatchObject({ totalCents: 29_000, offerIds: ["img-b", "song-a"] });
+  });
+
+  it("leaves an asset uncovered when every licence for it is ruled out", () => {
+    const r = cheapestWithinLimits(project, ["song", "image"], offers, { ...limits, maxPerLicenceCents: 10_000 }, (id) => who[id]);
+    expect(r.setAside).toEqual([{ offerId: "song-a", reason: "above the per-licence cap" }]);
+    expect(r.plan).toBeNull();
+    expect(r.uncoveredAssets).toEqual(["song"]);
   });
 });

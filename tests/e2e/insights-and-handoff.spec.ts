@@ -69,6 +69,8 @@ test("an agent can start a purchase, but only a person who takes control can app
   const breaches = page.getByTestId("mandate-breaches");
   await expect(breaches).toContainText("The song licence costs $200.00, above the $100.00 the agent was allowed for one licence.");
   await expect(breaches).toContainText("The font licence is from TypeForge Studio, a licensor the agent was told not to buy from.");
+  // What staying inside the limits would take: here no licence read for these assets fits, and it says so.
+  await expect(page.getByTestId("mandate-inside")).toContainText("No bundle inside those limits covers font, song");
 
   // The agent still cannot, and the ledger shows the handover.
   expect((await agent.request.post(`/api/sessions/${run.id}/approve`, { data: { approvedBy: "agent" } })).status()).toBe(403);

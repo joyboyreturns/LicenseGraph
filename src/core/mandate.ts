@@ -1,3 +1,7 @@
+import { minimumCompliantCost, type CostPlan } from "./optimizer";
+import type { LicenseOffer, Project } from "./types";
+import type { VerifyOptions } from "./rules";
+
 /**
  * What an AI agent was told it may spend. The person gives the agent a cap; the agent states it when it starts a
  * purchase, and code checks the verified bundle against it. The check informs the person who approves; it never
@@ -52,4 +56,43 @@ export function mandateBreaches(mandate: Mandate, licences: { assetId: string; p
     }
   }
   return out;
+}
+
+export interface WithinLimits {
+  /** Offers the licence-level limits ruled out, each with why. */
+  setAside: { offerId: string; reason: string }[];
+  /** The cheapest compliant bundle among the rest, or null when some asset is left with nothing. */
+  plan: CostPlan | null;
+  uncoveredAssets: string[];
+}
+
+/**
+ * The cheapest compliant bundle that also respects a mandate's licence-level limits: offers above the per-licence cap
+ * or from an avoided licensor are set aside (and listed with why), then the same exact search runs on the rest.
+ */
+export function cheapestWithinLimits(
+  project: Project,
+  requiredAssetIds: string[],
+  offers: LicenseOffer[],
+  limits: Pick<Mandate, "currency" | "maxPerLicenceCents" | "avoidLicensors">,
+  licensorOf: (offerId: string) => string | undefined,
+  options: VerifyOptions = {},
+): WithinLimits {
+  const avoided = new Set((limits.avoidLicensors ?? []).map(squash).filter(Boolean));
+  const setAside: WithinLimits["setAside"] = [];
+  const allowed = offers.filter((o) => {
+    if (limits.maxPerLicenceCents !== undefined && o.currency === limits.currency && o.priceCents > limits.maxPerLicenceCents) {
+      setAside.push({ offerId: o.id, reason: "above the per-licence cap" });
+      return false;
+    }
+    const who = licensorOf(o.id);
+    if (who && avoided.has(squash(who))) {
+      setAside.push({ offerId: o.id, reason: `from ${who}, a licensor to avoid` });
+      return false;
+    }
+    return true;
+  });
+  const frontier = minimumCompliantCost(project, requiredAssetIds, allowed, options);
+  const plan = frontier.plans.find((p) => p.currency === limits.currency) ?? frontier.plans[0] ?? null;
+  return { setAside, plan, uncoveredAssets: frontier.uncoveredAssets };
 }
