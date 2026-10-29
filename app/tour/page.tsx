@@ -89,10 +89,12 @@ export default function Page() {
               </span>
               {s.title}
             </h2>
-            <p className="ink-2" style={{ margin: 0, maxWidth: "72ch" }}>
-              <b>Look for:</b> {s.look}
-            </p>
-            <div>{s.action}</div>
+            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "12px 28px" }}>
+              <p className="ink-2" style={{ margin: 0, flex: "1 1 440px", maxWidth: "72ch" }}>
+                <b>Look for:</b> {s.look}
+              </p>
+              <div>{s.action}</div>
+            </div>
           </li>
         ))}
       </ol>
