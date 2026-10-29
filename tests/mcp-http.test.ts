@@ -28,7 +28,7 @@ describe("MCP over HTTP", () => {
 
   it("lists the same tools as the stdio server, and the buying prompt", async () => {
     const tools = (await rpc("tools/list")).body.result.tools.map((t: { name: string }) => t.name);
-    expect(tools).toEqual(["check_licence_bundle", "cheapest_compliant_bundle", "what_if_brief", "licence_end_dates", "licence_fine_print", "start_licence_purchase", "get_purchase_status", "compare_runs", "verify_licence_passport"]);
+    expect(tools).toEqual(["check_licence_bundle", "evaluate_licence_offer", "cheapest_compliant_bundle", "what_if_brief", "licence_end_dates", "licence_fine_print", "start_licence_purchase", "get_purchase_status", "compare_runs", "verify_licence_passport"]);
     const prompts = (await rpc("prompts/list")).body.result.prompts.map((p: { name: string }) => p.name);
     expect(prompts).toEqual(["buy_licences"]);
   });

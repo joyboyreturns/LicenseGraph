@@ -7,7 +7,7 @@ import { greedyProposer } from "../src/agent/greedy";
 import { SessionStore } from "../src/app-logic/session";
 import { demoModel } from "../src/demo/mock-model";
 import { scenarioById } from "../src/demo/scenarios";
-import { checkBundleInput, cheapestBundleInput, compareRunsTool, licenceEndDatesInput, checkBundle, cheapestBundle, licenceEndDates, licenceFinePrint, purchasePlaybook, purchaseStatus, startPurchase, whatIfBrief, whatIfInput, type AppClient } from "../src/mcp/tools";
+import { checkBundleInput, cheapestBundleInput, compareRunsTool, evaluateLicenceOffer, licenceEndDatesInput, checkBundle, cheapestBundle, licenceEndDates, licenceFinePrint, purchasePlaybook, purchaseStatus, startPurchase, whatIfBrief, whatIfInput, type AppClient } from "../src/mcp/tools";
 import type { Runtime } from "../src/server/runtime";
 import { runExample } from "./mcp-fixtures";
 
@@ -41,6 +41,31 @@ describe("check_licence_bundle", () => {
 
   it("refuses ids that are not among the offers", () => {
     expect(checkBundle({ project, requiredAssetIds, offers, chosenOfferIds: ["offer-nope"] })).toEqual({ ok: false, error: "Unknown offer ids: offer-nope" });
+  });
+});
+
+describe("evaluate_licence_offer", () => {
+  it("shows every rule for one offer: the one that failed with its reason, and the ones that do not apply", () => {
+    const photo = offers.find((o) => o.id === "offer-photo")!;
+    const r = evaluateLicenceOffer({ project, offer: photo });
+    expect(r.compliant).toBe(false);
+    expect(r.failedRules).toEqual(["commercial-use"]);
+    const commercial = r.rules.find((x) => x.rule === "commercial-use")!;
+    expect(commercial).toMatchObject({ status: "fail", messages: [expect.stringMatching(/commercial/i)] });
+    expect(r.rules.find((x) => x.rule === "territory")).toMatchObject({ status: "pass" });
+    // The same offer passes once the brief is not commercial, and the rule is then skipped rather than passed.
+    const relaxed = evaluateLicenceOffer({ project: { ...project, commercial: false }, offer: photo });
+    expect(relaxed.compliant).toBe(true);
+    expect(relaxed.rules.find((x) => x.rule === "commercial-use")!.status).toBe("skip");
+  });
+
+  it("agrees with the rules engine on every offer, and says silence fails", () => {
+    for (const offer of offers) {
+      const chosen = checkBundle({ project, requiredAssetIds: [offer.assetId], offers, chosenOfferIds: [offer.id] });
+      expect(evaluateLicenceOffer({ project, offer }).compliant, offer.id).toBe(chosen.ok);
+    }
+    const silent = { ...offers[0]!, terms: { ...offers[0]!.terms, mediums: undefined } };
+    expect(evaluateLicenceOffer({ project: { ...project, mediums: ["web"] }, offer: silent }).failedRules).toContain("medium");
   });
 });
 

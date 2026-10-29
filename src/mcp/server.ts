@@ -1,6 +1,6 @@
 import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { checkBundle, checkBundleInput, compareRunsInput, compareRunsTool, cheapestBundle, cheapestBundleToolInput, licenceEndDates, licenceEndDatesInput, licenceFinePrint, licenceFinePrintInput, purchasePlaybook, passportDocument, purchaseStatus, rulesGuide, startPurchase, startPurchaseInput, verifyPassportTool, whatIfBrief, whatIfInput, type AppClient } from "./tools";
+import { checkBundle, checkBundleInput, compareRunsInput, compareRunsTool, evaluateLicenceOffer, evaluateOfferInput, cheapestBundle, cheapestBundleToolInput, licenceEndDates, licenceEndDatesInput, licenceFinePrint, licenceFinePrintInput, purchasePlaybook, passportDocument, purchaseStatus, rulesGuide, startPurchase, startPurchaseInput, verifyPassportTool, whatIfBrief, whatIfInput, type AppClient } from "./tools";
 
 const text = (value: unknown) => ({ content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }] });
 
@@ -15,6 +15,12 @@ export function createLicenseGraphServer(app: AppClient): McpServer {
     "check_licence_bundle",
     { description: "Check a proposed set of licence offers against a project's requirements with the deterministic rules engine. Returns ok, the total in cents and every violation. Never trust a bundle without calling this.", inputSchema: checkBundleInput.shape },
     async (input) => text(checkBundle(input)),
+  );
+
+  server.registerTool(
+    "evaluate_licence_offer",
+    { description: "Check one licence offer against every rule for a project, the same grid the run page shows: for each rule pass, fail or skip (the rule does not apply to this brief), with the reason for each failure. Use it to tell the person exactly why an offer was set aside, or what to ask its licensor to change.", inputSchema: evaluateOfferInput.shape },
+    async (input) => text(evaluateLicenceOffer(input)),
   );
 
   server.registerTool(

@@ -84,6 +84,7 @@ A Licence Passport can be re-verified from a terminal, with no browser and no ru
 | Tool | What it does |
 | --- | --- |
 | `check_licence_bundle` | The rules engine's verdict on a proposed bundle, with every violation |
+| `evaluate_licence_offer` | One licence offer against every rule, the same grid the run page shows: pass, fail or skip for each rule, with the reason for each failure |
 | `cheapest_compliant_bundle` | Exact minimum cost, what each requirement adds, what to ask for where nothing passes, and the best-case total and per-asset price ceiling if every licensor agreed. Pass a `mandate` (total, per-licence cap, licensors to avoid) and it also finds the cheapest bundle inside those limits, which offers it set aside and why, and what the limits cost |
 | `what_if_brief` | The exact cost if the brief changed (territory, term, media, a requirement added or dropped), what shifts, and what to ask a licensor where nothing fits |
 | `compare_runs` | Sets two runs side by side from their verified bundles: which asset's licence changed, what each costs, and the difference in the total. Read-only. |

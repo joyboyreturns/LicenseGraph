@@ -7,7 +7,7 @@ import { negotiationOutlook, savingLevers } from "../core/negotiation";
 import { buildIcs, licenceEnds } from "../core/renewals";
 import { isIsoDate } from "../core/dates";
 import { minimumCompliantCost } from "../core/optimizer";
-import { RULE_CATALOG, verifyBundle } from "../core/rules";
+import { evaluateOffer, RULE_CATALOG, verifyBundle } from "../core/rules";
 import { RULE_NOTES } from "../ui/lib/rule-notes";
 import { whatIf } from "../core/whatif";
 import type { LicenseOffer, Project } from "../core/types";
@@ -112,6 +112,23 @@ function withinMandate(input: z.infer<typeof cheapestBundleToolInput>, project: 
     /** What staying inside the limits costs over the cheapest bundle with no limits; null when either has no bundle or the currencies differ. */
     extraCostCents: plan && unconstrainedTotal !== undefined && plan.currency === currency ? plan.totalCents - unconstrainedTotal : null,
     withinTotalCap: plan && m.maxSpend !== undefined && plan.currency === currency ? plan.totalCents <= Math.round(m.maxSpend * 100) : null,
+  };
+}
+
+export const evaluateOfferInput = z.object({ project: projectSchema, offer: offerSchema });
+
+/**
+ * One licence offer against every rule, the same grid the run page shows: for each rule, whether the offer passes, fails
+ * or the rule does not apply to this brief, and why it failed. Use it to say exactly what is wrong with an offer.
+ */
+export function evaluateLicenceOffer(input: z.infer<typeof evaluateOfferInput>) {
+  const results = evaluateOffer(input.project as Project, input.offer as LicenseOffer, { today: today() });
+  const failed = results.filter((r) => r.status === "fail");
+  return {
+    compliant: failed.length === 0,
+    rules: results.map((r) => ({ rule: r.rule, label: r.label, status: r.status, ...(r.messages.length ? { messages: r.messages } : {}) })),
+    failedRules: failed.map((r) => r.rule),
+    note: "A rule marked skip does not apply to this brief. A licence that is silent on something the brief requires fails; it is never assumed to allow it.",
   };
 }
 
