@@ -77,6 +77,14 @@ describe("buildPortfolioData", () => {
     rebriefed.meta = { ...rebriefed.meta, rebriefedFrom: original.id };
     const rows = buildPortfolioData([original, revised, rebriefed]).sources.find((x) => x.id === "runs")!.data;
     expect(rows.map((r) => r.origin)).toEqual(["Original", "After a licensor reply", "Changed brief"]);
+    // The same bundle as the run it came from: no movement. A run with no source in the portfolio, or no bundle, has nothing to show.
+    expect(rows.map((r) => r.changeVsSource)).toEqual([null, 0, 0]);
+    const cheaper = structuredClone(rebriefed);
+    cheaper.bundle = { ...cheaper.bundle!, totalCents: cheaper.bundle!.totalCents - 3_500 };
+    const moved = buildPortfolioData([original, cheaper]).sources.find((x) => x.id === "runs")!.data;
+    expect(moved.map((r) => r.changeVsSource)).toEqual([null, -35]);
+    const orphan = buildPortfolioData([cheaper]).sources.find((x) => x.id === "runs")!.data;
+    expect(orphan[0]!.changeVsSource).toBeNull();
   });
 
   it("is consistent: every row has every declared field, and relationships point at real fields", async () => {
