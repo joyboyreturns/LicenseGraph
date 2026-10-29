@@ -33,25 +33,27 @@ export function DealHistory({ runId }: { runId: string }) {
         </h2>
         <span className="small muted">{steps.length} runs, oldest first</span>
       </div>
-      <ol className={styles.list}>
-        {steps.map((s) => (
-          <li key={s.id} className={styles.lever}>
-            <span className={styles.name}>
-              {s.current ? (
-                <b aria-current="step">{KIND[s.kind]} (this run)</b>
-              ) : (
-                <Link prefetch={false} href={`/run/${s.id}`}>
-                  {KIND[s.kind]}
-                </Link>
-              )}
-            </span>
-            <span className={`${styles.extra} num`} data-free={s.deltaCents !== null && s.deltaCents < 0 ? "true" : undefined}>
-              {s.deltaCents === null ? "" : s.deltaCents === 0 ? "no change" : `${s.deltaCents < 0 ? "−" : "+"}${formatMoney(Math.abs(s.deltaCents), s.currency!)}`}
-            </span>
-            <span className={styles.hint}>{outcome(s)}</span>
-          </li>
-        ))}
-      </ol>
+      <div className={styles.levers}>
+        <ol className={styles.list}>
+          {steps.map((s) => (
+            <li key={s.id} className={styles.lever}>
+              <span className={styles.name}>
+                {s.current ? (
+                  <b aria-current="step">{KIND[s.kind]} (this run)</b>
+                ) : (
+                  <Link prefetch={false} href={`/run/${s.id}`}>
+                    {KIND[s.kind]}
+                  </Link>
+                )}
+              </span>
+              <span className={`${styles.extra} num`} data-free={s.deltaCents !== null && s.deltaCents < 0 ? "true" : undefined}>
+                {s.deltaCents === null ? "" : s.deltaCents === 0 ? "no change" : `${s.deltaCents < 0 ? "−" : "+"}${formatMoney(Math.abs(s.deltaCents), s.currency!)}`}
+              </span>
+              <span className={styles.hint}>{outcome(s)}</span>
+            </li>
+          ))}
+        </ol>
+      </div>
     </section>
   );
 }

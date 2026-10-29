@@ -50,28 +50,30 @@ export function CompareWithEarlier({ view, earlierId }: { view: SessionView; ear
           Open that run
         </Link>
       </div>
-      <p className="small ink-2" style={{ marginBottom: 10 }}>
-        {earlier.bundle ? `That run's verified bundle cost ${formatMoney(earlier.bundle.totalCents, earlier.bundle.currency)}.` : "That run found no compliant bundle."}{" "}
-        {view.bundle ? `This one costs ${formatMoney(view.bundle.totalCents, view.bundle.currency)}` : "This one found no compliant bundle"}
-        {deltaCents === null ? "." : deltaCents === 0 ? ", the same." : `, ${formatMoney(Math.abs(deltaCents), currency!)} ${deltaCents < 0 ? "less" : "more"}.`}
-      </p>
-      <ul className={styles.list}>
-        {result.assets.map((a) => (
-          <li key={a.assetId} className={styles.lever}>
-            <span className={styles.name}>
-              <AssetIcon assetId={a.assetId} size={14} /> {assetLabel(a.assetId)}
-            </span>
-            <span className={`${styles.extra} num`} data-free={a.change === "cheaper" || a.change === "same" ? "true" : undefined}>
-              {WORDS[a.change]}
-            </span>
-            <span className={styles.hint}>
-              {a.before ? `${names(a.before.offerId)} at ${formatMoney(a.before.priceCents, earlier.bundle!.currency)}` : "Nothing was bought"}
-              {" → "}
-              {a.after ? `${names(a.after.offerId)} at ${formatMoney(a.after.priceCents, view.bundle!.currency)}` : "nothing bought"}
-            </span>
-          </li>
-        ))}
-      </ul>
+      <div className={styles.levers}>
+        <p className="small ink-2" style={{ marginBottom: 10 }}>
+          {earlier.bundle ? `That run's verified bundle cost ${formatMoney(earlier.bundle.totalCents, earlier.bundle.currency)}.` : "That run found no compliant bundle."}{" "}
+          {view.bundle ? `This one costs ${formatMoney(view.bundle.totalCents, view.bundle.currency)}` : "This one found no compliant bundle"}
+          {deltaCents === null ? "." : deltaCents === 0 ? ", the same." : `, ${formatMoney(Math.abs(deltaCents), currency!)} ${deltaCents < 0 ? "less" : "more"}.`}
+        </p>
+        <ul className={styles.list}>
+          {result.assets.map((a) => (
+            <li key={a.assetId} className={styles.lever}>
+              <span className={styles.name}>
+                <AssetIcon assetId={a.assetId} size={14} /> {assetLabel(a.assetId)}
+              </span>
+              <span className={`${styles.extra} num`} data-free={a.change === "cheaper" || a.change === "same" ? "true" : undefined}>
+                {WORDS[a.change]}
+              </span>
+              <span className={styles.hint}>
+                {a.before ? `${names(a.before.offerId)} at ${formatMoney(a.before.priceCents, earlier.bundle!.currency)}` : "Nothing was bought"}
+                {" → "}
+                {a.after ? `${names(a.after.offerId)} at ${formatMoney(a.after.priceCents, view.bundle!.currency)}` : "nothing bought"}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
     </section>
   );
 }
