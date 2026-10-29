@@ -27,6 +27,9 @@ Record at 1920x1080 in a clean browser window (hide bookmarks, use the app's dar
 - **Where the money went.** On the portfolio dashboard, the money flow widget draws what buyers paid flowing to each creator, and the assistant adds one from "Add a money flow diagram of what was paid to each creator."
 
 ## Checklist before you record
+
+Use `docs/READINESS.md` to distinguish the checks already run from the release evidence still needed. The table above describes the intended final recording, not proof that a fresh live Sandbox journey has been recorded.
+
 - Run the scenario once beforehand so the first view is warm (the replay plays once on first open; use a fresh run for the video).
 - Have the Sandbox buyer login ready; log in with a private window.
 - Confirm the creators' payout line items show SUCCESS (use real Sandbox creator accounts via `LICENSEGRAPH_CREATOR_EMAILS`).

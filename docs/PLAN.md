@@ -1,6 +1,6 @@
 # LicenseGraph step-by-step plan
 
-> **Status:** steps 1 to 8 are built. After them the product was extended and redesigned for the hackathon: creator payouts, per-offer rule matrix and price-only comparison, the Licence Passport with in-browser verification, persistence, run ownership, an offline payment simulator, plain-English briefs and run Q&A, four scenarios, a full front-end redesign, a cross-run AG Studio portfolio, and end-to-end browser tests. Deployment is deferred by the owner; `docs/DEPLOY.md` is ready for when it is wanted. What remains is in the last section.
+> **Status:** steps 1 to 8 are built. After them the product was extended and redesigned for the hackathon: creator payouts, per-offer rule matrix and price-only comparison, the Licence Passport with in-browser verification, persistence, run ownership, an offline payment simulator, plain-English briefs and run Q&A, four scenarios, a full front-end redesign, a cross-run AG Studio portfolio, and end-to-end browser tests. Deployment is deferred by the owner; `docs/DEPLOY.md` is ready for when it is wanted. What remains is in the last section; current verification evidence is in `docs/READINESS.md`.
 
 Target: submit to the PayPal AI Hackathon on **11 Nov 2026** (official close 12 Nov, 12:00 PM PT; confirmed from PayPal's developer blog). Budget about 45-50 hours, 2-3 hours a day alongside PIVOT until 8 Nov.
 
@@ -84,7 +84,8 @@ Prize targets: Best Overall, Best Use of Agentic Commerce, Best Use of AG Grid. 
 ## Step 9: Ship (11 Nov)
 
 - [x] README with demo steps and submission drafts
-- [ ] Confirm public repository access, complete the owner-approved hosting setup, record the demo video and submit
+- [x] Public repository access confirmed on 29 October 2026
+- [ ] Complete the owner-approved hosting setup, record the demo video and submit
 - 12 Nov: buffer only.
 
 ## After step 8: product and polish

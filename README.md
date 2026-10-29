@@ -23,6 +23,22 @@ Requires Node.js 20.19 or newer (22 recommended). The first run builds the app (
 
 The **tour** (`/tour`) lists seven things to try in order, with what to look for in each.
 
+## A judge's five-minute walkthrough
+
+Start with **Game launch trailer**. It has eight offers for three assets: the cheapest price-only purchase is **$220**, but fails the brief; the independently checked compliant minimum is **$2,170** across 18 possible bundles. These are fixture prices, not customer savings or a legal opinion.
+
+1. Watch a proposal fail, open the verification matrix, and click a source quote.
+2. Check the independent cost minimum, then review and approve the exact bundle.
+3. Approve the buyer's payment in the labelled simulator and watch the creator payouts settle.
+4. Open the passport, download its JSON, and verify it at `/verify`. Try a tampered copy and watch it fail.
+5. Open `/agents` to watch tools price a purchase and hand control to a person; open `/dashboard?portfolio=1` for the four custom dashboard widgets.
+
+For a second path, run **Exclusive theme tune**: nothing can be bought until the licensors change their terms. The app shows the missing rights and a priced negotiation outlook, then can replay revised replies as a new run.
+
+**Demo modes:** built-in scenarios use recorded extraction output and a deterministic proposer; they do not make live model calls. `npm run demo` forces simulated payments even if a local `.env` has credentials. Custom licence extraction and the dashboard assistant require a configured free model. Real Sandbox checkout requires separate test accounts and buyer approval.
+
+Feature-by-feature test evidence and outstanding release checks are in [the readiness report](docs/READINESS.md). The complete recording script is in [the demo script](docs/DEMO_SCRIPT.md).
+
 ## What you will see
 
 | | |
@@ -35,7 +51,7 @@ The **tour** (`/tour`) lists seven things to try in order, with what to look for
 | ![](docs/images/compare.jpg) | **A negotiation is one record.** When you change the brief or a licensor replies, the new run opens beside the one it came from: each asset's licence and price before and after, the difference in the total, and every run of the deal listed in order. |
 | ![](docs/images/settled.jpg) | **Settlement.** The order can only be created for the verified bundle a human approved. After the buyer approves, the payment is captured and each creator is paid. A submission failure never undoes the captured payment. Retries preserve the original batch id, recipients and amounts; individual failures require reconciliation rather than resending successful payments. |
 | ![](docs/images/passport.jpg) | **The Licence Passport** re-checks itself in your browser: the hash-chained ledger, the rules engine re-run on the exact terms, every quote found at its recorded position, and the PayPal capture and payout records. Download its licences as a spreadsheet (one row each, with price, terms, end date and payout status; a licensor's name can never run as a formula), print it, share it, or verify a downloaded file at `/verify`. A paid run also has a status badge for a README or a site (`/api/passports/{id}/badge`), built from the passport's own re-verification, so it can say "verified", "check failed" or "payment reversed" but nothing more than the record proves. |
-| ![](docs/images/portfolio.jpg) | **Portfolio dashboard** built with [AG Studio](https://www.ag-grid.com/studio/): spend, licences the rules blocked, creators paid, and every offer, violation and ledger event as linked tables. Its AI assistant builds new views from plain English (needs a model). Changes you make, including widgets the assistant builds, are kept in your browser (only a layout that differs from the original is saved), with a button to put the original back. |
+| ![](docs/images/portfolio.jpg) | **Portfolio dashboard** built with [AG Studio](https://www.ag-grid.com/studio/): spend, licences the rules blocked, creators paid, and every offer, violation and ledger event as linked tables. Its AI assistant builds new views from plain English (needs a model). Open run and portfolio dashboards refresh automatically as approvals, payments and ledger events change. Changes you make, including widgets the assistant builds, are kept in your browser (only a layout that differs from the original is saved), with a button to put the original back. |
 
 On a phone it stays usable:
 
@@ -162,7 +178,7 @@ verified ──► human approval (locks the bundle digest) ──► PayPal ord
 | `src/core` | The rules engine (`verifyBundle`, `evaluateOffer`), the price-only comparison, canonical hashing. Pure TypeScript shared by server and browser. |
 | `src/extraction`, `src/agent` | Term extraction with evidence checking; the propose-verify-revise loop; model clients (free-models-only guard, rate pacing). |
 | `src/ledger` | Hash-chained, append-only event log; browser-safe verification. |
-| `src/payments` | PayPal Orders and Payouts client (Sandbox only), the approval-gated checkout, creator payout planning, the offline simulator. |
+| `src/payments` | PayPal Orders, Payouts, Refunds and webhook support (Sandbox only), the approval-gated checkout, creator payout planning, the offline simulator. |
 | `src/passport` | Passport builder and the in-browser verifier. |
 | `src/app-logic` | The session flow that enforces the order of steps, and persistence. |
 | `src/server`, `app/api` | Runtime wiring, owner cookies, the model proxy, rate limits, HTTP routes. |
@@ -181,8 +197,11 @@ npm test               # unit, property and API tests, no network
 npm run typecheck
 npm run test:e2e       # real browser journeys against the offline demo (needs: npx playwright install chromium)
 npm run test:live      # PayPal Sandbox (needs credentials)
-npm run test:gateway   # free-model extraction (one request per fixture)
+npm run test:gateway   # live extraction; defaults to up to 3 attempts per fixture
+npm run test:proposer  # one live proposal, free-model guard required
 ```
+
+The latest full audit passed **762 unit/property/API tests** and **65 browser journeys**, with **27 credential-dependent tests skipped** in the offline suite. Three real Sandbox order tests also passed separately; they do not cover buyer approval, capture or creator settlement. A broader live extraction check passed 16 fixtures before a provider timeout stopped it; live reliability is still a recording/release check. See [the dated readiness report](docs/READINESS.md) for the exact scope and live-check results.
 
 The suite covers the rules, the payment gate, payouts and their failure and retry, ledger and passport tamper detection (forged prices, terms, quotes, capture ids, edited ledger events), persistence, API routes and run ownership, the offline simulator, a check that browser-bound modules never import Node code, and full browser journeys including the mobile layout.
 
@@ -199,7 +218,7 @@ The suite covers the rules, the payment gate, payouts and their failure and retr
 - **In the product:** a free language model through the Vercel AI Gateway (licence term extraction, bundle proposals, brief reading, run Q&A and the dashboard assistant), as described above.
 - **In development:** AI coding tools were used to help write and test the code, under the author's direction. The author reviewed the work and takes responsibility for it.
 
-Audit results and the remaining submission work are in [`docs/AUDIT.md`](docs/AUDIT.md) and [`docs/HACKATHON.md`](docs/HACKATHON.md).
+Current verification evidence is in [`docs/READINESS.md`](docs/READINESS.md). Earlier audit results and the remaining submission work are in [`docs/AUDIT.md`](docs/AUDIT.md) and [`docs/HACKATHON.md`](docs/HACKATHON.md).
 
 ## Documents
 

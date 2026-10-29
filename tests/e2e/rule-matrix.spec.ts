@@ -108,3 +108,33 @@ test("the custom deal ladder widget draws each negotiation's totals, step by ste
   expect(await accessibilityViolations(page)).toEqual([]);
   expect(errors).toEqual([]);
 });
+
+test("an open portfolio refreshes its custom widgets when a purchase settles", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  const { id } = await (await page.request.post("/api/sessions", { data: { scenarioId: "documentary" } })).json();
+  await expect.poll(async () => (await (await page.request.get(`/api/sessions/${id}`)).json()).phase).toBe("verified");
+  await page.goto("/dashboard?portfolio=1");
+  await expect(page.getByRole("table", { name: /How many times each rule rejected each asset/ })).toBeVisible();
+  const flow = page.getByRole("img", { name: /^Where the \$329\.00 went:/ });
+  await expect(flow).toHaveCount(0);
+
+  expect((await page.request.post(`/api/sessions/${id}/approve`, { data: { approvedBy: "Portfolio reviewer" } })).ok()).toBe(true);
+  const paid = await (await page.request.post(`/api/sessions/${id}/pay`)).json();
+  expect((await page.request.post(`/api/simulator/orders/${paid.order.id}`)).ok()).toBe(true);
+  expect((await page.request.post(`/api/sessions/${id}/capture`)).ok()).toBe(true);
+
+  // No navigation or reload: the widget must read the new rows, not just a refreshed page header.
+  await expect(flow).toBeVisible();
+  await expect(page.getByRole("list", { name: "Licence end dates" }).getByRole("listitem")).toHaveCount(3);
+
+  // A later brief change must also wake the initially empty deal ladder.
+  const earlier = await (await page.request.post("/api/sessions", { data: { scenarioId: "documentary" } })).json();
+  await expect.poll(async () => (await (await page.request.get(`/api/sessions/${earlier.id}`)).json()).phase).toBe("verified");
+  const changed = await page.request.post(`/api/sessions/${earlier.id}/rebrief`, { data: { change: { commercial: false } } });
+  expect(changed.ok()).toBe(true);
+  const revised = await changed.json();
+  await expect.poll(async () => (await (await page.request.get(`/api/sessions/${revised.id}`)).json()).phase).toBe("verified");
+  await expect(page.getByRole("img", { name: new RegExp(`\\(${earlier.id.slice(0, 6)}\\): First run \\$329\\.00, then Changed brief \\$294\\.00, \\$35\\.00 less overall`) })).toBeVisible();
+  expect(errors).toEqual([]);
+});

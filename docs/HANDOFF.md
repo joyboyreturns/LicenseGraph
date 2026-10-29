@@ -1,5 +1,7 @@
 # Continuation prompt
 
+Current feature evidence and release gates are in `docs/READINESS.md` (29 October 2026). The counts and validation notes below describe the earlier audit and are retained as history.
+
 Continue work on LicenseGraph in `/Users/vincent/Documents/LicenseGraph` for the PayPal AI Hackathon. Read `AGENTS.md`, `docs/AUDIT.md`, `docs/HACKATHON.md` and the current diff before changing anything. The user authorized a broad correctness audit, bug fixes, optimization and product improvements, with no paid model usage and no new payment bypasses. Preserve all existing work. Do not reset, clean, stash or move this shared checkout without coordinating with the owner; another agent accidentally reset it once during this audit, and the work was recovered from an automatic stash.
 
 The base revision was `141ad0d`. The owner subsequently requested that the audited changes be committed and pushed; consult `git status` and `git log` for the current delivery state. No deployment was performed. The original recovery stash is retained, but it is older than the final working tree. A source-only recovery archive from before delivery is at `/private/tmp/licensegraph-audit-20261028.zip`.

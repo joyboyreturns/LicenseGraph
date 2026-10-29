@@ -28,9 +28,11 @@ const LEFT = 16;
 const RIGHT_X = 330;
 const BAR = 14;
 
-export function MoneyFlow({ dataMapping, widgetApi }: AgWidgetParams<FlowDef>) {
+export function MoneyFlow(params: AgWidgetParams<FlowDef>) {
+  const { dataMapping, widgetApi } = params;
   const [rows, setRows] = useState<FlowInput[] | null>(null);
 
+  // Studio refreshes params for data and filter changes even when the field mapping stays the same.
   useEffect(() => {
     let live = true;
     const [payee, amount] = [asList(dataMapping.payee)[0], asList(dataMapping.amount)[0]];
@@ -55,10 +57,11 @@ export function MoneyFlow({ dataMapping, widgetApi }: AgWidgetParams<FlowDef>) {
     return () => {
       live = false;
     };
-  }, [dataMapping, widgetApi]);
+  }, [params]);
 
   const flow = useMemo(() => (rows ? buildFlow(rows) : undefined), [rows]);
-  if (!flow) return null;
+  // Keep a DOM node while empty so Studio can finish mounting and deliver later refreshes.
+  if (!flow) return <div aria-hidden />;
 
   const usable = H - GAP * (flow.lines.length - 1);
   let leftY = 0;

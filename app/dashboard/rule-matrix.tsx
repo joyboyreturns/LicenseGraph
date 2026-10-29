@@ -25,9 +25,11 @@ export interface StudioRegistry extends AgRegistry {
 
 const asList = (v: unknown): { id?: string }[] => (Array.isArray(v) ? v : v ? [v as { id?: string }] : []);
 
-function RuleMatrix({ dataMapping, widgetApi }: AgWidgetParams<MatrixDef>) {
+function RuleMatrix(params: AgWidgetParams<MatrixDef>) {
+  const { dataMapping, widgetApi } = params;
   const [matrix, setMatrix] = useState<Matrix | null>(null);
 
+  // Studio refreshes params for data and filter changes even when the field mapping stays the same.
   useEffect(() => {
     let live = true;
     const [row, column, value] = [asList(dataMapping.rows)[0], asList(dataMapping.columns)[0], asList(dataMapping.value)[0]];
@@ -49,9 +51,10 @@ function RuleMatrix({ dataMapping, widgetApi }: AgWidgetParams<MatrixDef>) {
     return () => {
       live = false;
     };
-  }, [dataMapping, widgetApi]);
+  }, [params]);
 
-  if (!matrix?.total) return null;
+  // Keep a DOM node while empty so Studio can finish mounting and deliver later refreshes.
+  if (!matrix?.total) return <div aria-hidden />;
   return (
     <div style={{ overflow: "auto", height: "100%", padding: 8, fontFamily: "var(--font-ui)", fontSize: 12.5 }}>
       <table style={{ borderCollapse: "separate", borderSpacing: 3, minWidth: "100%" }}>

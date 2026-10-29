@@ -32,9 +32,11 @@ const STATE: Record<Urgency, string> = { ended: "Ended", soon: "Ends soon", late
 const describe = (b: TimelineBar) =>
   b.perpetual ? `${b.label}: perpetual, from ${b.start}` : `${b.label}: ${b.start} to ${b.end}, ${b.daysLeft! < 0 ? `ended ${-b.daysLeft!} days ago` : `${b.daysLeft} days left`}`;
 
-export function LicenceTimeline({ dataMapping, widgetApi }: AgWidgetParams<TimelineDef>) {
+export function LicenceTimeline(params: AgWidgetParams<TimelineDef>) {
+  const { dataMapping, widgetApi } = params;
   const [rows, setRows] = useState<TimelineInput[] | null>(null);
 
+  // Studio refreshes params for data and filter changes even when the field mapping stays the same.
   useEffect(() => {
     let live = true;
     const [label, start, end] = [asList(dataMapping.label)[0], asList(dataMapping.start)[0], asList(dataMapping.end)[0]];
@@ -59,10 +61,11 @@ export function LicenceTimeline({ dataMapping, widgetApi }: AgWidgetParams<Timel
     return () => {
       live = false;
     };
-  }, [dataMapping, widgetApi]);
+  }, [params]);
 
   const timeline = useMemo(() => (rows ? buildTimeline(rows, todayIso()) : undefined), [rows]);
-  if (!timeline) return null;
+  // Keep a DOM node while empty so Studio can finish mounting and deliver later refreshes.
+  if (!timeline) return <div aria-hidden />;
 
   return (
     <div style={{ overflow: "auto", height: "100%", padding: "10px 12px", fontFamily: "var(--font-ui)", fontSize: 12.5 }}>

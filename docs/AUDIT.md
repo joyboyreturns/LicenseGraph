@@ -1,5 +1,7 @@
 # Correctness and readiness audit
 
+This records the earlier correctness audit. See [the current readiness report](READINESS.md) for the 29 October 2026 full-suite results, limited live provider checks and outstanding release evidence.
+
 Baseline: repository revision `141ad0d`, 364 passing unit/API tests, 24 credential-dependent tests skipped. No real-money operations or model requests were made during the audit.
 
 ## Corrected behaviour

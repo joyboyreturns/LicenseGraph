@@ -27,9 +27,11 @@ const W = 560;
 const ROW_H = 86;
 const PAD_X = 56;
 
-export function DealLadder({ dataMapping, widgetApi }: AgWidgetParams<LadderDef>) {
+export function DealLadder(params: AgWidgetParams<LadderDef>) {
+  const { dataMapping, widgetApi } = params;
   const [rows, setRows] = useState<LadderInput[] | null>(null);
 
+  // Studio refreshes params for data and filter changes even when the field mapping stays the same.
   useEffect(() => {
     let live = true;
     const fields = [asList(dataMapping.deal)[0], asList(dataMapping.stage)[0], asList(dataMapping.step)[0], asList(dataMapping.total)[0]];
@@ -54,10 +56,11 @@ export function DealLadder({ dataMapping, widgetApi }: AgWidgetParams<LadderDef>
     return () => {
       live = false;
     };
-  }, [dataMapping, widgetApi]);
+  }, [params]);
 
   const ladders = useMemo(() => (rows ? buildLadders(rows) : []), [rows]);
-  if (!ladders.length) return null;
+  // Keep a DOM node while empty so Studio can finish mounting and deliver later refreshes.
+  if (!ladders.length) return <div aria-hidden />;
 
   return (
     <div style={{ overflow: "auto", height: "100%", padding: "10px 12px", fontFamily: "var(--font-ui)", fontSize: 12.5 }}>
