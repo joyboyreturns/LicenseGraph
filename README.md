@@ -157,10 +157,10 @@ npm run build && npm start  # or: npm run dev
 
 - **PayPal Sandbox:** create a *Merchant* app on [developer.paypal.com](https://developer.paypal.com) under Sandbox, use **United States** Sandbox accounts (India-region accounts cannot transact in USD), and set `PAYPAL_CLIENT_ID` and `PAYPAL_CLIENT_SECRET`. The app only talks to the Sandbox host and refuses anything else. Add a few Sandbox personal accounts to `LICENSEGRAPH_CREATOR_EMAILS` to see the creator payouts land as SUCCESS.
 - **No PayPal account?** Set `LICENSEGRAPH_SIMULATOR=1` instead: the same order, approval, capture and payout flow runs locally against a labelled simulator.
-- **Your own licences:** set `AI_GATEWAY_API_KEY` and a **free** `LICENSEGRAPH_MODEL`, then use *Describe your project* on the home page. Live runs are slower (free models are rate limited, so calls are spaced about 12 seconds apart).
+- **Your own licences:** set `AI_GATEWAY_API_KEY` and a **free** `LICENSEGRAPH_MODEL`, then use *Describe your project* on the home page. Live runs are slower (free models are rate limited, so calls are spaced about 12 seconds apart). Extraction and dashboard-assistant calls have a 100-second deadline by default, configured with `LICENSEGRAPH_MODEL_TIMEOUT_MS`; the assistant reports a timeout rather than running indefinitely.
 - **Dashboard licence:** AG Studio is commercial; without `NEXT_PUBLIC_AG_STUDIO_LICENSE_KEY` it runs with a trial watermark.
 
-All settings are documented in [`.env.example`](.env.example). Running it on a home server behind Tailscale Funnel is covered in [`docs/DEPLOY.md`](docs/DEPLOY.md).
+All settings are documented in [`.env.example`](.env.example). Running it on a home server behind Tailscale Funnel is covered in [`docs/DEPLOY.md`](docs/DEPLOY.md). Deployment is planned for after 5 November 2026; local testing remains available before then.
 
 ## How it is built
 
@@ -201,7 +201,7 @@ npm run test:gateway   # live extraction; defaults to up to 3 attempts per fixtu
 npm run test:proposer  # one live proposal, free-model guard required
 ```
 
-The latest full audit passed **762 unit/property/API tests** and **65 browser journeys**, with **27 credential-dependent tests skipped** in the offline suite. Three real Sandbox order tests also passed separately; they do not cover buyer approval, capture or creator settlement. A broader live extraction check passed 16 fixtures before a provider timeout stopped it; live reliability is still a recording/release check. See [the dated readiness report](docs/READINESS.md) for the exact scope and live-check results.
+The latest full audit passed **765 unit/property/API tests** and **66 browser journeys**, with **27 credential-dependent tests skipped** in the offline suite. Three real Sandbox order tests also passed separately; they do not cover buyer approval, capture or creator settlement. A separate, approved local live-assistant check created and saved a KPI in two free-model calls. A broader live extraction check passed 16 fixtures before a provider timeout stopped it; live reliability is still a recording/release check. See [the dated readiness report](docs/READINESS.md) for the exact scope and live-check results.
 
 The suite covers the rules, the payment gate, payouts and their failure and retry, ledger and passport tamper detection (forged prices, terms, quotes, capture ids, edited ledger events), persistence, API routes and run ownership, the offline simulator, a check that browser-bound modules never import Node code, and full browser journeys including the mobile layout.
 

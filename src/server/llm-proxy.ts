@@ -81,20 +81,34 @@ export function createLlmProxy(config: GatewayConfig, limits: ProxyLimits = DEFA
       }
     }
 
-    const res = await doFetch(`${config.baseUrl ?? "https://ai-gateway.vercel.sh"}/v1/chat/completions`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${config.apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: config.model, // fixed by the server
-        temperature: 0,
-        max_tokens: config.maxTokens ?? 16000,
-        messages: b.messages,
-        ...(b.tools ? { tools: b.tools } : {}),
-        ...(b.tools && b.tool_choice ? { tool_choice: b.tool_choice } : {}),
-      }),
-    });
-    const json = (await res.json().catch(() => ({}))) as { choices?: { message?: unknown }[]; usage?: unknown; model?: string; error?: { message?: string } };
-    if (!res.ok) throw new ProxyError(`The model request failed (${res.status}). ${json.error?.message ?? ""}`.trim(), 502);
-    return { message: json.choices?.[0]?.message, usage: json.usage, model: json.model };
+    const timeoutMs = config.timeoutMs ?? 100_000;
+    const signal = AbortSignal.timeout(timeoutMs);
+    try {
+      const res = await doFetch(`${config.baseUrl ?? "https://ai-gateway.vercel.sh"}/v1/chat/completions`, {
+        method: "POST",
+        signal,
+        headers: { Authorization: `Bearer ${config.apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: config.model, // fixed by the server
+          temperature: 0,
+          max_tokens: config.maxTokens ?? 16000,
+          messages: b.messages,
+          ...(b.tools ? { tools: b.tools } : {}),
+          ...(b.tools && b.tool_choice ? { tool_choice: b.tool_choice } : {}),
+        }),
+      });
+      const json = (await res.json().catch((e) => {
+        if (signal.aborted) throw e;
+        return {};
+      })) as { choices?: { message?: unknown }[]; usage?: unknown; model?: string; error?: { message?: string } };
+      if (!res.ok) throw new ProxyError(`The model request failed (${res.status}). ${json.error?.message ?? ""}`.trim(), 502);
+      return { message: json.choices?.[0]?.message, usage: json.usage, model: json.model };
+    } catch (e) {
+      if (signal.aborted) {
+        const duration = timeoutMs >= 1000 ? `${Math.round(timeoutMs / 1000)}s` : `${timeoutMs}ms`;
+        throw new ProxyError(`The assistant model request timed out after ${duration}. Try again when the service is available.`, 504);
+      }
+      throw e;
+    }
   };
 }

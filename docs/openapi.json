@@ -1545,7 +1545,7 @@
           "Service"
         ],
         "summary": "Model proxy for the AG Studio assistant",
-        "description": "Used by the dashboard's built-in assistant. Forwards to the configured free model.",
+        "description": "Used by the dashboard's built-in assistant. Forwards to the configured free model with a completion deadline (100 seconds by default, configured by LICENSEGRAPH_MODEL_TIMEOUT_MS).",
         "requestBody": {
           "required": true,
           "content": {
@@ -1569,8 +1569,75 @@
               }
             }
           },
+          "400": {
+            "description": "Messages are missing or invalid.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The model could not be confirmed free.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The conversation or tool list is too large.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "The assistant is busy or rate limited.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The gateway refused the request or could not be reached.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "503": {
-            "description": "No model is configured."
+            "description": "No model is configured.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "The model request exceeded its completion deadline.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       }

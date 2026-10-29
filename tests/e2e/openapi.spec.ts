@@ -5,6 +5,7 @@ test("the running server publishes its own OpenAPI document, pointing at itself"
   expect(res.status()).toBe(200);
   const spec = await res.json();
   expect(spec.openapi).toBe("3.1.0");
+  expect(spec.paths["/api/llm"].post.responses["504"].description).toMatch(/deadline/);
   expect(spec.servers[0].url).toBe(baseURL);
   expect(Object.keys(spec.paths)).toEqual(expect.arrayContaining(["/api/sessions", "/api/sessions/{id}/refund", "/api/passports/{id}/verify"]));
   // A real run answers with the shape the document promises.

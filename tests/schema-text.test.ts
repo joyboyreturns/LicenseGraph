@@ -15,6 +15,16 @@ describe("describeSchema", () => {
     expect(text).toContain("Relationships: assets one-to-many offers");
   });
 
+  it("gives the assistant canonical tool ids when Studio supplies decorated references", () => {
+    const text = describeSchema({
+      tables: [{ id: "assets", name: "Assets", reference: "@table[assets]", fields: [{ fieldId: "assets.chosenPrice", name: "Chosen price", reference: "@field[assets.assets.chosenPrice]", dataType: "number", aggregations: ["sum"] }] }],
+      relationships: [],
+    });
+    expect(text).toContain("Table Assets [assets]");
+    expect(text).toContain("Chosen price [assets.chosenPrice]");
+    expect(text).not.toContain("assets.assets.chosenPrice");
+  });
+
   it("copes with no relationships and no description", () => {
     expect(describeSchema({ tables: [{ name: "T", reference: "t", fields: [] }], relationships: [] })).toBe("Table T [t]");
   });

@@ -42,6 +42,38 @@ describe("createLlmProxy", () => {
     expect(fetchMock.mock.calls.some((c) => c[0].endsWith("/chat/completions"))).toBe(false);
   });
 
+  it("times out a stalled completion, reports 504 and allows a later request", async () => {
+    let calls = 0;
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.endsWith("/v1/models")) return models(FREE);
+      calls++;
+      if (calls > 1) return chat();
+      return new Promise<Response>((_resolve, reject) => {
+        init!.signal!.addEventListener("abort", () => reject(init!.signal!.reason), { once: true });
+      });
+    });
+    const proxy = createLlmProxy({ apiKey: "key", model: "free/model", timeoutMs: 20, fetch: fetchMock as typeof fetch }, NO_PACING);
+    const error = await status(proxy(body));
+    expect(error).toBeInstanceOf(ProxyError);
+    expect(error.status).toBe(504);
+    expect(error.message).toContain("timed out after 20ms");
+    await expect(proxy(body)).resolves.toMatchObject({ message: { content: "hi" } });
+    expect(calls).toBe(2);
+  });
+
+  it("keeps the deadline active while reading the response body", async () => {
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.endsWith("/v1/models")) return models(FREE);
+      return new Response(new ReadableStream({
+        start(controller) {
+          init!.signal!.addEventListener("abort", () => controller.error(init!.signal!.reason), { once: true });
+        },
+      }));
+    });
+    const proxy = createLlmProxy({ apiKey: "key", model: "free/model", timeoutMs: 20, fetch: fetchMock as typeof fetch }, NO_PACING);
+    expect((await status(proxy(body))).status).toBe(504);
+  });
+
   it("validates the request", async () => {
     const { proxy } = make();
     expect((await status(proxy(null))).status).toBe(400);

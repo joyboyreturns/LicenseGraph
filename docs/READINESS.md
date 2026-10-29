@@ -1,6 +1,6 @@
 # Feature verification and submission readiness
 
-Checked on 29 October 2026 against the working tree based on revision `9343221`, including the custom-widget correction delivered with this report. This report separates repeatable offline verification from provider checks and release work. Passing tests demonstrate the cases below; they do not establish that licence interpretations are legally correct or guarantee a competition result.
+Checked on 29 October 2026 against the working tree based on revision `c26b30d`, including the assistant corrections delivered with this update. This report separates repeatable offline verification from provider checks and release work. Passing tests demonstrate the cases below; they do not establish that licence interpretations are legally correct or guarantee a competition result.
 
 ## Current verification evidence
 
@@ -8,17 +8,28 @@ Checked on 29 October 2026 against the working tree based on revision `9343221`,
 | --- | --- |
 | Public source repository | Repository metadata confirms `PUBLIC` visibility at `https://github.com/joyboyreturns/LicenseGraph`. |
 | Dependency installation | `npm install --no-audit --no-fund` passed; lockfile unchanged. |
-| Unit, property and API suite | `npm test`: 762 passed, 27 credential-dependent tests skipped. |
+| Unit, property and API suite | `npm test`: 765 passed, 27 credential-dependent tests skipped. |
 | Type checking | `npm run typecheck` passed. |
 | Production build | `node scripts/demo.mjs --build --build-only` passed. |
-| Complete browser suite | `npx playwright test`: 65 passed across the normal, payout-failure and refund test servers. The production build includes the custom-widget correction described below. |
-| Published CI | [The workflow for the audited application revision](https://github.com/joyboyreturns/LicenseGraph/actions/runs/40808455304) passed, including a fresh production build and the full offline browser suite. |
+| Complete browser suite | `npx playwright test`: 66 passed across the normal, payout-failure and refund test servers. The production build includes the custom-widget correction described below. |
+| Baseline published CI | [The workflow for revision c26b30d](https://github.com/joyboyreturns/LicenseGraph/actions/runs/40853602202) passed, including a fresh production build and the full offline browser suite. |
 | Dependency registry audit | Zero known vulnerabilities reported by `npm audit` on this date. This is a point-in-time registry result. |
 | Real Sandbox order API | `npm run test:live`: 3 passed. Covers order creation, a repeated idempotency key, and an itemised order through the verified/approved checkout gate. No buyer approval or capture is performed by these tests. |
 | Live model pricing | The configured model was listed with zero input and output prices before testing. The existing free-model guard remained enabled for each client. |
 | Live proposal | `npm run test:proposer`: 1 passed, one completion request. Checks that the proposal names existing offer ids; the rules engine remains responsible for accepting or rejecting a proposal. |
 | Live extraction sample | `LIVE_ATTEMPTS=1 npm run test:gateway -- -t "extracts 'song' with verified evidence"`: 1 passed, 22 unselected fixtures skipped. One attempt; price, stated terms and located evidence matched the fixture. |
 | Broader live extraction check | `LIVE_ATTEMPTS=1 npm run test:gateway -- --bail 1`: 16 fixtures passed, then `pod-art-editorial` timed out at the configured 100-second deadline; 6 fixtures were not attempted because the run stopped on that failure. The run took about 15 minutes. No automatic retries were enabled. Full live-catalogue reliability is not established; retain this failure in the submission evidence. |
+
+## Assistant follow-up verification
+
+A local browser check, explicitly approved by the owner, sent only the public dashboard schema/tool definitions and a synthetic KPI prompt to the configured free model. It used two model calls: `create_kpi`, followed by a text confirmation. The KPI rendered and its layout was saved. Payments were disabled, run storage was isolated, and the request was capped at two calls. Payload inspection found no configured credentials or creator emails. This verifies the local integration, not the future deployed assistant or arbitrary user requests.
+
+Two further corrections came from that inspection:
+
+- The dashboard proxy now applies `LICENSEGRAPH_MODEL_TIMEOUT_MS` (100 seconds by default) to both the request and response-body read. A stalled call returns HTTP 504 with an explanation, and later requests can recover. The published OpenAPI document describes this response and the proxy's other guarded failures. Unit tests cover both stalls and recovery.
+- Assistant instructions use canonical field IDs such as `assets.chosenPrice` from schema metadata. Decorated Studio references could repeat the table name and disagree with the tool's accepted IDs. Unit and browser assertions cover the actual instruction payload.
+
+The new offline browser regression exercises the real assistant, adapter and widget tool with intercepted model responses. It verifies the tool-result round trip, canonical IDs, widget rendering and persistence after reload without a gateway key.
 
 ## Correction found during this audit
 
@@ -47,18 +58,20 @@ All paths below are relative to the repository root. Browser tests use recorded 
 | Run questions and local fallback | Replies are grounded in the recorded run, referenced offers are checked, deterministic fallback remains available. | `tests/explain.test.ts`, `tests/e2e/accessibility.spec.ts` |
 | Agent tools, prompts, resources and discovery, `/agents` | Ten MCP tools; purchase and negotiation prompts; rules and paid-passport resources; stdio/HTTP transport; generated discovery lists; one-time claim handoff without agent approval/payment. | `tests/mcp.test.ts`, `tests/mcp-http.test.ts`, `tests/discovery.test.ts`, `tests/e2e/agents.spec.ts`, `tests/e2e/mcp-http.spec.ts` |
 | OpenAPI and bounded request validation | The checked-in API document matches the generated schemas; malformed/oversized input is refused; the published document points to its own server. | `tests/openapi.test.ts`, `tests/api.test.ts`, `tests/e2e/openapi.spec.ts` |
-| Dashboards and assistant, `/dashboard` | Four custom widgets: rule matrix, licence timeline, money flow and deal ladder; linked data; validated assistant tools and model adapter; saved layout/reset; automatic snapshot refresh. The live assistant's rendered response still needs a recorded check for the final deployment. | `tests/dashboard.test.ts`, `tests/widget-tools.test.ts`, `tests/llm-adapter.test.ts`, `tests/llm-proxy.test.ts`, `tests/saved-state.test.ts`, `tests/dashboard-live.test.ts`, `tests/e2e/rule-matrix.spec.ts`, `tests/e2e/brief-and-pages.spec.ts` |
+| Dashboards and assistant, `/dashboard` | Four custom widgets: rule matrix, licence timeline, money flow and deal ladder; linked data; validated assistant tools and model adapter; saved layout/reset; automatic snapshot refresh. The local live assistant rendered and saved a KPI in two approved free-model calls; the final deployment still needs its recorded check. | `tests/dashboard.test.ts`, `tests/widget-tools.test.ts`, `tests/llm-adapter.test.ts`, `tests/llm-proxy.test.ts`, `tests/schema-text.test.ts`, `tests/e2e/dashboard-assistant.spec.ts`, `tests/saved-state.test.ts`, `tests/dashboard-live.test.ts`, `tests/e2e/rule-matrix.spec.ts`, `tests/e2e/brief-and-pages.spec.ts` |
 | Mobile, accessibility and error pages | No horizontal overflow in tested phone views; automated accessibility checks in light/dark mode and interactive states; unknown run/page handling; security headers; share previews and web manifest. Automated scans cover only part of accessibility. | `tests/e2e/accessibility.spec.ts`, `tests/e2e/brief-and-pages.spec.ts` |
 
 ## Release checks still requiring evidence
 
 The implemented offline journeys pass. The following are not satisfied by those tests and remain open before the final submission:
 
-- [ ] Choose the final judging address or verify the clean local setup on another machine. Deployment was previously deferred by the owner; this audit does not publish infrastructure.
+- [x] Hosting choice confirmed by the owner: home Ubuntu server with Tailscale Funnel.
+- [ ] Deploy and verify the final judging address after 5 November 2026, as requested by the owner. This audit does not publish infrastructure.
 - [ ] Record a buyer approving an order from the current application on PayPal Sandbox; verify capture and each creator's individual SUCCESS receipt. The earlier capture milestone is recorded in `docs/PLAN.md`, but is not a new end-to-end check of the updated payout flow.
 - [ ] Register the deployed Sandbox webhook and verify a genuine provider delivery, including the return-page-independent capture path.
 - [ ] Obtain/set the dashboard trial key before the production build, and verify its validity through judging. A key was not configured in this checkout during the audit.
-- [ ] Record extraction, proposal and a rendered dashboard-assistant response with the actual free model configured for the submission. The current live checks are small samples; record slow calls accurately rather than presenting a replay as a live request.
+- [x] Verify a locally rendered dashboard-assistant response using the approved fixture-only payload and configured free model (two calls).
+- [ ] Record extraction, proposal and a rendered dashboard-assistant response on the final judging deployment with the actual free model configured for the submission. The current live checks are small samples; record slow calls accurately rather than presenting a replay as a live request.
 - [ ] Fill the hosted address, required public video link, model disclosure and judging credentials/instructions in `docs/DEVPOST.md`; check eligibility and ownership of the submitted assets.
 - [ ] Publish the complete video under three minutes, submit the form, and test its links from a signed-out browser. Keep judging access available through the published judging period.
 

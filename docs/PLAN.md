@@ -1,6 +1,6 @@
 # LicenseGraph step-by-step plan
 
-> **Status:** steps 1 to 8 are built. After them the product was extended and redesigned for the hackathon: creator payouts, per-offer rule matrix and price-only comparison, the Licence Passport with in-browser verification, persistence, run ownership, an offline payment simulator, plain-English briefs and run Q&A, four scenarios, a full front-end redesign, a cross-run AG Studio portfolio, and end-to-end browser tests. Deployment is deferred by the owner; `docs/DEPLOY.md` is ready for when it is wanted. What remains is in the last section; current verification evidence is in `docs/READINESS.md`.
+> **Status:** steps 1 to 8 are built. After them the product was extended and redesigned for the hackathon: creator payouts, per-offer rule matrix and price-only comparison, the Licence Passport with in-browser verification, persistence, run ownership, an offline payment simulator, plain-English briefs and run Q&A, four scenarios, a full front-end redesign, a cross-run AG Studio portfolio, and end-to-end browser tests. Deployment on the home Ubuntu server with Tailscale Funnel is deferred by the owner until after 5 November 2026; `docs/DEPLOY.md` is ready for when it is wanted. What remains is in the last section; current verification evidence is in `docs/READINESS.md`.
 
 Target: submit to the PayPal AI Hackathon on **11 Nov 2026** (official close 12 Nov, 12:00 PM PT; confirmed from PayPal's developer blog). Budget about 45-50 hours, 2-3 hours a day alongside PIVOT until 8 Nov.
 
@@ -102,7 +102,7 @@ Prize targets: Best Overall, Best Use of Agentic Commerce, Best Use of AG Grid. 
 - [x] README with local-run steps, `.env.example`, demo script and submission text drafts
 - [x] Requirement costs, gap requests and an "if every licensor said yes" outlook; what-if panel (controls or a typed sentence); negotiation loop (a licensor's revised licence is checked as a new run, linked in the ledger and shown on the passport)
 - [x] Licence end dates with a calendar download; accessibility scans in light and dark; OpenAPI document, PayPal webhooks, custom AG Studio widget, MCP tools
-- [ ] Deployment (deferred by the owner): home Ubuntu server with Tailscale Funnel, see `docs/DEPLOY.md`
+- [ ] Deployment (after 5 November 2026, per the owner): home Ubuntu server with Tailscale Funnel, see `docs/DEPLOY.md`
 - [ ] Request the AG Studio trial licence key (info@ag-grid.com) to remove the dashboard watermark
 - [ ] Create US Sandbox personal accounts for the demo creators (`LICENSEGRAPH_CREATOR_EMAILS`) so payouts show SUCCESS on camera
 - [ ] One run on the real PayPal Sandbox with the new payout flow (needs the buyer's approval in a browser)

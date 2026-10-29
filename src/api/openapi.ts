@@ -185,7 +185,15 @@ export function buildOpenApi(serverUrl = "http://localhost:3000"): Json {
       "/llms.txt": { get: { operationId: "getLlmsTxt", tags: ["Service"], summary: "Plain-text introduction for AI agents", responses: { "200": { description: "Markdown text.", content: { "text/plain": { schema: { type: "string" } } } } } } },
       "/llms-full.txt": { get: { operationId: "getLlmsFullTxt", tags: ["Service"], summary: "Plain-text introduction for AI agents, with the rules and the buying playbook", responses: { "200": { description: "Markdown text.", content: { "text/plain": { schema: { type: "string" } } } } } } },
       "/api/llm": {
-        post: { operationId: "assistantProxy", tags: ["Service"], summary: "Model proxy for the AG Studio assistant", description: "Used by the dashboard's built-in assistant. Forwards to the configured free model.", requestBody: { required: true, content: { "application/json": { schema: { type: "object", additionalProperties: true } } } }, responses: { "200": { description: "The model's reply.", content: { "application/json": { schema: { type: "object", additionalProperties: true } } } }, "503": { description: "No model is configured." } } },
+        post: {
+          operationId: "assistantProxy", tags: ["Service"], summary: "Model proxy for the AG Studio assistant",
+          description: "Used by the dashboard's built-in assistant. Forwards to the configured free model with a completion deadline (100 seconds by default, configured by LICENSEGRAPH_MODEL_TIMEOUT_MS).",
+          requestBody: { required: true, content: { "application/json": { schema: { type: "object", additionalProperties: true } } } },
+          responses: {
+            "200": { description: "The model's reply.", content: { "application/json": { schema: { type: "object", additionalProperties: true } } } },
+            ...err(["400", "Messages are missing or invalid."], ["403", "The model could not be confirmed free."], ["413", "The conversation or tool list is too large."], ["429", "The assistant is busy or rate limited."], ["502", "The gateway refused the request or could not be reached."], ["503", "No model is configured."], ["504", "The model request exceeded its completion deadline."]),
+          },
+        },
       },
       "/api/simulator/orders/{id}": {
         get: { operationId: "describeSimulatedOrder", tags: ["Service"], summary: "Simulated checkout page data", description: "Exists only when the offline payment simulator is running.", parameters: [idParam], responses: { "200": { description: "The simulated order." }, ...err(["404", "No simulator, or no such order."]) } },

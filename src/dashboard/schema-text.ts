@@ -1,10 +1,12 @@
 interface FieldMeta {
+  fieldId?: string;
   name: string;
   reference: string;
   dataType: string;
   aggregations?: readonly string[];
 }
 interface TableMeta {
+  id?: string;
   name: string;
   reference: string;
   description?: string;
@@ -22,8 +24,8 @@ export interface SchemaMeta {
  */
 export function describeSchema(schema: SchemaMeta): string {
   const tables = schema.tables.map((t) => {
-    const fields = t.fields.map((f) => `  - ${f.name} [${f.reference}] (${f.dataType}${f.aggregations?.length ? `; aggregations: ${f.aggregations.join(", ")}` : ""})`);
-    return [`Table ${t.name} [${t.reference}]${t.description ? `: ${t.description}` : ""}`, ...fields].join("\n");
+    const fields = t.fields.map((f) => `  - ${f.name} [${f.fieldId ?? f.reference}] (${f.dataType}${f.aggregations?.length ? `; aggregations: ${f.aggregations.join(", ")}` : ""})`);
+    return [`Table ${t.name} [${t.id ?? t.reference}]${t.description ? `: ${t.description}` : ""}`, ...fields].join("\n");
   });
   const links = schema.relationships.map((r) => `${r.sourceTableId} ${r.type} ${r.targetTableId}`);
   return [schema.description ?? "", ...tables, links.length ? `Relationships: ${links.join("; ")}` : ""].filter(Boolean).join("\n\n");
