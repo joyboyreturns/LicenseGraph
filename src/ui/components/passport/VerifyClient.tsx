@@ -247,7 +247,9 @@ export function VerifyClient() {
             <VerifyChecks checks={result?.checks ?? null} ok={result?.ok ?? null} runKey={runKey} stepMs={360} />
             {issuer && (
               <p className={`callout tone-${ISSUER_TEXT[issuer].tone}`} data-testid="issuer-signature">
-                <b>{ISSUER_TEXT[issuer].title}.</b> {ISSUER_TEXT[issuer].text}
+                <span>
+                  <b>{ISSUER_TEXT[issuer].title}.</b> {ISSUER_TEXT[issuer].text}
+                </span>
               </p>
             )}
             <div className={styles.resultActions}>
