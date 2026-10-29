@@ -188,3 +188,13 @@ test("the app can be installed: a web manifest names it and points at an icon th
   expect(manifest).toMatchObject({ name: "LicenseGraph", start_url: "/", display: "standalone" });
   expect((await request.get(manifest.icons[0].src)).status()).toBe(200);
 });
+
+test("an open run dashboard follows approval without a reload", async ({ page }) => {
+  const { id } = await (await page.request.post("/api/sessions", { data: { scenarioId: "podcast" } })).json();
+  await expect.poll(async () => (await (await page.request.get(`/api/sessions/${id}`)).json()).phase).toBe("verified");
+  await page.goto(`/dashboard?session=${id}`);
+  await expect(page.getByText("Verified, awaiting approval", { exact: true })).toBeVisible();
+  const approved = await page.request.post(`/api/sessions/${id}/approve`, { data: { approvedBy: "Dashboard reviewer" } });
+  expect(approved.ok()).toBe(true);
+  await expect(page.getByText("Approved", { exact: true })).toBeVisible();
+});

@@ -1,6 +1,6 @@
 # LicenseGraph step-by-step plan
 
-> **Status:** steps 1 to 8 are built. After them the product was extended and redesigned for the hackathon: creator payouts, per-offer rule matrix and price-only comparison, the Licence Passport with in-browser verification, persistence, run ownership, an offline payment simulator, plain-English briefs and run Q&A, three scenarios, a full front-end redesign, a cross-run AG Studio portfolio, and end-to-end browser tests. Deployment is deferred by the owner; `docs/DEPLOY.md` is ready for when it is wanted. What remains is in the last section.
+> **Status:** steps 1 to 8 are built. After them the product was extended and redesigned for the hackathon: creator payouts, per-offer rule matrix and price-only comparison, the Licence Passport with in-browser verification, persistence, run ownership, an offline payment simulator, plain-English briefs and run Q&A, four scenarios, a full front-end redesign, a cross-run AG Studio portfolio, and end-to-end browser tests. Deployment is deferred by the owner; `docs/DEPLOY.md` is ready for when it is wanted. What remains is in the last section.
 
 Target: submit to the PayPal AI Hackathon on **11 Nov 2026** (official close 12 Nov, 12:00 PM PT; confirmed from PayPal's developer blog). Budget about 45-50 hours, 2-3 hours a day alongside PIVOT until 8 Nov.
 
@@ -77,12 +77,14 @@ Prize targets: Best Overall, Best Use of Agentic Commerce, Best Use of AG Grid. 
 - [x] Verified in a browser: one plain-English request produced a rendered chart in about 17 seconds (2 model calls)
 - [ ] Request the AG Studio trial licence key (email info@ag-grid.com) before the public deploy, to remove the watermark
 - [x] Confirm the exact AG Grid prize requirements on the official page; see `docs/HACKATHON.md`
-- Known limits: assistant-built widgets live in the browser session (reloading restores the starting dashboard); Studio data is a snapshot of the run when the page opens.
-- Done when: the dashboard shows the live ledger.
+- [x] Dashboard layouts and added widgets persist in this browser, with a reset control.
+- [x] Run dashboards, portfolio dashboards and the run list refresh automatically; changed ledger data appears without reloading. Failed refreshes retain the last successful snapshot and retry with backoff.
+- Done: the dashboard follows the ledger while open.
 
 ## Step 9: Ship (11 Nov)
 
-- [ ] README with demo steps, repo public, Render deploy, demo video, submit
+- [x] README with demo steps and submission drafts
+- [ ] Confirm public repository access, complete the owner-approved hosting setup, record the demo video and submit
 - 12 Nov: buffer only.
 
 ## After step 8: product and polish

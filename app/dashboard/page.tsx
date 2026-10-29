@@ -8,6 +8,7 @@ import { useSearchParams } from "next/navigation";
 import type { SessionView } from "@/src/app-logic/session";
 import type { RunSummary } from "@/src/ui/components/home/types";
 import { formatMoney, phaseInfo, pluralise, relativeTime } from "@/src/ui/lib/format";
+import { useDashboardData } from "@/src/ui/components/useDashboardData";
 import styles from "./dashboard.module.css";
 
 // AG Studio draws into the DOM, so it only runs in the browser.
@@ -24,8 +25,7 @@ function Dashboard() {
   const params = useSearchParams();
   const id = params.get("session");
   const portfolioMode = Boolean(params.get("portfolio"));
-  const [view, setView] = useState<SessionView | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { data: view, error } = useDashboardData<SessionView>(id && !portfolioMode ? `/api/sessions/${encodeURIComponent(id)}` : null);
   const [assistant, setAssistant] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -38,10 +38,6 @@ function Dashboard() {
   useEffect(() => {
     if (!id) return;
     document.title = "Run dashboard · LicenseGraph";
-    fetch(`/api/sessions/${id}`)
-      .then(async (r) => (r.ok ? r.json() : Promise.reject(new Error((await r.json()).error ?? "Could not load the session"))))
-      .then(setView)
-      .catch((e) => setError(e.message));
   }, [id]);
 
   if (portfolioMode) return <PortfolioStudio assistant={assistant} />;
@@ -84,14 +80,10 @@ function Dashboard() {
 }
 
 function PortfolioStudio({ assistant }: { assistant: boolean | null }) {
-  const [views, setViews] = useState<SessionView[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { data, error } = useDashboardData<{ views: SessionView[] }>("/api/portfolio");
+  const views = data?.views ?? null;
   useEffect(() => {
     document.title = "Portfolio dashboard · LicenseGraph";
-    fetch("/api/portfolio")
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("Could not load the runs."))))
-      .then((d: { views: SessionView[] }) => setViews(d.views))
-      .catch((e: Error) => setError(e.message));
   }, []);
 
   return (
@@ -129,16 +121,12 @@ function PortfolioStudio({ assistant }: { assistant: boolean | null }) {
 }
 
 function Portfolio() {
-  const [runs, setRuns] = useState<RunSummary[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { data, error } = useDashboardData<{ runs: RunSummary[] }>("/api/sessions");
+  const runs = data?.runs ?? null;
   const [now, setNow] = useState(0);
   useEffect(() => {
     document.title = "Portfolio · LicenseGraph";
     setNow(Date.now());
-    fetch("/api/sessions")
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("Could not load the runs."))))
-      .then((d: { runs: RunSummary[] }) => setRuns(d.runs))
-      .catch((e: Error) => setError(e.message));
   }, []);
 
   const paid = runs?.filter((r) => r.paid) ?? [];
@@ -152,7 +140,7 @@ function Portfolio() {
       <div className={styles.head}>
         <div>
           <p className="eyebrow">Portfolio</p>
-          <h1 className={styles.title}>Every run on this server</h1>
+          <h1 className={styles.title}>Your licensing runs</h1>
           <p className={styles.lead}>Open a run to replay it, or open its AG Studio dashboard to explore offers, violations and the ledger as linked tables.</p>
         </div>
         <div className={styles.headActions}>
