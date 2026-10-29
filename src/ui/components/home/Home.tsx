@@ -60,6 +60,9 @@ export function Home() {
                 Describe your project <ArrowRight aria-hidden />
               </a>
             </div>
+            <p className="small ink-2" style={{ margin: "14px 0 0" }}>
+              New here? <Link prefetch={false} href="/tour">Take the ten-minute tour</Link>: seven things to try, and what to look for in each.
+            </p>
             <ul className={styles.trust}>
               <li>
                 <Quote aria-hidden /> Every term quoted from the licence
