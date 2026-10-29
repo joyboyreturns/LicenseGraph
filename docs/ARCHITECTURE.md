@@ -63,7 +63,7 @@ The visible propose, verify, reject, revise cycle is the product. The model neve
 | `src/intake/` | The plain-English brief reader and grounded run Q&A, each with an offline fallback. |
 | `src/demo/` | Built-in scenarios and the recorded model output they replay. |
 | `src/ui/`, `app/` | The Next.js front end: home, run theatre (rights graph, replay, matrix, evidence, settlement), passport, verify, simulator checkout. Pure UI logic is unit-tested in `tests/ui`. |
-| `src/dashboard/`, `app/dashboard/` | AG Studio dashboards: a single run, and the cross-run portfolio, with three custom widgets (rule matrix, licence timeline, money flow) whose layout code is pure and tested. Validated chart, table, KPI, timeline and money-flow tools for the assistant. |
+| `src/dashboard/`, `app/dashboard/` | AG Studio dashboards: a single run, and the cross-run portfolio, with four custom widgets (rule matrix, licence timeline, money flow, deal ladder) whose layout code is pure and tested. Validated chart, table, KPI, timeline and money-flow tools for the assistant. |
 | `src/mcp/`, `scripts/mcp-server.ts` | The MCP server: tools (`check_licence_bundle`, `cheapest_compliant_bundle`, `what_if_brief`, `licence_end_dates`, `start_licence_purchase`, `get_purchase_status`, `compare_runs`, `verify_licence_passport`) and the `buy_licences` prompt, built once in `server.ts` and served over stdio and, statelessly, over HTTP at `/api/mcp`. |
 | `src/mcp/discovery.ts` | `/llms.txt` and the `/.well-known/mcp.json` server card, built from the running MCP server's own tool list so they cannot drift from it. |
 | `src/core/compare.ts` | A run beside the run it came from (asset by asset, from the two verified bundles): shown as a panel on the run and as an answer in the Ask box. |

@@ -77,6 +77,15 @@ describe("buildPortfolioData", () => {
     rebriefed.meta = { ...rebriefed.meta, rebriefedFrom: original.id };
     const rows = buildPortfolioData([original, revised, rebriefed]).sources.find((x) => x.id === "runs")!.data;
     expect(rows.map((r) => r.origin)).toEqual(["Original", "After a licensor reply", "Changed brief"]);
+    // The negotiation each run belongs to, in order: a lone run belongs to none.
+    revised.createdAt = new Date(Date.parse(original.createdAt) + 60_000).toISOString();
+    rebriefed.createdAt = new Date(Date.parse(original.createdAt) + 120_000).toISOString();
+    const rowsFull = buildPortfolioData([original, revised, rebriefed]).sources.find((x) => x.id === "runs")!.data;
+    expect(new Set(rowsFull.map((r) => r.deal)).size).toBe(1);
+    expect(rowsFull.map((r) => [r.dealStep, r.dealStage])).toEqual([[1, "First run"], [2, "After a licensor reply"], [3, "Changed brief"]]);
+    expect(String(rowsFull[0]!.deal)).toContain(original.id.slice(0, 6));
+    const lone = buildPortfolioData([original]).sources.find((x) => x.id === "runs")!.data;
+    expect([lone[0]!.deal, lone[0]!.dealStep, lone[0]!.dealStage]).toEqual([null, null, null]);
     // The same bundle as the run it came from: no movement. A run with no source in the portfolio, or no bundle, has nothing to show.
     expect(rows.map((r) => r.changeVsSource)).toEqual([null, 0, 0]);
     const cheaper = structuredClone(rebriefed);

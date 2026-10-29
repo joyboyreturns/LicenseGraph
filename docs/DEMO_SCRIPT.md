@@ -23,6 +23,7 @@ Record at 1920x1080 in a clean browser window (hide bookmarks, use the app's dar
 - **Who issued it.** On the Verify page, press "Use this server's published key": the signature is checked in the browser against the Ed25519 public key, with no server involved, and "Try a tampered copy" fails both the content checks and the issuer check. For a real check, give the page a key you were handed rather than the server's own.
 - **A changed brief, side by side.** On a verified run, change the brief in the what-if panel and press the button that checks it as a new run. The new run opens with its licences and prices set against the first, and its Ask box answers "How is this different from the run it came from?".
 - **An agent that finds the server itself.** `curl <your address>/llms.txt` and `/.well-known/mcp.json`: the endpoint and every tool, read from the running server.
+- **What a negotiation did to the price.** After changing a brief or playing a licensor reply, open the portfolio: the deal ladder draws each negotiation as a ladder of totals, step by step.
 - **Where the money went.** On the portfolio dashboard, the money flow widget draws what buyers paid flowing to each creator, and the assistant adds one from "Add a money flow diagram of what was paid to each creator."
 
 ## Checklist before you record

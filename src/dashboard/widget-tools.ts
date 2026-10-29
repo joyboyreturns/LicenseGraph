@@ -156,6 +156,18 @@ export function buildMoneyFlow(c: FieldCatalog, a: TimelineArgs): Built<Record<s
   };
 }
 
+/** Deal ladder: each negotiation as a ladder of verified totals, from the runs table. Only offered where that table has the negotiation fields. */
+export function buildDealLadder(c: FieldCatalog, a: TimelineArgs): Built<Record<string, unknown>> {
+  const errors: string[] = [];
+  for (const id of ["runs.deal", "runs.dealStage", "runs.dealStep", "runs.verifiedTotal"]) if (!c.byId[id]) errors.push(`This dashboard has no "${id}" field, so it cannot draw how a negotiation moved the price.`);
+  if (errors.length) return { ok: false, errors };
+  return {
+    ok: true,
+    size: { xSpan: 12, ySpan: 6 },
+    widget: { type: "deal-ladder", dataMapping: { deal: [{ id: "runs.deal" }], stage: [{ id: "runs.dealStage" }], step: [{ id: "runs.dealStep" }], total: [{ id: "runs.verifiedTotal" }] }, format: { title: { enabled: true, text: a.title } } },
+  };
+}
+
 type Layout = { xTrack: number; yTrack: number; xSpan: number; ySpan: number };
 export interface PageLike {
   id: string;

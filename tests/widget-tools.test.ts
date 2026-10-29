@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildChart, buildKpi, buildLicenceTimeline, buildMoneyFlow, buildTable, catalogFrom, placeWidget, type StateLike } from "../src/dashboard/widget-tools";
+import { buildChart, buildDealLadder, buildKpi, buildLicenceTimeline, buildMoneyFlow, buildTable, catalogFrom, placeWidget, type StateLike } from "../src/dashboard/widget-tools";
 
 const catalog = catalogFrom({
   sources: [
@@ -135,5 +135,23 @@ describe("buildMoneyFlow", () => {
     const result = buildMoneyFlow(run, { title: "Money" });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.errors.join(" ")).toContain('"payouts.amount"');
+  });
+});
+
+describe("buildDealLadder", () => {
+  const portfolio = catalogFrom({ sources: [{ id: "runs", fields: ["deal", "dealStage", "dealStep", "verifiedTotal"].map((id) => ({ id, format: id === "verifiedTotal" ? "currencyFormat" : "textFormat" })) }] });
+
+  it("maps the runs table's negotiation fields and verified total onto the ladder widget", () => {
+    expect(buildDealLadder(portfolio, { title: "Deals" })).toMatchObject({
+      ok: true,
+      widget: { type: "deal-ladder", dataMapping: { deal: [{ id: "runs.deal" }], stage: [{ id: "runs.dealStage" }], step: [{ id: "runs.dealStep" }], total: [{ id: "runs.verifiedTotal" }] }, format: { title: { text: "Deals" } } },
+    });
+  });
+
+  it("says plainly that a dashboard without those fields cannot draw one", () => {
+    const run = catalogFrom({ sources: [{ id: "offers", fields: [{ id: "price", format: "currencyFormat" }] }] });
+    const result = buildDealLadder(run, { title: "Deals" });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors.join(" ")).toContain('"runs.dealStep"');
   });
 });

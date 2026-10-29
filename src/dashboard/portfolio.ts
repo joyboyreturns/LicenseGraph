@@ -1,4 +1,5 @@
 import type { SessionView } from "../app-logic/session";
+import { dealHistory, type HistoryRun } from "../core/deal-history";
 import { licenceEnd } from "../core/renewals";
 import { buildDashboardData } from "./data";
 
@@ -24,6 +25,17 @@ function mandateLabel(v: SessionView): string {
   return status === "within" ? "Within cap" : status === "over" ? "Over cap" : status === "other_currency" ? "Not comparable" : "None stated";
 }
 
+const STAGE: Record<string, string> = { original: "First run", reply: "After a licensor reply", brief: "Changed brief" };
+
+/** Which negotiation a run belongs to, and where in it: the deal is named for its first run, the step counts from 1 (null for a run on its own). */
+function dealOf(v: SessionView, views: SessionView[], runs: HistoryRun[]): { deal: string | null; step: number | null; stage: string | null } {
+  const steps = dealHistory(runs, v.id);
+  if (!steps.length) return { deal: null, step: null, stage: null };
+  const first = views.find((x) => x.id === steps[0]!.id)!;
+  const at = steps.findIndex((s) => s.id === v.id);
+  return { deal: `${runLabel(first)} (${first.id.slice(0, 6)})`, step: at + 1, stage: STAGE[steps[at]!.kind]! };
+}
+
 /** What this run's verified total moved by against the run it came from, in the run's own currency (null when there is nothing to set it against). */
 function changeVsSource(v: SessionView, views: SessionView[]): number | null {
   const sourceId = v.meta?.revisedFrom ?? v.meta?.rebriefedFrom;
@@ -41,6 +53,7 @@ export function buildPortfolioData(views: SessionView[]) {
   const requirements: Row[] = [];
   const licences: Row[] = [];
 
+  const historyRuns: HistoryRun[] = views.map((x) => ({ id: x.id, createdAt: x.createdAt, phase: x.phase, revisedFrom: x.meta?.revisedFrom, rebriefedFrom: x.meta?.rebriefedFrom, totalCents: x.bundle?.totalCents, currency: x.bundle?.currency, paid: Boolean(x.capture) }));
   for (const v of views) {
     const t = buildDashboardData(v);
     const naive = v.analysis?.naiveTotalCents ?? 0;
@@ -65,6 +78,7 @@ export function buildPortfolioData(views: SessionView[]) {
       startedBy: v.meta?.startedBy === "agent" ? "AI agent" : "Person",
       mandate: mandateLabel(v),
       changeVsSource: changeVsSource(v, views),
+      ...(({ deal, step, stage }) => ({ deal, dealStep: step, dealStage: stage }))(dealOf(v, views, historyRuns)),
       origin: v.meta?.revisedFrom ? "After a licensor reply" : v.meta?.rebriefedFrom ? "Changed brief" : "Original",
     });
     for (const o of t.offers) offers.push({ ...o, runId: v.id, run: runLabel(v) });
@@ -108,7 +122,7 @@ export function buildPortfolioData(views: SessionView[]) {
         name: "Runs",
         description: "One row per licensing run.",
         data: runs,
-        fields: [text("runId", "Run id"), text("run", "Project"), text("started", "Started"), text("source", "Source"), text("status", "Status"), whole("rounds", "Agent rounds"), text("currency", "Currency"), money("verifiedTotal", "Verified total"), decimal("verifiedTotalLocal", "Verified total (own currency)"), money("priceOnlyTotal", "Price-only total"), money("compliancePremium", "Compliance premium"), whole("blockedLicences", "Licences blocked"), text("paid", "Payment"), text("startedBy", "Started by"), text("mandate", "Agent mandate"), text("origin", "How the run began"), decimal("changeVsSource", "Total vs the run it came from")],
+        fields: [text("runId", "Run id"), text("run", "Project"), text("started", "Started"), text("source", "Source"), text("status", "Status"), whole("rounds", "Agent rounds"), text("currency", "Currency"), money("verifiedTotal", "Verified total"), decimal("verifiedTotalLocal", "Verified total (own currency)"), money("priceOnlyTotal", "Price-only total"), money("compliancePremium", "Compliance premium"), whole("blockedLicences", "Licences blocked"), text("paid", "Payment"), text("startedBy", "Started by"), text("mandate", "Agent mandate"), text("origin", "How the run began"), decimal("changeVsSource", "Total vs the run it came from"), text("deal", "Negotiation"), whole("dealStep", "Step in the negotiation"), text("dealStage", "Step type")],
       },
       {
         id: "offers",
@@ -224,6 +238,11 @@ export const PORTFOLIO_INITIAL_STATE = {
           dataMapping: { payee: [{ id: "payouts.licensor" }], amount: [{ id: "payouts.amount" }] },
           format: { title: { enabled: true, text: "Where the money went" } },
         },
+        dealLadder: {
+          type: "deal-ladder",
+          dataMapping: { deal: [{ id: "runs.deal" }], stage: [{ id: "runs.dealStage" }], step: [{ id: "runs.dealStep" }], total: [{ id: "runs.verifiedTotal" }] },
+          format: { title: { enabled: true, text: "What each step of a negotiation did to the price" } },
+        },
         licencesGrid: {
           type: "grid",
           dataMapping: { cols: ["licences.run", "licences.licensor", "licences.asset", "licences.price", "licences.boughtOn", "licences.endsOn", "licences.cover"].map((id) => ({ id })) },
@@ -250,6 +269,7 @@ export const PORTFOLIO_INITIAL_STATE = {
         licenceTimeline: { xTrack: 0, yTrack: 27, xSpan: 12, ySpan: 5 },
         moneyFlow: { xTrack: 0, yTrack: 32, xSpan: 12, ySpan: 6 },
         licencesGrid: { xTrack: 0, yTrack: 38, xSpan: 12, ySpan: 5 },
+        dealLadder: { xTrack: 0, yTrack: 43, xSpan: 12, ySpan: 6 },
       },
     },
   ],

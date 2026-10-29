@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { accessibilityViolations } from "./helpers";
 
 test("the custom rule matrix widget shows which rule rejected which asset on a run's dashboard", async ({ page, request }) => {
   const errors: string[] = [];
@@ -89,5 +90,21 @@ test("a dashboard someone changed is kept in their browser and can be put back; 
   await page.getByRole("button", { name: "Reset to the original layout" }).click();
   await expect(grid).toBeVisible({ timeout: 30_000 });
   await expect.poll(saved).toBeNull();
+  expect(errors).toEqual([]);
+});
+
+test("the custom deal ladder widget draws each negotiation's totals, step by step", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  const { id } = await (await page.request.post("/api/sessions", { data: { scenarioId: "documentary" } })).json();
+  const done = async (r: string) => expect.poll(async () => (await (await page.request.get(`/api/sessions/${r}`)).json()).phase, { timeout: 30_000 }).toBe("verified");
+  await done(id);
+  const next = await (await page.request.post(`/api/sessions/${id}/rebrief`, { data: { change: { commercial: false } } })).json();
+  await done(next.id);
+
+  await page.goto("/dashboard?portfolio=1");
+  const ladder = page.getByRole("img", { name: new RegExp(`\\(${id.slice(0, 6)}\\): First run \\$329\\.00, then Changed brief \\$294\\.00, \\$35\\.00 less overall`) });
+  await expect(ladder).toBeVisible({ timeout: 30_000 });
+  expect(await accessibilityViolations(page)).toEqual([]);
   expect(errors).toEqual([]);
 });
