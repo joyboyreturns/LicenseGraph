@@ -125,9 +125,10 @@ function MandateNote({ view }: { view: SessionView }) {
   const breaches = mandateBreaches(mandate, bundle.offers.map((o) => ({ assetId: o.assetId, priceCents: o.priceCents, currency: o.currency, licensor: licensorOf.get(o.evidence[0]?.documentId ?? "") })));
   return (
     <div className={styles.lockNote} role="note" data-tone={check.status === "within" && !breaches.length ? undefined : "warn"} data-testid="mandate-note">
+      <Bot aria-hidden />
       <div>
         <p style={{ margin: 0 }}>
-          <Bot aria-hidden /> {text}
+          {text}
           {mandate.note ? ` Its instruction: \u201c${mandate.note}\u201d` : ""}
         </p>
         {breaches.length > 0 && (
