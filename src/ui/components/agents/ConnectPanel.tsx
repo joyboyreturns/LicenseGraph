@@ -23,6 +23,10 @@ export function ConnectPanel() {
 
   const http = JSON.stringify({ mcpServers: { licensegraph: { url: `${origin}/api/mcp` } } }, null, 2);
   const stdio = JSON.stringify({ mcpServers: { licensegraph: { command: "npx", args: ["tsx", "scripts/mcp-server.ts"], env: { LICENSEGRAPH_URL: origin } } } }, null, 2);
+  const curl = `curl -s ${origin}/api/mcp \\
+  -H 'content-type: application/json' \\
+  -H 'accept: application/json, text/event-stream' \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'`;
   return (
     <div className={styles.grid}>
       <section className={styles.block} aria-labelledby="connect-title">
@@ -40,6 +44,13 @@ export function ConnectPanel() {
         <pre className={styles.snippet} tabIndex={0} aria-label="MCP over stdio: configuration to copy">{stdio}</pre>
         <CopyButton text={stdio} label="Copy stdio configuration" announce="Configuration copied" className="btn btn-sm">
           Copy stdio configuration
+        </CopyButton>
+        <p className="small ink-2" style={{ margin: "6px 0 0" }}>
+          Or ask it from a terminal, with nothing but curl:
+        </p>
+        <pre className={styles.snippet} tabIndex={0} aria-label="List the tools with curl: command to copy">{curl}</pre>
+        <CopyButton text={curl} label="Copy curl command" announce="Command copied" className="btn btn-sm">
+          Copy curl command
         </CopyButton>
       </section>
       <section className={styles.block} aria-labelledby="tools-title">

@@ -10,6 +10,11 @@ test("the Agents page lists the tools live, and plays an agent session whose fig
   const tools = page.getByRole("region", { name: "What it finds there" });
   await expect(tools.getByText("cheapest_compliant_bundle")).toBeVisible({ timeout: 20_000 });
   await expect(tools.getByText("start_licence_purchase")).toBeVisible();
+  // So does the curl command, and it really works against this server.
+  const curl = page.getByLabel("List the tools with curl: command to copy");
+  await expect(curl).toContainText("curl -s http://localhost:3300/api/mcp");
+  const listed = await page.request.post("/api/mcp", { headers: { accept: "application/json, text/event-stream" }, data: { jsonrpc: "2.0", id: 1, method: "tools/list" } });
+  expect((await listed.json()).result.tools.map((t: { name: string }) => t.name)).toContain("compare_runs");
   // The configuration points at this server.
   await expect(page.getByText(/"url": "http:\/\/localhost:3300\/api\/mcp"/)).toBeVisible();
 
