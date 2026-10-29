@@ -182,6 +182,8 @@ export const startPurchaseInput = z.object({
       maxSpend: z.number().positive().max(10_000_000).describe("The most the person said you may spend, in whole currency units, for example 800 for $800."),
       currency: z.string().length(3).optional().describe("Defaults to the project's currency, or USD."),
       note: z.string().max(200).optional().describe("The person's instruction in their own words."),
+      maxPerLicence: z.number().positive().max(10_000_000).optional().describe("The most the person allowed for any one licence, in whole currency units."),
+      avoidLicensors: z.array(z.string().min(1).max(80)).max(10).optional().describe("Licensors the person does not want to buy from, by name."),
     })
     .optional()
     .describe("Your spending mandate. It is recorded, checked against the verified bundle and shown to the person who approves; it does not let you pay."),
@@ -203,7 +205,7 @@ async function call(app: AppClient, path: string, init?: RequestInit): Promise<{
  */
 export async function startPurchase(app: AppClient, input: z.infer<typeof startPurchaseInput>) {
   const { mandate, ...run } = input;
-  const stated = mandate && { maxTotalCents: Math.round(mandate.maxSpend * 100), currency: (mandate.currency ?? (run.project as { currency?: string }).currency ?? "USD").toUpperCase(), ...(mandate.note ? { note: mandate.note } : {}) };
+  const stated = mandate && { maxTotalCents: Math.round(mandate.maxSpend * 100), currency: (mandate.currency ?? (run.project as { currency?: string }).currency ?? "USD").toUpperCase(), ...(mandate.note ? { note: mandate.note } : {}), ...(mandate.maxPerLicence ? { maxPerLicenceCents: Math.round(mandate.maxPerLicence * 100) } : {}), ...(mandate.avoidLicensors?.length ? { avoidLicensors: mandate.avoidLicensors } : {}) };
   const { status, body } = await call(app, "/api/sessions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...run, ...(stated ? { mandate: stated } : {}), handoff: true }) });
   if (status !== 201) return { ok: false as const, error: body?.error ?? `The app answered ${status}.` };
   return {
@@ -239,7 +241,7 @@ export async function purchaseStatus(app: AppClient, runId: string) {
     approvedBy: body.approval?.approvedBy ?? null,
     payment: body.capture ? { orderId: body.capture.id, captureId: body.capture.captureId, amount: body.capture.amount } : null,
     creatorPayouts: body.payouts ? { status: body.payouts.status, lines: body.payouts.lines.map((l: any) => ({ assetId: l.assetId, status: l.status })) } : null,
-    mandate: ((e) => (e ? { status: e.payload.status as string, capCents: e.payload.maxTotalCents as number, totalCents: e.payload.totalCents as number, currency: e.payload.currency as string } : null))((body.events as { kind: string; payload: Record<string, unknown> }[] | undefined)?.find((x) => x.kind === "mandate_checked")),
+    mandate: ((e) => (e ? { status: e.payload.status as string, capCents: e.payload.maxTotalCents as number, totalCents: e.payload.totalCents as number, currency: e.payload.currency as string, breaches: ((e.payload.breaches as { detail: string }[] | undefined) ?? []).map((b) => b.detail) } : null))((body.events as { kind: string; payload: Record<string, unknown> }[] | undefined)?.find((x) => x.kind === "mandate_checked")),
     ledgerIntact: body.chainValid as boolean,
     passportUrl: body.capture ? `${app.baseUrl.replace(/\/$/, "")}/passport/${runId}` : null,
     // Once paid, a printable receipt per creator, which the person can forward to each licensor.

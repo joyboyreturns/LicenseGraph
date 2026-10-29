@@ -68,7 +68,9 @@ export function eventTitle(e: Pick<LedgerEvent, "kind" | "payload">, catalog?: P
     case "mandate_checked": {
       const cur = String(p.currency ?? "USD");
       const [cap, total] = [formatMoney(Number(p.maxTotalCents), cur), formatMoney(Number(p.totalCents), cur)];
-      return p.status === "within" ? `Within the agent's mandate: ${total} of ${cap}` : p.status === "over" ? `Over the agent's mandate: ${total} against a cap of ${cap}` : `The agent's mandate is in ${cur}, so ${total} could not be compared`;
+      const breaches = count(p.breaches);
+      const base = p.status === "within" ? `Within the agent's mandate: ${total} of ${cap}` : p.status === "over" ? `Over the agent's mandate: ${total} against a cap of ${cap}` : `The agent's mandate is in ${cur}, so ${total} could not be compared`;
+      return breaches ? `${base}; ${pluralise(breaches, "licence")} outside its licence-level limits` : base;
     }
     case "approved": {
       const shown = typeof p.finePrintShown === "number" ? p.finePrintShown : 0;

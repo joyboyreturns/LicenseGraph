@@ -3508,6 +3508,20 @@
               "note": {
                 "type": "string",
                 "maxLength": 200
+              },
+              "maxPerLicenceCents": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "avoidLicensors": {
+                "maxItems": 10,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 80
+                }
               }
             },
             "required": [

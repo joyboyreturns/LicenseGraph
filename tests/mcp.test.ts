@@ -155,6 +155,19 @@ describe("start_licence_purchase", () => {
     expect(await run(400)).toMatchObject({ ok: true, mandate: { status: "within", capCents: 40_000, totalCents: 32_900, currency: "USD" } });
     expect(await run(300)).toMatchObject({ ok: true, mandate: { status: "over", capCents: 30_000, totalCents: 32_900 }, awaitingPerson: true });
     expect(await run()).toMatchObject({ ok: true, mandate: null });
+    expect(await run(400)).toMatchObject({ ok: true, mandate: { breaches: [] } });
+  });
+
+  it("states the limits on single licences, and the status tells the agent which licences broke them", async () => {
+    const started = await startPurchase(app, { ...input(), mandate: { maxSpend: 400, maxPerLicence: 100, avoidLicensors: ["TypeForge Studio"] } });
+    if (!started.ok) throw new Error(started.error);
+    let status = await purchaseStatus(app, started.runId);
+    for (let i = 0; i < 100 && status.ok && status.phase !== "verified"; i++) {
+      await new Promise((r) => setTimeout(r, 20));
+      status = await purchaseStatus(app, started.runId);
+    }
+    expect(status.ok && status.mandate?.breaches).toHaveLength(2);
+    expect(status.ok && status.mandate?.breaches.join(" ")).toMatch(/above the \$100\.00.*TypeForge Studio.*not to buy from/s);
   });
 
   it("sets two runs side by side from their verified bundles, and reports an unknown run instead of throwing", async () => {

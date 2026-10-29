@@ -13,7 +13,7 @@ import { centsToValue } from "../payments/paypal";
 import { paymentRequestId } from "../payments/request-id";
 import { isIsoDate } from "../core/dates";
 import { minimumCompliantCost } from "../core/optimizer";
-import { checkMandate, type Mandate } from "../core/mandate";
+import { checkMandate, mandateBreaches, type Mandate } from "../core/mandate";
 import { finePrint } from "../core/fine-print";
 
 export type Phase = "created" | "extracting" | "proposing" | "verified" | "failed" | "approved" | "order_created" | "captured" | "settled" | "refunded";
@@ -288,7 +288,9 @@ function recordMandateCheck(session: Session): void {
   if (!mandate || !bundle || total === undefined) return;
   const currency = bundle.offers[0]?.currency ?? "USD";
   const check = checkMandate(mandate, { totalCents: total, currency });
-  session.ledger.append("mandate_checked", { ...check, maxTotalCents: mandate.maxTotalCents, currency: mandate.currency, totalCents: total, ...(mandate.note ? { note: mandate.note } : {}) });
+  const licensorOf = new Map(session.input.documents.map((d) => [d.id, d.licensor?.name]));
+  const breaches = mandateBreaches(mandate, bundle.offers.map((o) => ({ assetId: o.assetId, priceCents: o.priceCents, currency: o.currency, licensor: licensorOf.get(o.evidence[0]?.documentId ?? "") })));
+  session.ledger.append("mandate_checked", { ...check, ...(breaches.length ? { breaches } : {}), maxTotalCents: mandate.maxTotalCents, currency: mandate.currency, totalCents: total, ...(mandate.note ? { note: mandate.note } : {}) });
 }
 
 /**

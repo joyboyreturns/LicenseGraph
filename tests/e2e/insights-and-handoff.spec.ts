@@ -31,7 +31,7 @@ test("a verified run shows where it could cost less, with what to ask each licen
 test("an agent can start a purchase, but only a person who takes control can approve it", async ({ page, browser }) => {
   // The agent: no cookie, so it owns nothing. It receives a claim link and nothing it can approve with.
   const agent = await browser.newContext();
-  const started = await agent.request.post("/api/sessions", { data: { scenarioId: "documentary", handoff: true, mandate: { maxTotalCents: 30_000, currency: "USD", note: "Stay under $300" } } });
+  const started = await agent.request.post("/api/sessions", { data: { scenarioId: "documentary", handoff: true, mandate: { maxTotalCents: 30_000, currency: "USD", note: "Stay under $300", maxPerLicenceCents: 10_000, avoidLicensors: ["TypeForge Studio"] } } });
   expect(started.status()).toBe(201);
   const run = await started.json();
   expect(run.awaitingPerson).toBe(true);
@@ -66,6 +66,9 @@ test("an agent can start a purchase, but only a person who takes control can app
   await page.getByRole("button", { name: "Review and approve" }).click();
   await expect(page.getByTestId("mandate-note")).toContainText("Over the agent's mandate by $29.00");
   await expect(page.getByTestId("mandate-note")).toContainText("Stay under $300");
+  const breaches = page.getByTestId("mandate-breaches");
+  await expect(breaches).toContainText("The song licence costs $200.00, above the $100.00 the agent was allowed for one licence.");
+  await expect(breaches).toContainText("The font licence is from TypeForge Studio, a licensor the agent was told not to buy from.");
 
   // The agent still cannot, and the ledger shows the handover.
   expect((await agent.request.post(`/api/sessions/${run.id}/approve`, { data: { approvedBy: "agent" } })).status()).toBe(403);

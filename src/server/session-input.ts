@@ -57,5 +57,7 @@ export const sessionInputSchema = z.object({
     maxTotalCents: z.number().int().safe().positive(),
     currency: z.string().refine(supportsCentCurrency, "Unsupported settlement currency"),
     note: z.string().trim().max(200).optional(),
+    maxPerLicenceCents: z.number().int().safe().positive().optional(),
+    avoidLicensors: z.array(z.string().trim().min(1).max(80)).max(10).optional(),
   }).optional(),
 });

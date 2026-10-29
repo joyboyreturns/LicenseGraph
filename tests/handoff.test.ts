@@ -121,6 +121,23 @@ describe("an agent's spending mandate", () => {
     expect(v.chainValid).toBe(true);
   });
 
+  it("also checks the limits on single licences: a price above the per-licence cap, and a licensor the person asked not to buy from", async () => {
+    const mandate = { maxTotalCents: 40_000, currency: "USD", maxPerLicenceCents: 10_000, avoidLicensors: ["typeforge studio"] };
+    const { id } = await json(await postSession(req("http://app/api/sessions", { scenarioId: "documentary", handoff: true, mandate })));
+    let v: any;
+    for (let i = 0; i < 100 && v?.phase !== "verified"; i++) {
+      v = await json(await getSession(new Request("http://app"), ctx(id)));
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    const event = v.events.find((e: { kind: string }) => e.kind === "mandate_checked");
+    expect(event.payload.status).toBe("within");
+    expect(event.payload.breaches.map((b: { kind: string; assetId: string }) => [b.kind, b.assetId]).sort()).toEqual([["avoided-licensor", "font"], ["per-licence-cap", "song"]]);
+    expect(v.meta.mandate).toMatchObject({ maxPerLicenceCents: 10_000, avoidLicensors: ["typeforge studio"] });
+    expect(v.chainValid).toBe(true);
+    // Nothing was blocked: the limits inform the person, who still decides.
+    expect(v.phase).toBe("verified");
+  });
+
   it("survives a restart, with the ledger entry that recorded the check", async () => {
     const repo = new FileSessionRepository(mkdtempSync(join(tmpdir(), "lg-mandate-")));
     const rt = install(new SessionStore(10, repo));
@@ -133,7 +150,7 @@ describe("an agent's spending mandate", () => {
   });
 
   it("is refused when malformed, and absent when not stated", async () => {
-    for (const mandate of [{ maxTotalCents: -5, currency: "USD" }, { maxTotalCents: 100, currency: "ZZZ" }, { maxTotalCents: 1.5, currency: "USD" }]) {
+    for (const mandate of [{ maxTotalCents: -5, currency: "USD" }, { maxTotalCents: 100, currency: "ZZZ" }, { maxTotalCents: 1.5, currency: "USD" }, { maxTotalCents: 100, currency: "USD", maxPerLicenceCents: 0 }, { maxTotalCents: 100, currency: "USD", avoidLicensors: [""] }]) {
       expect((await postSession(req("http://app/api/sessions", { scenarioId: "documentary", handoff: true, mandate }))).status).toBe(400);
     }
     const { id } = await json(await postSession(req("http://app/api/sessions", { scenarioId: "documentary", handoff: true })));

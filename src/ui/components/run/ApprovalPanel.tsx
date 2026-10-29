@@ -3,7 +3,7 @@
 import { Bot, FileSearch, Lock, UserCheck } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import type { SessionView } from "@/src/app-logic/session";
-import { checkMandate } from "@/src/core/mandate";
+import { checkMandate, mandateBreaches } from "@/src/core/mandate";
 import { finePrint } from "@/src/core/fine-print";
 import type { Catalog } from "@/src/ui/lib/catalog";
 import { assetLabel, formatMoney, termsSummary } from "@/src/ui/lib/format";
@@ -121,11 +121,24 @@ function MandateNote({ view }: { view: SessionView }) {
       : check.status === "over"
         ? `Over the agent's mandate by ${formatMoney(check.overByCents, bundle.currency)}: it was told to spend at most ${cap}. Only approve if you meant to allow more.`
         : `The agent's mandate (${cap}) is in ${mandate.currency} but this bundle is in ${bundle.currency}, so they cannot be compared.`;
+  const licensorOf = new Map(view.documents.map((d) => [d.id, d.licensorName]));
+  const breaches = mandateBreaches(mandate, bundle.offers.map((o) => ({ assetId: o.assetId, priceCents: o.priceCents, currency: o.currency, licensor: licensorOf.get(o.evidence[0]?.documentId ?? "") })));
   return (
-    <p className={styles.lockNote} role="note" data-tone={check.status === "within" ? undefined : "warn"} data-testid="mandate-note">
-      <Bot aria-hidden /> {text}
-      {mandate.note ? ` Its instruction: \u201c${mandate.note}\u201d` : ""}
-    </p>
+    <div className={styles.lockNote} role="note" data-tone={check.status === "within" && !breaches.length ? undefined : "warn"} data-testid="mandate-note">
+      <div>
+        <p style={{ margin: 0 }}>
+          <Bot aria-hidden /> {text}
+          {mandate.note ? ` Its instruction: \u201c${mandate.note}\u201d` : ""}
+        </p>
+        {breaches.length > 0 && (
+          <ul style={{ margin: "6px 0 0", paddingLeft: 20 }} data-testid="mandate-breaches">
+            {breaches.map((b) => (
+              <li key={`${b.kind}-${b.assetId}`}>{b.detail}</li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
   );
 }
 
