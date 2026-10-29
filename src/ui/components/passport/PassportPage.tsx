@@ -1,10 +1,11 @@
 "use client";
 
-import { ArrowLeft, BadgeCheck, CalendarPlus, Download, FileClock, Link2, Printer, RotateCcw, ServerCrash, ShieldCheck, ShieldQuestion } from "lucide-react";
+import { ArrowLeft, BadgeCheck, CalendarPlus, Download, FileClock, FileSpreadsheet, Link2, Printer, RotateCcw, ServerCrash, ShieldCheck, ShieldQuestion } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { verifyPassport, type Passport, type PassportCheck } from "@/src/passport/passport";
 import { api, ApiError, errorMessage } from "@/src/ui/lib/api";
+import { passportCsv } from "@/src/passport/csv";
 import { passportCalendar } from "@/src/ui/lib/licence-dates";
 import { CopyButton } from "../bits";
 import { useToast } from "../Providers";
@@ -112,6 +113,14 @@ export function PassportPage({ id }: { id: string }) {
     a.click();
     URL.revokeObjectURL(url);
   };
+  const downloadCsv = () => {
+    const url = URL.createObjectURL(new Blob([passportCsv(p)], { type: "text/csv;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `licences-${p.id.slice(0, 8)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
   const sig = signature && signature !== "error" ? SIGNATURE_TEXT[signature] : null;
   return (
     <div className={`container-wide ${styles.page}`}>
@@ -131,6 +140,9 @@ export function PassportPage({ id }: { id: string }) {
             <CalendarPlus aria-hidden /> Add licence end dates to my calendar
           </button>
         )}
+        <button type="button" className="btn" onClick={downloadCsv}>
+          <FileSpreadsheet aria-hidden /> Download licences as a spreadsheet
+        </button>
         <button type="button" className="btn" onClick={() => window.print()}>
           <Printer aria-hidden /> Print or save as PDF
         </button>

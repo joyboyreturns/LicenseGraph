@@ -53,6 +53,14 @@ test("a scenario goes from licences to a verified, paid and independently checka
   expect(ics.match(/BEGIN:VEVENT/g)?.length ?? 0).toBeGreaterThan(0);
   expect(ics).toContain("TRIGGER:-P30D");
 
+  // The same licences as a spreadsheet for whoever keeps the books: one row each, adding up to the payment.
+  const [sheet] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Download licences as a spreadsheet" }).click()]);
+  expect(sheet.suggestedFilename()).toMatch(/^licences-.*\.csv$/);
+  const csv = readFileSync(await sheet.path(), "utf8").trimEnd().split("\r\n");
+  expect(csv).toHaveLength(4);
+  expect(csv[0]).toContain('"Licensor","Terms","Price"');
+  expect(csv.slice(1).reduce((n, row) => n + Math.round(Number(row.split('","')[5]) * 100), 0)).toBe(217_000);
+
   // The downloaded file verifies on its own; a tampered copy does not.
   const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("link", { name: "Download JSON" }).click()]);
   const file = test.info().outputPath("passport.json");
