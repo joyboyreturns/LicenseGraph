@@ -54,6 +54,27 @@ describe("cheapest_compliant_bundle", () => {
     expect(r.savingLevers).toEqual([expect.objectContaining({ assetId: "image", offerId: "offer-photo", savingCents: 3_500 })]);
   });
 
+  it("with a mandate, also finds the cheapest bundle inside it, says which offers it set aside and why, and what the limits cost", () => {
+    const archive = offers.find((o) => o.id === "offer-archive")!;
+    const dearerImage = { ...archive, id: "offer-archive-b", priceCents: 12_000 };
+    const all = [...offers, dearerImage];
+    const mandate = { avoidLicensors: ["  historyvault ARCHIVE "], licensors: { "offer-archive": "HistoryVault Archive", "offer-archive-b": "Other Images" }, maxSpend: 400 };
+    const r = cheapestBundle({ project, requiredAssetIds, offers: all, mandate });
+    // The unconstrained answer is unchanged.
+    expect(r.plans[0]).toMatchObject({ totalCents: 32_900, offerIds: ["offer-font", "offer-archive", "offer-song"] });
+    expect(r.withinMandate).toMatchObject({ extraCostCents: 4_000, withinTotalCap: true, uncoveredAssets: [], setAside: [{ offerId: "offer-archive", reason: "from HistoryVault Archive, a licensor to avoid" }] });
+    expect(r.withinMandate?.plan).toMatchObject({ totalCents: 36_900, offerIds: ["offer-font", "offer-archive-b", "offer-song"] });
+    // A total cap below what the limits force is reported, not hidden.
+    expect(cheapestBundle({ project, requiredAssetIds, offers: all, mandate: { ...mandate, maxSpend: 350 } }).withinMandate?.withinTotalCap).toBe(false);
+    // A per-licence cap that rules out the only song licence leaves the song uncovered, and says so.
+    const capped = cheapestBundle({ project, requiredAssetIds, offers: all, mandate: { maxPerLicence: 150 } }).withinMandate;
+    expect(capped?.setAside).toEqual([{ offerId: "offer-song", reason: "above the per-licence cap" }]);
+    expect(capped?.plan).toBeNull();
+    expect(capped?.uncoveredAssets).toEqual(["song"]);
+    // No mandate, no extra answer.
+    expect("withinMandate" in cheapestBundle({ project, requiredAssetIds, offers })).toBe(false);
+  });
+
   it("says what to ask for when nothing passes", () => {
     const r = cheapestBundle({ project: { ...project, requiresExclusive: true }, requiredAssetIds, offers });
     expect(r.plans).toEqual([]);

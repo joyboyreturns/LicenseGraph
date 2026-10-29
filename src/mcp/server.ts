@@ -1,6 +1,6 @@
 import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { checkBundle, checkBundleInput, compareRunsInput, compareRunsTool, cheapestBundle, cheapestBundleInput, licenceEndDates, licenceEndDatesInput, licenceFinePrint, licenceFinePrintInput, purchasePlaybook, passportDocument, purchaseStatus, rulesGuide, startPurchase, startPurchaseInput, verifyPassportTool, whatIfBrief, whatIfInput, type AppClient } from "./tools";
+import { checkBundle, checkBundleInput, compareRunsInput, compareRunsTool, cheapestBundle, cheapestBundleToolInput, licenceEndDates, licenceEndDatesInput, licenceFinePrint, licenceFinePrintInput, purchasePlaybook, passportDocument, purchaseStatus, rulesGuide, startPurchase, startPurchaseInput, verifyPassportTool, whatIfBrief, whatIfInput, type AppClient } from "./tools";
 
 const text = (value: unknown) => ({ content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }] });
 
@@ -19,7 +19,7 @@ export function createLicenseGraphServer(app: AppClient): McpServer {
 
   server.registerTool(
     "cheapest_compliant_bundle",
-    { description: "From a set of licence offers, find the exact minimum cost of a bundle that satisfies the project, what each requirement adds to that cost, and, where an asset has no compliant offer, the nearest offer, what to ask the licensor to change, and (ifLicensorsAgree) the best-case total and per-asset price ceiling if every licensor agreed at its quoted price. Also savingLevers: where the cheapest compliant bundle could cost less if a licensor changed terms, with what to ask and the exact saving.", inputSchema: cheapestBundleInput.shape },
+    { description: "From a set of licence offers, find the exact minimum cost of a bundle that satisfies the project, what each requirement adds to that cost, and, where an asset has no compliant offer, the nearest offer, what to ask the licensor to change, and (ifLicensorsAgree) the best-case total and per-asset price ceiling if every licensor agreed at its quoted price. Also savingLevers: where the cheapest compliant bundle could cost less if a licensor changed terms, with what to ask and the exact saving. Pass your mandate (maxSpend, maxPerLicence, avoidLicensors, and licensors to say which licensor each offer comes from) and withinMandate also gives the cheapest compliant bundle that respects it, the offers set aside and why, and what the limits cost.", inputSchema: cheapestBundleToolInput.shape },
     async (input) => text(cheapestBundle(input)),
   );
 

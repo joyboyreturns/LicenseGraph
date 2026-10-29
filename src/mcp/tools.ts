@@ -77,13 +77,63 @@ export function checkBundle(input: z.infer<typeof checkBundleInput>) {
   return { ok: verdict.ok, totalCents: verdict.totalCents, violations: verdict.violations };
 }
 
+/** The limits a person gave the agent, so the search can respect them before anything is started. */
+export const mandateLimitsSchema = z.object({
+  maxSpend: z.number().positive().max(10_000_000).optional().describe("The most the person said you may spend in total, in whole currency units."),
+  maxPerLicence: z.number().positive().max(10_000_000).optional().describe("The most the person allowed for any one licence, in whole currency units."),
+  avoidLicensors: z.array(z.string().min(1).max(80)).max(10).optional().describe("Licensors the person does not want to buy from, by name."),
+  licensors: z.record(z.string().max(100), z.string().max(80)).optional().describe("Which licensor each offer id comes from, so avoidLicensors can be applied. Offers do not carry a licensor name themselves."),
+});
+
+export const cheapestBundleToolInput = cheapestBundleInput.extend({
+  mandate: mandateLimitsSchema.optional().describe("Your spending mandate. When given, the answer also says what the cheapest compliant bundle is within it."),
+});
+
+const squashName = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
+
+/**
+ * The cheapest compliant bundle among only the offers the mandate allows: offers above the per-licence cap or from an
+ * avoided licensor are set aside (and listed with why), then the same exact search runs on the rest. Tells the agent
+ * what staying inside the person's limits costs, before it starts a purchase.
+ */
+function withinMandate(input: z.infer<typeof cheapestBundleToolInput>, project: Project, candidates: LicenseOffer[], unconstrainedTotal: number | undefined) {
+  const m = input.mandate;
+  if (!m) return undefined;
+  const currency = project.currency ?? candidates[0]?.currency ?? "USD";
+  const avoided = new Set((m.avoidLicensors ?? []).map(squashName));
+  const setAside: { offerId: string; reason: string }[] = [];
+  const allowed = candidates.filter((o) => {
+    if (m.maxPerLicence !== undefined && o.currency === currency && o.priceCents > Math.round(m.maxPerLicence * 100)) {
+      setAside.push({ offerId: o.id, reason: "above the per-licence cap" });
+      return false;
+    }
+    const who = m.licensors?.[o.id];
+    if (who && avoided.has(squashName(who))) {
+      setAside.push({ offerId: o.id, reason: `from ${who}, a licensor to avoid` });
+      return false;
+    }
+    return true;
+  });
+  const frontier = minimumCompliantCost(project, input.requiredAssetIds, allowed, { today: today() });
+  const plan = frontier.plans[0] ?? null;
+  return {
+    setAside,
+    plan,
+    uncoveredAssets: frontier.uncoveredAssets,
+    /** What staying inside the limits costs over the cheapest bundle with no limits; null when either has no bundle or the currencies differ. */
+    extraCostCents: plan && unconstrainedTotal !== undefined && plan.currency === currency ? plan.totalCents - unconstrainedTotal : null,
+    withinTotalCap: plan && m.maxSpend !== undefined && plan.currency === currency ? plan.totalCents <= Math.round(m.maxSpend * 100) : null,
+  };
+}
+
 /** The exact minimum compliant cost, what each requirement adds to it, and what to ask for where nothing passes. */
-export function cheapestBundle(input: z.infer<typeof cheapestBundleInput>) {
+export function cheapestBundle(input: z.infer<typeof cheapestBundleToolInput>) {
   const options = { today: today() };
   const candidates = input.offers as LicenseOffer[];
   const project = input.project as Project;
   const frontier = minimumCompliantCost(project, input.requiredAssetIds, candidates, options);
   return {
+    ...(input.mandate ? { withinMandate: withinMandate(input, project, candidates, frontier.plans[0]?.totalCents) } : {}),
     plans: frontier.plans,
     uncoveredAssets: frontier.uncoveredAssets,
     requirementCosts: requirementCosts(project, input.requiredAssetIds, candidates, options) ?? null,
@@ -165,7 +215,7 @@ export function purchasePlaybook(brief?: string): string {
     "You are buying creative licences for a person. Work in this order, and take every figure from the tools, never from memory or arithmetic of your own.",
     brief ? `The brief: ${brief}` : "Start by getting the brief: where it will be shown, for how long, which media, whether it is commercial, whether you can credit creators, whether you must sublicense, whether it needs exclusivity, and the budget.",
     "1. Read each licence into an offer: the price, and each term it states, with the exact sentence it came from. A term the licence does not state stays blank; a blank is not a yes.",
-    "2. Call cheapest_compliant_bundle. It gives the exact minimum cost, what each requirement adds to it, and, where an asset has no compliant offer, the closest offer and what to ask its licensor to change.",
+    "2. Call cheapest_compliant_bundle. It gives the exact minimum cost, what each requirement adds to it, and, where an asset has no compliant offer, the closest offer and what to ask its licensor to change. If the person gave you limits (a total, a cap per licence, licensors to avoid), pass them as mandate: withinMandate then gives the cheapest bundle that respects them and what the limits cost, so you tell the person before you start anything.",
     "3. If nothing can be bought, read gapRequests and ifLicensorsAgree. Tell the person plainly: what blocks each asset, what to ask each licensor, the best-case total if they all said yes, and how far each price could rise before the budget breaks. Call what_if_brief to price a smaller scope (a different territory, a shorter term, one requirement dropped). Do not offer to proceed with a bundle the tools did not verify.",
     "4. If a bundle exists, call licence_fine_print on the licence texts and tell the person any clause it returns, then call licence_end_dates so the person knows when each licence runs out, then start_licence_purchase with the raw licence texts and, if the person gave you a spending limit, that limit as the mandate. LicenseGraph re-reads the licences, re-verifies the bundle itself and checks its total against your mandate for the person to see.",
     "5. Give the person the claim link. Only they can approve and pay; you cannot, and you must not say a payment happened until get_purchase_status shows it.",
