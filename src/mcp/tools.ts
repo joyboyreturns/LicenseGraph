@@ -229,6 +229,23 @@ export function purchasePlaybook(brief?: string): string {
   ].join("\n\n");
 }
 
+/**
+ * The order to work in when the answer is no: nothing can be bought as the licences stand. It turns the gap requests into
+ * messages to licensors, checks a reply as a new run, and tells the person exactly what moved.
+ */
+export function negotiationPlaybook(brief?: string): string {
+  return [
+    "You are helping a person whose licences cannot be bought as they stand. Work in this order, and take every figure from the tools, never from memory or arithmetic of your own.",
+    brief ? `The brief: ${brief}` : "Start from the brief and the licences already read.",
+    "1. Call cheapest_compliant_bundle with the offers you have. If plans is empty, read gapRequests: for each asset, the closest offer and exactly which terms to change. Call evaluate_licence_offer on an offer if the person asks why it fails.",
+    "2. Read ifLicensorsAgree: the best case if every licensor agreed to every ask at its quoted price, and how far each price could rise before the budget breaks. Say it is a best case, not an offer.",
+    "3. Write one short message per licensor from its asks: what the person wants, what the licence says now, and the terms to change. Do not promise anything on the person's behalf, and do not invent a price.",
+    "4. If the person would accept a smaller scope, call what_if_brief to price it exactly (a different territory, a shorter term, one requirement dropped) before suggesting it.",
+    "5. When a licensor replies with revised licence text, start a new run with start_licence_purchase: the revised terms are checked from scratch, and the earlier run stays on record. Then call compare_runs with the two run ids and tell the person exactly what moved.",
+    "6. Only a bundle that passes the rules can be bought, and only the person can approve and pay. Do not offer to proceed with anything the tools did not verify.",
+  ].join("\n\n");
+}
+
 export const startPurchaseInput = z.object({
   project: projectSchema,
   requiredAssetIds: z.array(textId).min(1).max(12),

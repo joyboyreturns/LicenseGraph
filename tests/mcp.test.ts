@@ -7,7 +7,7 @@ import { greedyProposer } from "../src/agent/greedy";
 import { SessionStore } from "../src/app-logic/session";
 import { demoModel } from "../src/demo/mock-model";
 import { scenarioById } from "../src/demo/scenarios";
-import { checkBundleInput, cheapestBundleInput, compareRunsTool, evaluateLicenceOffer, licenceEndDatesInput, checkBundle, cheapestBundle, licenceEndDates, licenceFinePrint, purchasePlaybook, purchaseStatus, startPurchase, whatIfBrief, whatIfInput, type AppClient } from "../src/mcp/tools";
+import { checkBundleInput, cheapestBundleInput, compareRunsTool, evaluateLicenceOffer, licenceEndDatesInput, checkBundle, cheapestBundle, licenceEndDates, licenceFinePrint, negotiationPlaybook, purchasePlaybook, purchaseStatus, startPurchase, whatIfBrief, whatIfInput, type AppClient } from "../src/mcp/tools";
 import type { Runtime } from "../src/server/runtime";
 import { runExample } from "./mcp-fixtures";
 
@@ -277,6 +277,18 @@ describe("buy_licences prompt", () => {
   });
   it("asks for the brief when none is given", () => {
     expect(purchasePlaybook()).toMatch(/Start by getting the brief/);
+  });
+});
+
+describe("negotiate_licences prompt", () => {
+  it("names the tools in the order a negotiation uses them, and never lets the agent promise, invent a price, approve or pay", () => {
+    const text = negotiationPlaybook("An exclusive theme tune");
+    const order = ["cheapest_compliant_bundle", "evaluate_licence_offer", "ifLicensorsAgree", "what_if_brief", "start_licence_purchase", "compare_runs"].map((t) => text.indexOf(t));
+    expect(order.every((i) => i >= 0)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    expect(text).toContain("An exclusive theme tune");
+    expect(text).toMatch(/do not invent a price/);
+    expect(text).toMatch(/only the person can approve and pay/);
   });
 });
 

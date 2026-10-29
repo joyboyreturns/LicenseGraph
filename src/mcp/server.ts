@@ -1,6 +1,6 @@
 import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { checkBundle, checkBundleInput, compareRunsInput, compareRunsTool, evaluateLicenceOffer, evaluateOfferInput, cheapestBundle, cheapestBundleToolInput, licenceEndDates, licenceEndDatesInput, licenceFinePrint, licenceFinePrintInput, purchasePlaybook, passportDocument, purchaseStatus, rulesGuide, startPurchase, startPurchaseInput, verifyPassportTool, whatIfBrief, whatIfInput, type AppClient } from "./tools";
+import { checkBundle, checkBundleInput, compareRunsInput, compareRunsTool, evaluateLicenceOffer, evaluateOfferInput, cheapestBundle, cheapestBundleToolInput, licenceEndDates, licenceEndDatesInput, licenceFinePrint, licenceFinePrintInput, purchasePlaybook, passportDocument, negotiationPlaybook, purchaseStatus, rulesGuide, startPurchase, startPurchaseInput, verifyPassportTool, whatIfBrief, whatIfInput, type AppClient } from "./tools";
 
 const text = (value: unknown) => ({ content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }] });
 
@@ -93,6 +93,12 @@ export function createLicenseGraphServer(app: AppClient): McpServer {
     "buy_licences",
     { title: "Buy licences for a project", description: "The order to work in when buying creative licences for a person: check, price, negotiate, hand over.", argsSchema: { brief: z.string().max(2000).optional().describe("What the project needs, in plain words.") } },
     ({ brief }) => ({ messages: [{ role: "user" as const, content: { type: "text" as const, text: purchasePlaybook(brief) } }] }),
+  );
+
+  server.registerPrompt(
+    "negotiate_licences",
+    { title: "Negotiate when nothing can be bought", description: "The order to work in when no licence meets the brief: read what blocks each asset, write to each licensor, check a reply as a new run, and tell the person what moved.", argsSchema: { brief: z.string().max(2000).optional().describe("What the project needs, in plain words.") } },
+    ({ brief }) => ({ messages: [{ role: "user" as const, content: { type: "text" as const, text: negotiationPlaybook(brief) } }] }),
   );
 
   return server;

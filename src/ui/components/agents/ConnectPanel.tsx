@@ -68,7 +68,7 @@ export function ConnectPanel() {
           </ul>
         )}
         <p className="small muted" style={{ margin: 0 }}>
-          It also offers a <code>buy_licences</code> prompt with the order to work in, and two resources: the rules (<code>licensegraph://rules</code>) and the signed passport of a paid purchase (<code>licensegraph://passport/&#123;runId&#125;</code>). Agents can check, price and start a purchase; approval and payment stay with a person.
+          It also offers two prompts, <code>buy_licences</code> and <code>negotiate_licences</code> (the order to work in when nothing can be bought), and two resources: the rules (<code>licensegraph://rules</code>) and the signed passport of a paid purchase (<code>licensegraph://passport/&#123;runId&#125;</code>). Agents can check, price and start a purchase; approval and payment stay with a person.
         </p>
       </section>
     </div>

@@ -10,7 +10,7 @@ test("an MCP client connects to the running server over HTTP, prices a purchase 
     const tools = (await client.listTools()).tools.map((t) => t.name);
     expect(tools).toContain("cheapest_compliant_bundle");
     expect(tools).toContain("start_licence_purchase");
-    expect((await client.listPrompts()).prompts.map((p) => p.name)).toEqual(["buy_licences"]);
+    expect((await client.listPrompts()).prompts.map((p) => p.name)).toEqual(["buy_licences", "negotiate_licences"]);
     // The rules are a resource an agent can read before it argues with a verdict.
     expect((await client.listResources()).resources.map((r) => r.uri)).toEqual(["licensegraph://rules"]);
     const rules = (await client.readResource({ uri: "licensegraph://rules" })).contents[0] as { text: string };
