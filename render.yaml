@@ -16,8 +16,13 @@ services:
       # Built-in scenarios replay recorded model output; set to "live" (and the gateway vars) to read your own licences.
       - key: LICENSEGRAPH_MODE
         value: demo
+      # Passports are signed with a key derived from this value, and its public half is published at /.well-known/licensegraph-keys.json.
+      # Render generates it once and keeps it; changing it later changes the key.
       - key: LICENSEGRAPH_PASSPORT_SECRET
         generateValue: true
+      # The AG Studio licence key. It is read when the app is built, so set it before the first deploy (or redeploy after setting it).
+      - key: NEXT_PUBLIC_AG_STUDIO_LICENSE_KEY
+        sync: false
       - key: PAYPAL_CLIENT_ID
         sync: false
       - key: PAYPAL_CLIENT_SECRET
