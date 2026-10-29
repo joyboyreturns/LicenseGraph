@@ -199,6 +199,13 @@ test("a rebriefed run sits beside the run it came from: what each asset now cost
   await expect(panel).toContainText("Cheaper licence");
   await expect(panel.getByRole("link", { name: "Open that run" })).toHaveAttribute("href", `/run/${id}`);
 
+  // The whole negotiation in order, with how the total moved.
+  const deal = page.getByTestId("deal-history");
+  await expect(deal).toContainText("2 runs, oldest first");
+  await expect(deal.getByRole("link", { name: "First run" })).toHaveAttribute("href", `/run/${id}`);
+  await expect(deal.getByText("Changed brief (this run)")).toBeVisible();
+  await expect(deal).toContainText(`−${formatMoney(earlier.bundle.totalCents - now.bundle.totalCents, "USD")}`);
+
   // The same comparison answers a question, in words, from the same two verified bundles.
   await page.getByRole("button", { name: "How is this different from the run it came from?" }).click();
   await expect(page.getByText(/now costs less/).first()).toBeVisible();
@@ -207,5 +214,8 @@ test("a rebriefed run sits beside the run it came from: what each asset now cost
   await page.goto(`/run/${id}`);
   await expect(page.getByRole("region", { name: "What if the project changed?" })).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId("compare-earlier")).toHaveCount(0);
+  // The first run is part of the same deal: from there it is listed too, with the changed brief as the link.
+  await expect(page.getByTestId("deal-history").getByText("First run (this run)")).toBeVisible();
+  await expect(page.getByTestId("deal-history").getByRole("link", { name: "Changed brief" })).toHaveAttribute("href", `/run/${next.id}`);
   expect(errors).toEqual([]);
 });
