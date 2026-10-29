@@ -68,6 +68,21 @@ export async function runAgentSession(rpc: Rpc, data: AgentRunData, onStep: (s: 
     });
   }
 
+  // Argue with one verdict: take an offer the cheapest bundle did not use and ask which rules it fails.
+  const chosen = new Set<string>(plan?.offerIds ?? []);
+  const unused = (data.candidates as { id: string }[]).find((o) => !chosen.has(o.id));
+  // An older server without the tool is skipped, as with the rules resource.
+  const verdict = unused ? await rpc("tools/call", { name: "evaluate_licence_offer", arguments: { project: data.project, offer: unused } }).then(toolResult).catch(() => undefined) : undefined;
+  if (unused && verdict) {
+    const failed: string[] = verdict.failedRules ?? [];
+    onStep({
+      tool: "evaluate_licence_offer",
+      intent: `Why is ${unused.id} not in that bundle?`,
+      result: verdict.compliant ? "It passes every rule; the bundle simply found a cheaper licence for that asset." : `It fails ${failed.length} rule${failed.length === 1 ? "" : "s"}: ${failed.join(", ")}.`,
+      raw: verdict,
+    });
+  }
+
   // Explore a change of scope: drop what blocks a purchase, or else ask what commercial use costs.
   const dropped = plan ? undefined : { ...(data.project.requiresExclusive ? { requiresExclusive: false } : {}), ...(data.project.needsSublicensing ? { needsSublicensing: false } : {}) };
   const change = dropped && Object.keys(dropped).length ? dropped : { commercial: false };
