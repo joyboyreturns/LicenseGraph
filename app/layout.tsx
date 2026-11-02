@@ -48,7 +48,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     siteName: "LicenseGraph",
-    title: "LicenseGraph: AI moves at machine speed. Creator rights and payments should too.",
+    title: "LicenseGraph: make your next release rights-ready.",
     description,
   },
   twitter: { card: "summary_large_image", title: "LicenseGraph", description },
@@ -56,8 +56,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f4f2ed" },
-    { media: "(prefers-color-scheme: dark)", color: "#0a0c10" },
+    { media: "(prefers-color-scheme: light)", color: "#f0f3ef" },
+    { media: "(prefers-color-scheme: dark)", color: "#0b1718" },
   ],
   width: "device-width",
   initialScale: 1,

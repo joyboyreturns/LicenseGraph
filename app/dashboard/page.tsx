@@ -45,6 +45,7 @@ function Dashboard() {
 
   return (
     <div className={styles.studioPage}>
+      <header className={`container-wide ${styles.workbenchHead}`}><div><p className="eyebrow">Clearance desk / Analysis</p><h1>Follow the rights. Follow the money.</h1><p>Explore recorded offers, rule decisions and creator outcomes. Fixed widget actions work without an account or model.</p></div></header>
       <div className={styles.context}>
         <Link prefetch={false} href={`/run/${id}`} className="btn btn-sm btn-ghost">
           <ArrowLeft aria-hidden /> Back to the run
@@ -88,6 +89,7 @@ function PortfolioStudio({ assistant }: { assistant: boolean | null }) {
 
   return (
     <div className={styles.studioPage}>
+      <header className={`container-wide ${styles.workbenchHead}`}><div><p className="eyebrow">Clearance desk / Analysis</p><h1>Follow the rights. Follow the money.</h1><p>Explore recorded offers, rule decisions and creator outcomes. Fixed widget actions work without an account or model.</p></div></header>
       <div className={styles.context}>
         <Link prefetch={false} href="/dashboard" className="btn btn-sm btn-ghost">
           <ArrowLeft aria-hidden /> All runs
@@ -161,6 +163,7 @@ function Portfolio() {
         </p>
       )}
 
+      {runs && <section className={styles.nextDesk} aria-label="Suggested next actions"><div><p className="eyebrow">Next at your desk</p><h2>{runs.some((r) => r.phase === "verified") ? "A verified bundle needs your review" : paid.length ? "Your purchase records are ready" : "Start with a release brief"}</h2><p>{runs.some((r) => r.phase === "verified") ? "Read the source evidence and approve the exact bundle before checkout." : paid.length ? "Open a passport to inspect the payment, creator outcomes and independent checks." : "The recorded game trailer takes you through rejection, verification and simulated settlement."}</p></div><Link href={runs.find((r) => r.phase === "verified") ? `/run/${runs.find((r) => r.phase === "verified")!.id}` : paid[0] ? `/passport/${paid[0].id}` : "/"} className="btn btn-primary">{runs.some((r) => r.phase === "verified") ? "Review verified run" : paid.length ? "Inspect a passport" : "Open the game trailer demo"}<ArrowRight aria-hidden/></Link></section>}
       {runs && runs.length > 0 && (
         <dl className={styles.kpis}>
           <div>

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { verifyPassport, type Passport, type PassportCheck } from "@/src/passport/passport";
 import { api, ApiError, errorMessage } from "@/src/ui/lib/api";
+import { formatMoney } from "@/src/ui/lib/format";
 import { passportCsv } from "@/src/passport/csv";
 import { passportCalendar } from "@/src/ui/lib/licence-dates";
 import { CopyButton } from "../bits";
@@ -124,6 +125,8 @@ export function PassportPage({ id }: { id: string }) {
   const sig = signature && signature !== "error" ? SIGNATURE_TEXT[signature] : null;
   return (
     <div className={`container-wide ${styles.page}`}>
+      <header className="desk-heading"><div><p className="eyebrow">Clearance archive / Purchase record</p><h2>Your release, with receipts.</h2></div><p>Share the record or download the file. Anyone can re-run the content checks in their browser; issuer authentication is checked separately.</p></header>
+      <section className="desk-summary" aria-label="Passport purchase summary"><div><span className="eyebrow">The purchase</span><strong>{formatMoney(p.bundle.totalCents, p.bundle.currency)}</strong><p>{p.bundle.offers.length} licences · {p.project.name}</p></div><div><span className="eyebrow">Payment environment</span><strong>{p.paypal.environment === "simulator" ? "Simulated payment" : "PayPal Sandbox"}</strong><p>No real money moved. Creator outcomes are listed in the certificate.</p></div><div><span className="eyebrow">Independent verification</span><strong>{result ? result.ok ? "9 content checks passed" : "Needs review" : "Checking in your browser…"}</strong><p>Rules, evidence, approval, ledger and payment are checked together.</p></div></section>
       <div className={`${styles.toolbar} no-print`}>
         <Link prefetch={false} href={`/run/${p.id}`} className="btn btn-ghost">
           <ArrowLeft aria-hidden /> Run

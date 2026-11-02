@@ -1,12 +1,34 @@
 # Feature verification and submission readiness
 
-Checked on 29 October 2026 against the working tree based on revision `c26b30d`, including the assistant corrections delivered with this update. This report separates repeatable offline verification from provider checks and release work. Passing tests demonstrate the cases below; they do not establish that licence interpretations are legally correct or guarantee a competition result.
+Latest local workbench verification: 2 November 2026. Earlier audit and provider evidence from 29 October 2026, based on revision `c26b30d`, is retained below. This report separates repeatable offline verification from provider checks and release work. Passing tests demonstrate the cases below; they do not establish that licence interpretations are legally correct or guarantee a competition result.
+
+## Clearance workbench refresh, 2 November 2026
+
+This refresh makes the recorded game trailer the primary judge journey. Home, the run, portfolio/dashboard, custom intake, settlement, checkout and passport now share a teal-and-paper visual system. The run leads with the current decision and project brief, source quotation cards precede approval, and optional exploration follows the purchase decision. Buyer capture and individual creator outcomes remain separate. The passport leads with the purchase, environment and independent content checks.
+
+| Local check | Result and scope |
+| --- | --- |
+| Dependency installation | `npm install` passed; no dependency changes were needed. |
+| Unit, property and API suite | `npm test`: **771 passed**, **27 credential-dependent tests skipped**. Includes the new phone layout regression, proving stacking order and that desktop state is not mutated. |
+| Type checking | `npm run typecheck` passed. |
+| Production build | `npm run build` passed; subsequent full browser runs rebuilt the production app with `node scripts/demo.mjs --build --build-only`. |
+| Browser suite | `npm run test:e2e`: **73 passed** across the normal, payout-failure and refund servers, including the fresh production build and all four new visual journeys. |
+| Rendered review | Home, run, custom intake requirements/files, dashboard, checkout, awaiting-buyer settlement, completed settlement and passport reviewed at **1440px and 390px**, in **light and dark** themes. Portfolio was reviewed separately at the same four combinations. Failed settlement also has four screenshot/axe combinations. |
+| Keyboard review | Enter opens the source-evidence drawer; Escape closes it and restores focus to the triggering quotation. The approval navigation anchor works by keyboard. Custom widgets expose named, focusable scroll regions. |
+| API and trust boundaries | API contracts unchanged. No changes to `src/core`, extraction pricing guards, approval digests or payment gates. Contract, tamper, ownership, failure/retry and refund tests remain in the suite. |
+| Account-free judge path | A separate browser walkthrough used the featured home entry, reviewed evidence, explicitly approved the exact $2,170 bundle, approved simulated checkout, observed creator settlement and passed all nine passport checks. No account or credentials were used. |
+
+The screenshot journeys in `tests/e2e/workbench.spec.ts` cover unsupported-file recovery without losing readable text, source quotations from the chosen licences, evidence drawer use, deterministic dashboard widgets, buyer approval, capture, settlement and passport checks. Screenshot files and region coordinates are written to `test-results/workbench-*/`; `tests/e2e/payout-retry.spec.ts` adds failed-settlement views. Representative current screenshots are retained in `docs/images/`.
+
+Visual review found and fixed dark-theme matrix-heading contrast, the default Filters panel obscuring phone charts, the embedded canvas enforcing a 720px desktop minimum, and keyboard access to newly scrollable phone widgets. The phone canvas now fits within the viewport; phone and desktop layouts use separate browser-storage keys. Automated accessibility checks are evidence for the tested states, not a full accessibility certification.
+
+No live model requests, Sandbox transactions, deployment, publication or live payments were made during this refresh. Custom licence extraction and the optional live assistant still require a configured model that passes the existing zero-price guard; scanned-PDF OCR remains unavailable. The local dashboard may retain a vendor trial watermark without an owner-supplied licence. Hosting is deferred; the public URL, final video, submission fields and any desired trial licence remain owner-supplied. Follow `docs/JUDGE.md` for the local demo and recovery paths. Earlier provider evidence below is historical and was not repeated by this refresh.
 
 ## Sandbox follow-up, 2 November 2026
 
 A human approved the documentary bundle and the buyer approved its itemised PayPal Sandbox order. PayPal reported a completed USD 329.00 capture; all three creator payout items reported SUCCESS. The issued passport passed all nine server verification checks and its signature was valid. This was a test-money transaction on a local instance; it does not verify a deployed webhook or the future judging environment. A bounded live proposer request and a single-attempt photo extraction also passed after the gateway's free-price check.
 
-## Current verification evidence
+## Earlier verification evidence (retained)
 
 | Check | Result and scope |
 | --- | --- |

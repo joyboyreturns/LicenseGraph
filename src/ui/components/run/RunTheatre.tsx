@@ -231,6 +231,12 @@ function Theatre({ view, accept, refresh }: { view: SessionView; accept: (v: Ses
         }
       />
       <StepRail state={state} />
+      <nav className="desk-nav" aria-label="Run workbench"><a href="#graph-title">01 Proposal & decisions</a><a href="#source-review">02 Source evidence</a><a href="#decide">03 Approval & settlement</a><a href="#matrix-title">All rule checks</a><a href="#explore-run">Explore this run</a></nav>
+      <section className="desk-summary" aria-label="Current clearance decision">
+        <div><span className="eyebrow">Current decision</span><strong>{replaying ? `Replay · round ${state.round || 1}` : view.phase === "verified" ? "Ready for human review" : view.phase === "settled" ? "Settlement complete" : view.phase.replaceAll("_", " ")}</strong><p>{replaying ? "The playhead follows recorded proposals and deterministic decisions. Approval remains a separate human action." : view.bundle ? `${view.bundle.offers.length} licences · ${formatMoney(view.bundle.totalCents, currency)} · verified by code` : "No purchase can proceed until the rules engine accepts a complete bundle."}</p></div>
+        <div><span className="eyebrow">Project brief</span><strong>{view.project.name}</strong><p>{requirements.map((r) => `${r.label}: ${r.value}`).join(" · ")}</p></div>
+        <div><span className="eyebrow">Your next action</span><strong>{replaying ? "Follow the rule decisions" : view.phase === "verified" ? "Read evidence, then approve" : showSettlement ? "Review the settlement record" : "Review the clearance result"}</strong><p>{view.meta?.runKind === "live" ? "Live extraction; every term needs source evidence." : "Recorded model output · rules checked again for this run."} {simulated ? "Simulated payments. No money moves." : "Sandbox payments only."}</p></div>
+      </section>
 
       <div className={styles.top}>
         <section className={`card ${styles.graphCard}`} aria-labelledby="graph-title">
@@ -296,6 +302,10 @@ function Theatre({ view, accept, refresh }: { view: SessionView; accept: (v: Ses
         </section>
       </div>
 
+      <section id="source-review" aria-labelledby="source-title">
+        <div className="desk-heading"><div><p className="eyebrow">02 / Evidence desk</p><h2 id="source-title">Read the terms behind the decision</h2></div><p>Select a quotation to inspect its source, located evidence and rule results.</p></div>
+        {state.chosen.length > 0 ? <div className="desk-evidence">{view.candidates.filter((o) => state.chosen.includes(o.id)).map((o) => <button type="button" key={o.id} onClick={() => setSelected(o.id)}><span className="eyebrow">{catalog.offer(o.id)?.licensor} · {formatMoney(o.priceCents, o.currency)}</span><q>{(o.evidence.find((e) => e.field === "mediums") ?? o.evidence.find((e) => e.field === "territories") ?? o.evidence[0])?.quote}</q><span>Read all {o.evidence.length} source quotations →</span></button>)}</div> : <p className="callout">Source quotations for the chosen bundle appear when the replay reaches verification. Select any licence in the rights graph to inspect its evidence now.</p>}
+      </section>
       <div id="decide" className={styles.mid}>
         <section className={`card ${styles.actionCard}`} aria-label="Decision">
           {view.phase === "verified" && <ApprovalPanel view={view} catalog={catalog} busy={busy === "approve"} onSelectOffer={setSelected} onApprove={(name) => run("approve", "approve", { approvedBy: name }, () => "Bundle approved")} />}
@@ -335,6 +345,11 @@ function Theatre({ view, accept, refresh }: { view: SessionView; accept: (v: Ses
             <ComplianceSummary analysis={view.analysis} catalog={catalog} currency={currency} verified={Boolean(view.bundle)} project={view.project} />
           </section>
         )}
+        </div>
+      </div>
+      <section id="explore-run" aria-labelledby="explore-title">
+      <div className="desk-heading"><div><p className="eyebrow">Explore / Optional</p><h2 id="explore-title">Work the alternatives</h2></div><p>Compare history, ask about the recorded facts, or test a different brief.</p></div>
+      <div className={styles.exploration}>
         {!live && <DealHistory runId={view.id} />}
         {!live && (view.meta?.rebriefedFrom ?? view.meta?.revisedFrom) && <CompareWithEarlier view={view} earlierId={(view.meta?.rebriefedFrom ?? view.meta?.revisedFrom)!} />}
         {levers.length > 0 && (
@@ -371,7 +386,7 @@ function Theatre({ view, accept, refresh }: { view: SessionView; accept: (v: Ses
           </section>
         )}
         </div>
-      </div>
+      </section>
 
       {view.analysis && (
         <section className={`card ${styles.matrixCard}`} aria-labelledby="matrix-title">

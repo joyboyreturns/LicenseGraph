@@ -5,6 +5,7 @@ import { AgStudio, AgStudioProvider } from "ag-studio-react";
 import { widgets, type StudioRegistry } from "./rule-matrix";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { SessionView } from "@/src/app-logic/session";
+import { phoneDashboard } from "@/src/dashboard/responsive";
 import { dashboardSuggestions, type DashboardSuggestion } from "@/src/dashboard/suggestions";
 import { buildStudioData } from "@/src/dashboard/data";
 import { buildPortfolioData, PORTFOLIO_INITIAL_STATE } from "@/src/dashboard/portfolio";
@@ -135,17 +136,30 @@ function useDarkMode(): boolean {
 type StudioProps = { assistant: boolean } & ({ view: SessionView; portfolio?: undefined } | { portfolio: SessionView[]; view?: undefined });
 
 export default function Studio(props: StudioProps) {
+  const [phone, setPhone] = useState(() => window.matchMedia("(max-width: 700px)").matches);
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 700px)");
+    const changed = () => setPhone(media.matches);
+    media.addEventListener("change", changed);
+    return () => media.removeEventListener("change", changed);
+  }, []);
+  return <StudioDesk key={phone ? "phone" : "desktop"} {...props} phone={phone} />;
+}
+
+function StudioDesk(props: StudioProps & { phone: boolean }) {
   const { assistant } = props;
   const isPortfolio = props.portfolio !== undefined;
   const [mode, setMode] = useState<"view" | "edit">("view");
   // The layout, and any widgets the person or the assistant added, are kept in this browser between visits.
-  const storageKey = savedStateKey(isPortfolio);
+  const storageKey = savedStateKey(isPortfolio) + (props.phone ? ".phone" : "");
   const [layoutVersion, setLayoutVersion] = useState(0);
   const [restored, setRestored] = useState(false);
   const startState = useMemo(
     () => (layoutVersion >= 0 ? loadSavedState(window.localStorage, storageKey) : undefined) as AgReportState<StudioRegistry> | undefined,
     [storageKey, layoutVersion],
   );
+  const desktopDefault = (isPortfolio ? PORTFOLIO_INITIAL_STATE : initialState) as AgReportState<StudioRegistry>;
+  const defaultState = useMemo(() => props.phone ? phoneDashboard(desktopDefault) : desktopDefault, [props.phone, desktopDefault]);
   useEffect(() => setRestored(Boolean(startState)), [startState]);
   const saveTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => () => clearTimeout(saveTimer.current), []);
@@ -199,8 +213,9 @@ export default function Studio(props: StudioProps) {
       setOfflineMessage(`Could not add ${suggestion.title}: ${built.errors.join(" ")}`);
       return;
     }
-    const state = currentState.current ?? startState ?? (isPortfolio ? PORTFOLIO_INITIAL_STATE : initialState);
-    const next = placeWidget(state as never, suggestion.title, built.widget, built.size).state;
+    const state = currentState.current ?? startState ?? defaultState;
+    const placed = placeWidget(state as never, suggestion.title, built.widget, built.size).state;
+    const next = props.phone ? phoneDashboard(placed as AgReportState<StudioRegistry>) : placed;
     saveState(window.localStorage, storageKey, next);
     currentState.current = next as AgReportState<StudioRegistry>;
     setOfflineMessage(`Added ${suggestion.title} below the existing widgets.`);
@@ -293,17 +308,19 @@ export default function Studio(props: StudioProps) {
           </button>
         )}
       </div>
-      <section aria-label="Offline dashboard assistant" style={{ padding: "8px 16px" }}>
+      <section aria-label="Offline dashboard assistant" className="desk-tools">
+        <p className="eyebrow">Workbench / Deterministic actions</p>
         <strong>Offline dashboard assistant</strong>
-        <p className="small">Choose a fixed action to add a widget. No model or account is needed.{assistant ? " The live assistant is also available in the dashboard." : ""}</p>
+        <p className="small">Choose a fixed action to add a widget. No model or account is needed.{assistant ? " Optional live assistant: available in the dashboard, with server-side free-model pricing checks before requests." : " Optional live assistant is unavailable. These actions work entirely from recorded run data."}</p>
         <div className="row">{dashboardSuggestions(isPortfolio).map((suggestion) => <button type="button" className="btn btn-sm" key={suggestion.title} onClick={() => addSuggestion(suggestion)}>{suggestion.label}</button>)}</div>
         <p role="status" className="small">{offlineMessage}</p>
       </section>
       <AgStudio<StudioRegistry>
         key={layoutVersion}
+        panels={props.phone ? { view: { right: [] }, edit: { right: assistant ? ["ai", "filters", "edit", "data"] : ["filters", "edit", "data"] } } : undefined}
         data={data as never}
         widgets={widgets}
-        initialState={(startState ?? (isPortfolio ? PORTFOLIO_INITIAL_STATE : initialState)) as AgReportState<StudioRegistry>}
+        initialState={startState ?? defaultState}
         onStateUpdated={onStateUpdated as never}
         onErrorRaised={onErrorRaised as never}
         mode={mode}

@@ -266,3 +266,12 @@
     font-size: 16px;
   }
 }
+
+.exploration { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px; align-items:start; }
+.top { gap:16px; }
+.graphCard { border-top:3px solid var(--primary); }
+.timelineCard { background:var(--surface-2); }
+.mid { grid-template-columns:minmax(0,1.6fr) minmax(0,1fr); }
+.actionCard { border:1px solid var(--line-strong); border-top:4px solid var(--ok); }
+@media(max-width:1180px) { .mid { grid-template-columns:1fr; } }
+@media(max-width:760px) { .exploration { grid-template-columns:1fr; } .req { height:auto; min-height:24px; white-space:normal; flex-wrap:wrap; } }

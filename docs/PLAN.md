@@ -112,3 +112,14 @@ Prize targets: Best Overall, Best Use of Agentic Commerce, Best Use of AG Grid. 
 ## Open questions
 
 - Official rules and sponsor brief were reviewed on 28 October 2026; see `docs/HACKATHON.md`. Each participant must verify their own eligibility. The FAQ states no maximum team size; the rules limit prize stacking.
+
+## Judge workbench refresh (2 November 2026)
+
+- [x] Feature the recorded game trailer as the primary entry with one coherent clearance-desk identity.
+- [x] Restructure the run around current decision, source evidence and exact-bundle approval; keep exploration secondary.
+- [x] Surface deterministic portfolio suggestions and offline widget actions; distinguish the guarded optional live assistant.
+- [x] Improve custom-file feedback/recovery and recorded-demo access; retain evidence review before approval.
+- [x] Separate simulated buyer capture, creator outcomes and independent passport verification.
+- [x] Add desktop/phone and light/dark browser regression journeys with screenshots; fix dark matrix contrast and phone dashboard obstruction.
+- [x] Update the demo script, Devpost draft and local judge guide. Validation results are recorded in docs/READINESS.md.
+- Deployment, public video, final submission fields and any trial licence remain owner-supplied release items.

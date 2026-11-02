@@ -25,7 +25,7 @@ export function SiteFooter() {
             <strong>LicenseGraph</strong>
           </div>
           <p className="serif" style={{ fontSize: 20, lineHeight: 1.25, marginTop: 12 }}>
-            AI moves at machine speed. Creator rights and payments should too.
+            Make your next release rights-ready.
           </p>
         </div>
         <div className={styles.notes}>

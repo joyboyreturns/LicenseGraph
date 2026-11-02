@@ -20,8 +20,8 @@ interface Palette {
   scheme: "light" | "dark";
 }
 
-const LIGHT: Palette = { bg: "#f4f2ed", surface: "#ffffff", surface2: "#faf8f4", ink: "#111318", ink2: "#343944", muted: "#5a606d", line: "#e3dfd6", accent: "#0a7446", scheme: "light" };
-const DARK: Palette = { bg: "#0a0c10", surface: "#11141a", surface2: "#151922", ink: "#eceef2", ink2: "#c2c7d1", muted: "#979eac", line: "#232935", accent: "#4ae6a6", scheme: "dark" };
+const LIGHT: Palette = { bg: "#f0f3ef", surface: "#ffffff", surface2: "#f5f7f3", ink: "#111318", ink2: "#343944", muted: "#5a606d", line: "#d8e1d9", accent: "#0a7446", scheme: "light" };
+const DARK: Palette = { bg: "#0b1718", surface: "#122426", surface2: "#172d2f", ink: "#eceef2", ink2: "#c2c7d1", muted: "#979eac", line: "#2d4547", accent: "#4ae6a6", scheme: "dark" };
 
 export function themeParams(p: Palette): Partial<AgStudioThemeParams> {
   const border = [1, p.line] as const;
@@ -39,13 +39,15 @@ export function themeParams(p: Palette): Partial<AgStudioThemeParams> {
     rowHoverColor: p.surface2,
     studioWrapperBackgroundColor: p.bg,
     studioWrapperBorder: border,
-    studioWrapperBorderRadius: 14,
+    studioWrapperBorderRadius: 6,
+    studioMinWidth: 0,
+    studioCanvasMinWidth: 0,
     studioCanvasBackgroundColor: p.bg,
     studioCanvasFontFamily: FONT,
     studioPanelContainerBackgroundColor: p.surface,
     studioWidgetBackgroundColor: p.surface,
     studioWidgetBorder: border,
-    studioWidgetBorderRadius: 14,
+    studioWidgetBorderRadius: 6,
     studioWidgetPadding: 8,
     studioWidgetTitleFontFamily: FONT,
     studioWidgetTitleFontSize: 15,

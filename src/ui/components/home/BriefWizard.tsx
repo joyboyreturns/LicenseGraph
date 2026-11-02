@@ -77,6 +77,7 @@ export function BriefWizard({ scenarios, onStartScenario, starting }: { scenario
   const [assets, setAssets] = useState<string[]>([]);
   const [customAsset, setCustomAsset] = useState("");
   const [docs, setDocs] = useState<DocDraft[]>([]);
+  const [readingFiles, setReadingFiles] = useState<string[]>([]);
   const [running, setRunning] = useState(false);
   const [runError, setRunError] = useState<string | null>(null);
   const [problems, setProblems] = useState<string[]>([]);
@@ -128,11 +129,17 @@ export function BriefWizard({ scenarios, onStartScenario, starting }: { scenario
 
   const loadFile = async (key: string, file: File | undefined) => {
     if (!file) return;
+    if (!/\.(pdf|txt|md)$/i.test(file.name)) {
+      setProblems([`${file.name} is not a supported licence file. Choose a text-based PDF, .txt or .md file, or paste the source text.`]);
+      return;
+    }
     const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
     if (file.size > (isPdf ? MAX_PDF_BYTES : MAX_DOC * 4)) {
       setProblems([`${file.name} is too large. Paste the licence text instead (up to ${MAX_DOC.toLocaleString()} characters).`]);
       return;
     }
+    setReadingFiles((keys) => [...keys, key]);
+    try {
     let full: string;
     const notes: string[] = [];
     if (isPdf) {
@@ -161,6 +168,9 @@ export function BriefWizard({ scenarios, onStartScenario, starting }: { scenario
     if (full.length > MAX_DOC) notes.push(`${file.name} is longer than ${MAX_DOC.toLocaleString()} characters; only the start was kept. Check that the terms you need are in it.`);
     setProblems(notes);
     setDocs((d) => d.map((x) => (x.key === key ? { ...x, text: full.slice(0, MAX_DOC), fileName: file.name } : x)));
+    } finally {
+      setReadingFiles((keys) => keys.filter((k) => k !== key));
+    }
   };
 
   /** A licensor is kept by name even with no payout email, so the run shows who the creator is; without an email they just cannot be paid. */
@@ -213,6 +223,7 @@ export function BriefWizard({ scenarios, onStartScenario, starting }: { scenario
 
   return (
     <div className={`card ${styles.wizard}`}>
+      <div className={styles.intakeHead}><div><p className="eyebrow">New clearance / Custom brief</p><h3>Bring the project. Keep the proof.</h3><p>Describe the release, confirm its requirements, then add the original licence text. Every extracted term needs a source quotation.</p></div><button type="button" className="btn" onClick={() => onStartScenario("game-trailer")} disabled={starting !== null}>Use the recorded game trailer</button></div>
       <ol className={styles.progress} aria-label="Steps">
         {["Describe", "Requirements", "Licences"].map((label, i) => (
           <li key={label} data-state={step === i + 1 ? "current" : step > i + 1 ? "done" : "todo"} aria-current={step === i + 1 ? "step" : undefined}>
@@ -239,11 +250,12 @@ export function BriefWizard({ scenarios, onStartScenario, starting }: { scenario
               if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && text.trim().length >= 5) void read();
             }}
           />
+          {config?.mode === "demo" && <p className="callout tone-info">The brief reader works offline. Custom licence extraction needs a free live model; the recorded game trailer works end to end without one.</p>}
           <div className={styles.exampleRow}>
             <span className={styles.exLabel}>Examples</span>
-            {EXAMPLES.map((ex) => (
+            {EXAMPLES.map((ex, i) => (
               <button key={ex} type="button" className={styles.example} onClick={() => setText(ex)} title={ex}>
-                {ex.length > 64 ? `${ex.slice(0, 62)}…` : ex}
+                {["Brand campaign", "Student film", "Game trailer"][i]}
               </button>
             ))}
           </div>
@@ -409,6 +421,7 @@ export function BriefWizard({ scenarios, onStartScenario, starting }: { scenario
 
       {step === 3 && draft && (
         <div className={styles.body}>
+          <div className={styles.reviewGuide}><b>Prepare your evidence</b><p>Text-based PDF up to 5 MB, or .txt / .md. Files are read on this device; review the text below before starting. Scanned images need a text transcription. After extraction, open source evidence in the run before approving.</p></div>
           <div className={styles.useScenario}>
             <label className="label" htmlFor={`${ids}-sc`}>
               No licences to hand? Load a scenario&rsquo;s licence documents
@@ -439,7 +452,7 @@ export function BriefWizard({ scenarios, onStartScenario, starting }: { scenario
                       <span className={styles.docNo}>Licence {i + 1}</span>
                       <label className={`btn btn-sm ${styles.fileBtn}`}>
                         <FileUp aria-hidden /> {d.fileName ? "Replace file" : "Load a PDF or text file"}
-                        <input type="file" accept=".pdf,.txt,.md,application/pdf,text/plain" className="visually-hidden" onChange={(e) => loadFile(d.key, e.target.files?.[0])} />
+                        <input type="file" accept=".pdf,.txt,.md,application/pdf,text/plain" className="visually-hidden" disabled={readingFiles.includes(d.key)} onChange={(e) => { void loadFile(d.key, e.target.files?.[0]); e.target.value = ""; }} />
                       </label>
                       {d.fileName && <span className="small muted">{d.fileName}</span>}
                       <button type="button" className="btn btn-ghost btn-sm btn-icon" aria-label={`Remove licence ${i + 1} for ${assetLabel(a).toLowerCase()}`} onClick={() => setDocs(docs.filter((x) => x.key !== d.key))}>
@@ -455,6 +468,7 @@ export function BriefWizard({ scenarios, onStartScenario, starting }: { scenario
                       value={d.text}
                       onChange={(e) => setDocs(docs.map((x) => (x.key === d.key ? { ...x, text: e.target.value } : x)))}
                     />
+                    <p role="status" className={styles.fileFeedback}>{readingFiles.includes(d.key) ? "Reading file on this device…" : d.text.trim() ? `${d.text.length.toLocaleString()} characters ready for extraction. Review the source text above.` : "Waiting for licence text. Paste it above or choose a supported file."}</p>
                     <div className={styles.payee}>
                       <input className="input" aria-label="Licensor name" placeholder="Licensor name" value={d.licensorName} maxLength={80} onChange={(e) => setDocs(docs.map((x) => (x.key === d.key ? { ...x, licensorName: e.target.value } : x)))} />
                       <input className="input" aria-label="Licensor payout email (optional)" placeholder="Payout email (needed to pay this creator)" type="email" value={d.licensorEmail} onChange={(e) => setDocs(docs.map((x) => (x.key === d.key ? { ...x, licensorEmail: e.target.value } : x)))} />
@@ -467,6 +481,7 @@ export function BriefWizard({ scenarios, onStartScenario, starting }: { scenario
             </div>
           ))}
 
+          {running && <p className="callout tone-info" role="status">Starting extraction: terms will be linked to source quotations, then each proposed bundle will be checked by the rules engine. You will review evidence before approval.</p>}
           {noModel && !runError && (
             <p className="callout tone-warn">
               <AlertTriangle aria-hidden />
@@ -507,7 +522,7 @@ export function BriefWizard({ scenarios, onStartScenario, starting }: { scenario
               <ArrowLeft aria-hidden /> Back
             </button>
             <span className="spacer" />
-            <button type="button" className="btn btn-primary btn-lg" onClick={submit} disabled={running}>
+            <button type="button" className="btn btn-primary btn-lg" onClick={submit} disabled={running || readingFiles.length > 0}>
               {running ? <Spinner label="Starting" /> : <Sparkles aria-hidden />}
               Find a compliant bundle
             </button>

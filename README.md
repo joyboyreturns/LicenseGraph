@@ -2,13 +2,13 @@
 
 [![CI](https://github.com/joyboyreturns/licensegraph/actions/workflows/ci.yml/badge.svg)](https://github.com/joyboyreturns/licensegraph/actions/workflows/ci.yml)
 
-> **AI moves at machine speed. Creator rights and payments should too.**
+> **Make your next release rights-ready.**
 
-LicenseGraph turns a pile of licence documents into a **verified, approved, paid-for licence bundle**, and pays the creators. An AI agent reads the licences and proposes the cheapest bundle; a **deterministic rules engine** (plain code, not AI) checks every proposal against your project and rejects what breaks it; a **human approves** exactly what was verified; **PayPal** settles the order and pays each licensor through **PayPal Payouts**. At the end you get a **Licence Passport**: a shareable, QR-coded record that anyone can re-verify in their own browser.
+LicenseGraph is a rights-clearing workbench for creative releases. Start with a game trailer: clear music, key art and sound effects as a **verified, approved, paid-for licence bundle**, and follow the creator payouts. An AI agent reads the licences and proposes the cheapest bundle; a **deterministic rules engine** (plain code, not AI) checks every proposal against your project and rejects what breaks it; a **human approves** exactly what was verified; **PayPal** settles the order and pays each licensor through **PayPal Payouts**. At the end you get a **Licence Passport**: a shareable, QR-coded record that anyone can re-verify in their own browser.
 
 Built for the PayPal AI Hackathon 2026. Everything runs against the PayPal **Sandbox** (or an offline simulator). No real money moves.
 
-![The run theatre: the agent proposes, the rules engine rejects, the agent revises](docs/images/run-replay.jpg)
+![The featured Neon Drift case at the LicenseGraph clearance desk](docs/images/home.jpg)
 
 ## Try it in two commands
 
@@ -17,9 +17,11 @@ git clone https://github.com/joyboyreturns/licensegraph && cd licensegraph
 npm install && npm run demo          # then open http://localhost:3000
 ```
 
-That needs **no accounts and no API keys**: the four built-in scenarios replay recorded model output (three end in a verified bundle; the fourth ends, honestly, with no bundle and a priced list of what to ask for), and a clearly labelled payment simulator stands in for PayPal. Press **Run the 60-second demo**, then follow the steps (approve, create the order, approve as the buyer in the simulator, watch the creators get paid, open the passport).
+That needs **no accounts and no API keys**: the four built-in scenarios replay recorded model output (three end in a verified bundle; the fourth ends, honestly, with no bundle and a priced list of what to ask for), and a clearly labelled payment simulator stands in for PayPal. Press **Explore the game trailer demo**, then follow the steps (approve, create the order, approve as the buyer in the simulator, watch the creators get paid, open the passport).
 
 Requires Node.js 20.19 or newer (22 recommended). The first run builds the app (about a minute).
+
+Detailed local judging and recovery instructions: [JUDGE.md](docs/JUDGE.md).
 
 The **tour** (`/tour`) lists seven things to try in order, with what to look for in each.
 
@@ -27,15 +29,15 @@ The **tour** (`/tour`) lists seven things to try in order, with what to look for
 
 Start with **Game launch trailer**. It has eight offers for three assets: the cheapest price-only purchase is **$220**, but fails the brief; the independently checked compliant minimum is **$2,170** across 18 possible bundles. These are fixture prices, not customer savings or a legal opinion.
 
-1. Watch a proposal fail, open the verification matrix, and click a source quote.
-2. Check the independent cost minimum, then review and approve the exact bundle.
+1. Press **Explore the game trailer demo** on the featured Neon Drift case. Watch the rights graph and agent timeline reject and revise proposals. Use the numbered workbench links to move between decisions, evidence and approval.
+2. At **Read the terms behind the decision**, open a source quotation. Check the independent cost minimum, then choose **Review and approve**, enter your name, and approve the exact $2,170 bundle.
 3. Approve the buyer's payment in the labelled simulator and watch the creator payouts settle.
 4. Open the passport, download its JSON, and verify it at `/verify`. Try a tampered copy and watch it fail.
-5. Open `/agents` to watch tools price a purchase and hand control to a person; open `/dashboard?portfolio=1` for the four custom dashboard widgets.
+5. Open **Dashboard** from the run. The **Offline dashboard assistant** adds useful widgets without credentials. **Portfolio** suggests the next review or passport action. Negotiation, questions and what-if tools remain under **Work the alternatives** on the run.
 
 For a second path, run **Exclusive theme tune**: nothing can be bought until the licensors change their terms. The app shows the missing rights and a priced negotiation outlook, then can replay revised replies as a new run.
 
-**Demo modes:** built-in scenarios use recorded extraction output and a deterministic proposer; they do not make live model calls. `npm run demo` forces simulated payments even if a local `.env` has credentials. Custom licence extraction and the dashboard assistant require a configured free model. Real Sandbox checkout requires separate test accounts and buyer approval.
+**Demo modes:** built-in scenarios use recorded extraction output and a deterministic proposer; they do not make live model calls. `npm run demo` forces simulated payments even if a local `.env` has credentials. Custom licence extraction and the optional live dashboard assistant require a configured free model. The brief reader and fixed dashboard actions work offline. Real Sandbox checkout requires separate test accounts and buyer approval.
 
 Feature-by-feature test evidence and outstanding release checks are in [the readiness report](docs/READINESS.md). The complete recording script is in [the demo script](docs/DEMO_SCRIPT.md).
 
@@ -43,15 +45,15 @@ Feature-by-feature test evidence and outstanding release checks are in [the read
 
 | | |
 |---|---|
+| ![](docs/images/intake.jpg) | **Custom intake** separates the brief, requirements and licence documents. Review loaded text and extracted evidence; invalid files show recovery guidance, and the recorded game trailer stays one click away without live extraction. |
 | ![](docs/images/run-verified.jpg) | **The loop is visible.** A hand-built rights graph shows licences, the offers the agent read, and the assets you need. The agent proposes (amber); the rules engine (blue, "code, not AI") rejects offers that break a rule and sends the reasons back; the agent revises. Replay it, scrub it, or skip to the result. |
 | ![](docs/images/matrix.jpg) | **Every offer is checked against every rule**, not only the proposed bundle. A licence that is *silent* on something the project requires fails: gaps are never assumed away. |
 | ![](docs/images/evidence.jpg) | **Every term links to the sentence it came from.** Quotes the model invents are rejected by code; the evidence viewer highlights the exact text. |
-| ![](docs/images/negotiation.jpg) | **When the answer is no, it says what to ask for.** No licence meets every requirement, so nothing is proposed. The run names the closest licence per asset, the exact terms to change, drafts the message to each licensor, and prices the best case: "if every licensor said yes, at the prices they quoted". |
 | ![](docs/images/approval.jpg) | **The person approves with the whole picture.** Beside the Approve button: who will be paid what once the payment is captured (addresses masked), the clauses in the licences that the rules engine does not check, quoted word for word, and, for a purchase an agent started, whether the verified total is within the spending cap the agent was given. |
-| ![](docs/images/compare.jpg) | **A negotiation is one record.** When you change the brief or a licensor replies, the new run opens beside the one it came from: each asset's licence and price before and after, the difference in the total, and every run of the deal listed in order. |
 | ![](docs/images/settled.jpg) | **Settlement.** The order can only be created for the verified bundle a human approved. After the buyer approves, the payment is captured and each creator is paid. A submission failure never undoes the captured payment. Retries preserve the original batch id, recipients and amounts; individual failures require reconciliation rather than resending successful payments. |
+| ![](docs/images/checkout.jpg) | **Clearly simulated checkout.** The account-free demo moves no money. A buyer explicitly approves before capture and creator payouts. |
 | ![](docs/images/passport.jpg) | **The Licence Passport** re-checks itself in your browser: the hash-chained ledger, the rules engine re-run on the exact terms, every quote found at its recorded position, and the PayPal capture and payout records. Download its licences as a spreadsheet (one row each, with price, terms, end date and payout status; a licensor's name can never run as a formula), print it, share it, or verify a downloaded file at `/verify`. A paid run also has a status badge for a README or a site (`/api/passports/{id}/badge`), built from the passport's own re-verification, so it can say "verified", "check failed" or "payment reversed" but nothing more than the record proves. |
-| ![](docs/images/portfolio.jpg) | **Portfolio dashboard** built with [AG Studio](https://www.ag-grid.com/studio/): spend, licences the rules blocked, creators paid, and every offer, violation and ledger event as linked tables. Its AI assistant builds new views from plain English (needs a model). Open run and portfolio dashboards refresh automatically as approvals, payments and ledger events change. Changes you make, including widgets the assistant builds, are kept in your browser (only a layout that differs from the original is saved), with a button to put the original back. |
+| ![](docs/images/portfolio.jpg) | **Run and portfolio dashboards** built with [AG Studio](https://www.ag-grid.com/studio/): spend, licences the rules blocked, creators paid, and every offer, violation and ledger event as linked tables. Its offline assistant adds validated widgets with no model or account. An optional live assistant builds views from plain English through the existing free-model guard. Open run and portfolio dashboards refresh automatically as approvals, payments and ledger events change. Changes you make, including widgets the assistant builds, are kept in your browser (only a layout that differs from the original is saved), with a button to put the original back. |
 
 On a phone it stays usable:
 
@@ -77,7 +79,7 @@ Two further answers come from the same rules engine, with no model involved:
 - **Saving levers.** For a verified bundle, the run lists each cheaper offer that fails only on terms its licensor could change, with the exact saving if they agreed at the price they quoted, what to ask, and a drafted message. Every lever is re-checked by the rules engine on the changed terms (a property test covers it), and it is always labelled a best case, never an offer. Agents get the same list from `cheapest_compliant_bundle`.
 - **The fine print.** Beside the Approve button, any clause the rules engine does not check (a licence that can be ended early, a ban on training AI, limits on resale, liability, reporting duties) is quoted word for word from the bought licences, and the approval records how many were shown.
 
-**What if the project changed?** Under the compliance summary, a panel lets you change the brief (where it is shown, how long, which media, whether it is commercial, credit, sublicensing, exclusivity) (by controls, or by typing a sentence such as "only Canada for 6 months, no exclusivity", read on your device) and see the new cheapest compliant bundle instantly, which asset's licence would change, and the delta against your brief. If no licence can cover the changed brief it says which asset and what to ask the licensor for. The panel's choices live in the page address, so a scenario can be shared as a link and reopened exactly (a hand-edited link is validated, never trusted). It re-runs the same exact cost check in the browser on the offers already read, so there is no model call and no estimate, and nothing on the run changes. Tests compare it against an exhaustive search of every bundle for random changes (`src/core/whatif.ts`). When a changed brief has a compliant bundle, **Check my licences against this brief** makes it real (`POST /api/sessions/{id}/rebrief`): a new run on the same licences, none of them read again, that can be approved and paid, linked to the first by a `brief_changed` ledger entry that the passport shows. The new run shows a side-by-side against the first (each asset's licence and price before and after, and the change in the total, from `src/core/compare.ts`), and the same panel appears on a run that answers a licensor's reply; the run's Ask box can also say, in words, how it differs from the run it came from. Every run in a negotiation (the first read, each licensor reply, each changed brief) is listed in order under "This deal so far", with how the total moved (`src/core/deal-history.ts`). The first run is never edited.
+**What if the project changed?** In **Work the alternatives**, a panel lets you change the brief (where it is shown, how long, which media, whether it is commercial, credit, sublicensing, exclusivity) (by controls, or by typing a sentence such as "only Canada for 6 months, no exclusivity", read on your device) and see the new cheapest compliant bundle instantly, which asset's licence would change, and the delta against your brief. If no licence can cover the changed brief it says which asset and what to ask the licensor for. The panel's choices live in the page address, so a scenario can be shared as a link and reopened exactly (a hand-edited link is validated, never trusted). It re-runs the same exact cost check in the browser on the offers already read, so there is no model call and no estimate, and nothing on the run changes. Tests compare it against an exhaustive search of every bundle for random changes (`src/core/whatif.ts`). When a changed brief has a compliant bundle, **Check my licences against this brief** makes it real (`POST /api/sessions/{id}/rebrief`): a new run on the same licences, none of them read again, that can be approved and paid, linked to the first by a `brief_changed` ledger entry that the passport shows. The new run shows a side-by-side against the first (each asset's licence and price before and after, and the change in the total, from `src/core/compare.ts`), and the same panel appears on a run that answers a licensor's reply; the run's Ask box can also say, in words, how it differs from the run it came from. Every run in a negotiation (the first read, each licensor reply, each changed brief) is listed in order under "This deal so far", with how the total moved (`src/core/deal-history.ts`). The first run is never edited.
 
 Both are also tables in AG Studio (`requirements`, `gaps`), and the portfolio has a `licences` table of when each bought licence ends, drawn by a second custom widget (a licence timeline with a today line and the licences ending soon highlighted), so the dashboard and its assistant can chart and filter them across runs.
 
@@ -201,7 +203,7 @@ npm run test:gateway   # live extraction; defaults to up to 3 attempts per fixtu
 npm run test:proposer  # one live proposal, free-model guard required
 ```
 
-The latest full audit passed **765 unit/property/API tests** and **66 browser journeys**, with **27 credential-dependent tests skipped** in the offline suite. Three real Sandbox order tests also passed separately; they do not cover buyer approval, capture or creator settlement. A separate, approved local live-assistant check created and saved a KPI in two free-model calls. A broader live extraction check passed 16 fixtures before a provider timeout stopped it; live reliability is still a recording/release check. See [the dated readiness report](docs/READINESS.md) for the exact scope and live-check results.
+The latest full audit passed **771 unit/property/API tests** and **73 browser journeys**, with **27 credential-dependent tests skipped** in the offline suite. Three real Sandbox order tests also passed separately; they do not cover buyer approval, capture or creator settlement. A separate, approved local live-assistant check created and saved a KPI in two free-model calls. A broader live extraction check passed 16 fixtures before a provider timeout stopped it; live reliability is still a recording/release check. See [the dated readiness report](docs/READINESS.md) for the exact scope and live-check results.
 
 The suite covers the rules, the payment gate, payouts and their failure and retry, ledger and passport tamper detection (forged prices, terms, quotes, capture ids, edited ledger events), persistence, API routes and run ownership, the offline simulator, a check that browser-bound modules never import Node code, and full browser journeys including the mobile layout.
 

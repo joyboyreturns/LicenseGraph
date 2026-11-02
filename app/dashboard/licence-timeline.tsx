@@ -68,7 +68,7 @@ export function LicenceTimeline(params: AgWidgetParams<TimelineDef>) {
   if (!timeline) return <div aria-hidden />;
 
   return (
-    <div style={{ overflow: "auto", height: "100%", padding: "10px 12px", fontFamily: "var(--font-ui)", fontSize: 12.5 }}>
+    <div tabIndex={0} role="region" aria-label="Licence timeline scroll area" style={{ overflow: "auto", height: "100%", padding: "10px 12px", fontFamily: "var(--font-ui)", fontSize: 12.5 }}>
       <div role="list" aria-label="Licence end dates" style={{ display: "grid", gridTemplateColumns: "minmax(120px, 22%) 1fr", rowGap: 6, columnGap: 10, minWidth: 420, position: "relative" }}>
         <div />
         <div style={{ position: "relative", height: 16, color: "var(--muted)" }} aria-hidden>

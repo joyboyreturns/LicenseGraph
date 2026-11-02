@@ -1,6 +1,6 @@
 # LicenseGraph architecture
 
-> AI moves at machine speed. Creator rights and payments should too.
+> Make your next release rights-ready.
 
 LicenseGraph helps a project that uses many licensed creative assets (music, images, fonts, footage) buy a compliant licence bundle. An AI agent proposes; a deterministic rules engine verifies; only a verified, human-approved bundle can reach PayPal.
 
@@ -114,3 +114,9 @@ Currency conversion and mixed-currency bundles, licensor onboarding and verified
 The independent cost frontier (`src/core/optimizer.ts`) computes minimum compliant cost per currency and rechecks each result with the verifier. It assumes the present rules remain independent between assets; coupled discounts or obligations would require a different optimizer.
 
 Payment operations coalesce concurrent requests within one server process. Payout submissions preserve the original identity and recipient plan across retries and restarts; batch status is reconciled per item before settlement. New approval digests include terms and evidence. Historical downloaded passports retain read-only support for the original digest; legacy unpaid approvals require reapproval, and old partial-field signatures must be reissued for full-content authentication. See `docs/AUDIT.md`.
+
+## Clearance desk presentation
+
+The primary account-free journey starts with the featured game-trailer case. The run separates the current decision and brief, replayed proposals and rule decisions, source quotations, and exact-bundle approval/settlement. Questions, negotiation, history and what-if exploration sit below the purchase decision. Source cards prefer media or territory permission quotes; the drawer retains every located quotation and rule result.
+
+The dashboard offers fixed, validated widget actions without a model. Phone dashboards stack widgets at full width and start with side panels closed; phone layout persistence uses a separate browser-storage key so a narrow view cannot overwrite a desktop arrangement. The optional live assistant retains the existing server-side free-model guard. The presentation does not change API contracts or the rules, approval, capture and payout boundaries.

@@ -85,6 +85,11 @@ export function SettlementPanel({ view, config, busy, actions }: { view: Session
         </div>
       </div>
 
+      <div className="desk-summary" aria-label="Settlement overview">
+        <div><span className="eyebrow">Approved purchase</span><strong>{total}</strong><p>{view.bundle?.offers.length} licences · exact bundle approval required</p></div>
+        <div><span className="eyebrow">Buyer payment</span><strong>{refunded ? "Refunded" : captured ? "Captured" : view.order ? "Awaiting buyer" : "Not started"}</strong><p>{simulated ? "Simulation only · no money moves" : "PayPal Sandbox · test money"}</p></div>
+        <div><span className="eyebrow">Creator outcomes</span><strong>{allPaid ? "All paid" : payoutsFailed ? "Needs attention" : captured ? "Review payout status" : "After capture"}</strong><p>Capture and creator settlement are separate. Pending outcomes must be reconciled before another submission.</p></div>
+      </div>
       {view.approval && (
         <p className={styles.approvedLine}>
           <BadgeCheck aria-hidden /> Approved by <b>{view.approval.approvedBy}</b> on {dateTimeText(view.approval.approvedAt)}. Bundle fingerprint <code className="mono">{shortHash(view.approval.bundleDigest, 12)}</code>

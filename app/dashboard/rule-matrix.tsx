@@ -56,7 +56,7 @@ function RuleMatrix(params: AgWidgetParams<MatrixDef>) {
   // Keep a DOM node while empty so Studio can finish mounting and deliver later refreshes.
   if (!matrix?.total) return <div aria-hidden />;
   return (
-    <div style={{ overflow: "auto", height: "100%", padding: 8, fontFamily: "var(--font-ui)", fontSize: 12.5 }}>
+    <div tabIndex={0} role="region" aria-label="Rule matrix scroll area" style={{ overflow: "auto", height: "100%", padding: 8, fontFamily: "var(--font-ui)", fontSize: 12.5 }}>
       <table style={{ borderCollapse: "separate", borderSpacing: 3, minWidth: "100%" }}>
         <caption style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)" }}>
           How many times each rule rejected each asset. {matrix.total} rejections in all.

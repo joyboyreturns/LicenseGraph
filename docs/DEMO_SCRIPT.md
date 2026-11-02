@@ -6,14 +6,16 @@ Record at 1920x1080 in a clean browser window (hide bookmarks, use the app's dar
 
 | Time | On screen | Say |
 |---|---|---|
-| 0:00 to 0:15 | Home page, hero | "Every project that uses music, images and fonts ends up with licences nobody has time to read, and the people who made the work get paid late. LicenseGraph fixes both." |
-| 0:15 to 0:35 | Click the Game launch trailer scenario | "Here's a game trailer: worldwide, two years, web, social and broadcast, three thousand dollars. Eight licences, three assets." |
-| 0:35 to 1:25 | Run theatre: replay. Pause on the first rejection, show the matrix, click an evidence quote | "This scenario replays recorded model output. The agent's extracted terms link to the source sentences; the rules engine checks the proposed bundle, rejects the invalid licences, and the agent revises. Three rounds later: verified." |
+| 0:00 to 0:15 | Home page, featured Neon Drift case | "Every project that uses music, images and fonts ends up with licences nobody has time to read, and the people who made the work get paid late. LicenseGraph fixes both." |
+| 0:15 to 0:35 | Press Explore the game trailer demo | "Here's a game trailer: worldwide, two years, web, social and broadcast, three thousand dollars. Eight licences, three assets." |
+| 0:35 to 1:25 | Run workbench: current decision, rights graph and timeline. Pause on a rejection, then use Source evidence to open a quotation | "This scenario replays recorded model output. The agent's extracted terms link to the source sentences; the rules engine checks the proposed bundle, rejects the invalid licences, and the agent revises. Three rounds later: verified." |
 | 1:25 to 1:45 | Compliance summary | "A price-only buyer would have bought three licences they couldn't use. The cost check independently proves the $2,170 minimum across the 18 possible bundles, with all rights requirements intact." |
 | 1:45 to 2:10 | Approve, create simulated order, simulator checkout, return | "A human approves exactly this bundle. This is the payment simulator: no money moves. The real integration also supports PayPal Sandbox." |
 | 2:10 to 2:30 | Simulated payouts settling, then the passport | "The simulator records a payout for each creator, and issues a Licence Passport." |
 | 2:30 to 2:45 | Passport verification animating | "Anyone can verify the record in their browser: the hash chain, rules, source quotes and simulated payment." |
-| 2:45 to 3:00 | Dashboard with the existing widgets | "The AG Studio dashboard brings the licences, rules and payments together. AI proposes. Code verifies. People approve." |
+| 2:45 to 3:00 | Dashboard: press What was rejected? in the Offline dashboard assistant | "The AG Studio dashboard brings the licences, rules and payments together. AI proposes. Code verifies. People approve." |
+
+The redesigned desk keeps the brief, current decision and next action together. Source cards precede approval; settlement separates buyer capture from creator outcomes. The passport summary distinguishes simulated payment, content verification and issuer signature. Do not skip the human name-and-approval step.
 
 ## Two beats worth swapping in for a live walk-through (no time for them in three minutes)
 - **What if the project changed?** On a verified run, type "only Canada for 6 months, no exclusivity" into the panel. The exact cheapest bundle re-prices in the browser, with which licence would change. No model is involved.
@@ -32,5 +34,5 @@ Use `docs/READINESS.md` to distinguish the checks already run from the release e
 
 - Run the scenario once beforehand so the first view is warm (the replay plays once on first open; use a fresh run for the video).
 - For the offline walkthrough, confirm the simulator label appears and all simulated payouts settle. No accounts or model calls are needed.
-- For a separate Sandbox recording, have the Sandbox buyer login ready and confirm creator payout line items show SUCCESS with Sandbox creator accounts. The dashboard assistant needs a configured free model; use the existing widgets for the offline walkthrough.
+- For a separate Sandbox recording, have the Sandbox buyer login ready and confirm creator payout line items show SUCCESS with Sandbox creator accounts. The optional live dashboard assistant needs a configured free model; the Offline dashboard assistant adds validated widgets without one.
 - Export at 1080p, upload to YouTube as Public, paste the link into Devpost.

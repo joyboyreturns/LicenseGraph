@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { StatusPills } from "@/src/ui/components/SiteHeader";
 
 export const metadata: Metadata = {
   title: "Portfolio",
@@ -6,5 +7,5 @@ export const metadata: Metadata = {
 };
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  return children;
+  return <><div className="container-wide" style={{ paddingBlock: 10, borderBottom: "1px solid var(--line)" }} aria-label="Dashboard environment"><StatusPills stacked /></div>{children}</>;
 }

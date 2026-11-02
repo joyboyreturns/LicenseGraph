@@ -475,3 +475,12 @@
     color: var(--muted);
   }
 }
+
+.panel { padding:clamp(18px,2.5vw,32px); }
+.panelHead { padding-bottom:20px; border-bottom:1px solid var(--line); }
+.steps { margin-top:24px; }
+.sStep { padding:18px 12px; border:1px solid var(--line); border-radius:6px; background:var(--surface-2); margin-bottom:12px; }
+.sStep[data-state="current"] { border-color:var(--engine-line); background:var(--engine-soft); }
+.sStep[data-state="failed"] { border-color:var(--bad-line); }
+.approveForm { padding:20px; background:var(--ok-soft); border:1px solid var(--ok-line); border-radius:6px; }
+@media(max-width:700px) { .panel :global(.desk-summary) { margin-inline:0; } }

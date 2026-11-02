@@ -63,7 +63,7 @@ export function DealLadder(params: AgWidgetParams<LadderDef>) {
   if (!ladders.length) return <div aria-hidden />;
 
   return (
-    <div style={{ overflow: "auto", height: "100%", padding: "10px 12px", fontFamily: "var(--font-ui)", fontSize: 12.5 }}>
+    <div tabIndex={0} role="region" aria-label="Deal ladder scroll area" style={{ overflow: "auto", height: "100%", padding: "10px 12px", fontFamily: "var(--font-ui)", fontSize: 12.5 }}>
       <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 14, minWidth: 420 }} aria-label="Negotiations, each as a ladder of totals">
         {ladders.map((l) => {
           const totals = l.steps.map((s) => s.total).filter((t): t is number => t !== null);

@@ -143,3 +143,9 @@
     display: none;
   }
 }
+
+.header { background:var(--surface); border-bottom:1px solid var(--line-strong); }
+.brand { border-right:1px solid var(--line); padding-right:24px; }
+.link { border-radius:4px; }
+.link[aria-current="page"] { background:var(--ok-soft); color:var(--ok); }
+@media(max-width:760px) { .brand { padding-right:12px; margin-right:0; } }

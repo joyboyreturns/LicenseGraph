@@ -23,7 +23,7 @@ for (const scheme of ["light", "dark"] as const) {
 
     test("the home page and the verify page have no automated accessibility violations", async ({ page }) => {
       await page.goto("/");
-      await expect(page.getByRole("heading", { name: /Four projects/ })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Explore the case library" })).toBeVisible();
       expect(await violations(page)).toEqual([]);
       await page.goto("/verify");
       await expect(page.locator("main")).toBeVisible();

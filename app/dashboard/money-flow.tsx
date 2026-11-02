@@ -78,7 +78,7 @@ export function MoneyFlow(params: AgWidgetParams<FlowDef>) {
   const xm = (xl + RIGHT_X) / 2;
 
   return (
-    <div style={{ overflow: "auto", height: "100%", padding: "10px 12px", fontFamily: "var(--font-ui)", fontSize: 12.5 }}>
+    <div tabIndex={0} role="region" aria-label="Money flow scroll area" style={{ overflow: "auto", height: "100%", padding: "10px 12px", fontFamily: "var(--font-ui)", fontSize: 12.5 }}>
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Where the ${dollars(flow.total)} went: ${flow.lines.map((l) => `${l.payee} ${dollars(l.amount)}`).join(", ")}`} style={{ width: "100%", maxHeight: "100%", minWidth: 420 }}>
         <rect x={LEFT} y={0} width={BAR} height={H} rx={4} fill="var(--ink)" opacity={0.8} />
         <text x={LEFT + BAR + 8} y={14} fill="var(--muted)" fontSize={12}>

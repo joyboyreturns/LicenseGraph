@@ -8,7 +8,7 @@ import { useConfig } from "../Providers";
 import { Spinner } from "../bits";
 import { useStartScenario } from "../useStartScenario";
 import { BriefWizard } from "./BriefWizard";
-import { HeroGraph } from "./HeroGraph";
+
 import { RecentRuns } from "./RecentRuns";
 import { ScenarioCards } from "./ScenarioCards";
 import type { ScenarioInfo } from "./types";
@@ -44,13 +44,13 @@ export function Home() {
         <div className={`container ${styles.heroGrid}`}>
           <div className={styles.heroText}>
             <p className={styles.kicker}>
-              <span className={styles.kickerDot} aria-hidden /> Rights and settlement for projects built on licensed work
+              <span className={styles.kickerDot} aria-hidden /> The creative rights clearance desk
             </p>
             <h1 className={styles.h1}>
-              AI moves at machine speed. <em>Creator rights and payments should too.</em>
+              Make your next release <em>rights-ready.</em>
             </h1>
             <p className={styles.lead}>
-              Find a licence bundle that fits your project, see the evidence behind each term, and check the result before you approve. A Licence Passport makes the purchase and creator payments independently verifiable.
+              Clear music, artwork and sound for one game trailer. Watch recorded proposals meet real rules, approve the exact verified bundle, and follow simulated payments into a shareable Licence Passport.
             </p>
             <div className={styles.ctas}>
               <button type="button" className="btn btn-primary btn-lg" onClick={() => start("game-trailer")} disabled={starting !== null}>
@@ -75,11 +75,22 @@ export function Home() {
             </ul>
           </div>
           <div className={styles.heroArt}>
-            <HeroGraph />
+            <article className={styles.caseFile} aria-labelledby="featured-case">
+              <div className={styles.caseTop}><span>CASE 01 / FEATURED DEMO</span><span>Recorded model output</span></div>
+              <div className={styles.caseArt} aria-hidden><span>NEON<br/>DRIFT<span className={styles.artSub}>WORLDWIDE LAUNCH / 24 MONTHS</span></span><div className={styles.orbit} /></div>
+              <div className={styles.caseBody}>
+                <p className="eyebrow">The assignment</p><h2 id="featured-case">Game launch trailer</h2>
+                <p>Three assets. Eight licence offers. One bundle that can actually ship.</p>
+                <div className={styles.caseAssets}><span>01 Music</span><span>02 Key art</span><span>03 Sound effects</span></div>
+                <ol className={styles.caseTrail}><li>Propose</li><li>Reject & revise</li><li>Verify</li><li>You approve</li></ol>
+                <div className={styles.caseBottom}><span>Web · Social · Broadcast TV</span><span>{simulated ? "Simulated payment" : payLabel}</span></div>
+              </div>
+            </article>
           </div>
         </div>
       </section>
 
+      <nav className={`container ${styles.jumpNav}`} aria-label="Start exploring"><a href="#how-title">01 The process</a><a href="#scenarios">02 Other cases</a><a href="#describe">03 Your project</a><Link href="/dashboard">04 Your workbench</Link></nav>
       <section className={`container ${styles.section}`} aria-labelledby="how-title">
         <div className={styles.sectionHead}>
           <p className="eyebrow">How it works</p>
@@ -108,9 +119,9 @@ export function Home() {
         <div className={styles.sectionHead}>
           <p className="eyebrow">Try it</p>
           <h2 id="scenarios-title" className="section-title">
-            Four projects, four ways the cheapest licence goes wrong
+            Explore the case library
           </h2>
-          <p className={styles.sectionLead}>Each scenario replays recorded model output. The rules engine checks it again and a person approves the result. {simulated ? "Payments are simulated; no money moves." : config?.paymentsMode === "paypal-sandbox" ? "Payments use PayPal Sandbox test accounts." : "Payment availability is shown above."}</p>
+          <p className={styles.sectionLead}>Start with the featured game trailer above, or explore another brief. Each scenario replays recorded model output. The rules engine checks it again and a person approves the result. {simulated ? "Payments are simulated; no money moves." : config?.paymentsMode === "paypal-sandbox" ? "Payments use PayPal Sandbox test accounts." : "Payment availability is shown above."}</p>
         </div>
         <ScenarioCards scenarios={scenarios} error={scenarioError} onStart={start} starting={starting} />
       </section>
