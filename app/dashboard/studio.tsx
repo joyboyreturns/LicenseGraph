@@ -5,6 +5,7 @@ import { AgStudio, AgStudioProvider } from "ag-studio-react";
 import { widgets, type StudioRegistry } from "./rule-matrix";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { SessionView } from "@/src/app-logic/session";
+import { dashboardSuggestions, type DashboardSuggestion } from "@/src/dashboard/suggestions";
 import { buildStudioData } from "@/src/dashboard/data";
 import { buildPortfolioData, PORTFOLIO_INITIAL_STATE } from "@/src/dashboard/portfolio";
 import { chatCompletionsAdapter } from "@/src/dashboard/llm-adapter";
@@ -151,11 +152,14 @@ export default function Studio(props: StudioProps) {
   // Studio reports its starting layout as soon as it loads. Only a layout that differs from that is worth keeping,
   // so someone who only looked at the dashboard does not get today's default frozen in their browser.
   const baseline = useRef<string | undefined>(undefined);
+  const currentState = useRef<AgReportState<StudioRegistry> | undefined>(undefined);
+  const [offlineMessage, setOfflineMessage] = useState("");
   useEffect(() => {
     baseline.current = undefined;
   }, [layoutVersion]);
   const onStateUpdated = useCallback(
     (e: { state: unknown }) => {
+      currentState.current = e.state as AgReportState<StudioRegistry>;
       const now = JSON.stringify(e.state);
       if (baseline.current === undefined) {
         baseline.current = now;
@@ -189,6 +193,19 @@ export default function Studio(props: StudioProps) {
     for (const source of def.sources) for (const f of source.fields) if (f.format === "currencyFormat") Object.assign(f, { formatOptions: { format: money } });
     return def;
   }, [props.portfolio, props.view]);
+  const addSuggestion = (suggestion: DashboardSuggestion) => {
+    const built = suggestion.build(catalogFrom(data));
+    if (!built.ok) {
+      setOfflineMessage(`Could not add ${suggestion.title}: ${built.errors.join(" ")}`);
+      return;
+    }
+    const state = currentState.current ?? startState ?? (isPortfolio ? PORTFOLIO_INITIAL_STATE : initialState);
+    const next = placeWidget(state as never, suggestion.title, built.widget, built.size).state;
+    saveState(window.localStorage, storageKey, next);
+    currentState.current = next as AgReportState<StudioRegistry>;
+    setOfflineMessage(`Added ${suggestion.title} below the existing widgets.`);
+    setLayoutVersion((v) => v + 1);
+  };
   // The assistant talks to our server route, which holds the gateway key and fixes the (free) model.
   const ai = useMemo<AgAiHarnessSetup | undefined>(() => {
     if (!assistant) return undefined;
@@ -276,6 +293,12 @@ export default function Studio(props: StudioProps) {
           </button>
         )}
       </div>
+      <section aria-label="Offline dashboard assistant" style={{ padding: "8px 16px" }}>
+        <strong>Offline dashboard assistant</strong>
+        <p className="small">Choose a fixed action to add a widget. No model or account is needed.{assistant ? " The live assistant is also available in the dashboard." : ""}</p>
+        <div className="row">{dashboardSuggestions(isPortfolio).map((suggestion) => <button type="button" className="btn btn-sm" key={suggestion.title} onClick={() => addSuggestion(suggestion)}>{suggestion.label}</button>)}</div>
+        <p role="status" className="small">{offlineMessage}</p>
+      </section>
       <AgStudio<StudioRegistry>
         key={layoutVersion}
         data={data as never}

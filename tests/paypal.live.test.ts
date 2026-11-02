@@ -16,14 +16,14 @@ describe.skipIf(!process.env.RUN_PAYPAL_SANDBOX)("PayPal Sandbox (live)", () => 
     const order = await client.createOrder({ amountCents: 500, currency: "USD", referenceId: "live-test", description: "live test", requestId: randomUUID() });
     expect(order.status).toBe("PAYER_ACTION_REQUIRED");
     expect(new URL(order.approveUrl).host).toBe("www.sandbox.paypal.com");
-  });
+  }, 30_000);
 
   it("returns the same order when a request is retried with the same key", async () => {
     const requestId = randomUUID();
     const args = { amountCents: 500, currency: "USD", referenceId: "live-test", description: "live test", requestId };
     const [a, b] = [await client.createOrder(args), await client.createOrder(args)];
     expect(b.id).toBe(a.id);
-  });
+  }, 30_000);
 
   it("goes from verified, approved bundle to a Sandbox order", async () => {
     const project: Project = { name: `live-${randomUUID().slice(0, 8)}`, commercial: true, territories: ["US"], termMonths: 12 };
@@ -50,5 +50,5 @@ describe.skipIf(!process.env.RUN_PAYPAL_SANDBOX)("PayPal Sandbox (live)", () => 
     // Two licences make an itemised order with a custom id: Sandbox must accept the line items and their total.
     const order = await startCheckout(client, { project, requiredAssetIds: ["song", "image"], bundle, approval: approve(bundle, "owner") });
     expect(order.id).toBeTruthy();
-  });
+  }, 30_000);
 });

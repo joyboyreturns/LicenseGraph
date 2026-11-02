@@ -57,7 +57,7 @@ function Dashboard() {
             <span className={`chip chip-sm tone-${phaseInfo(view.phase).tone}`}>{phaseInfo(view.phase).label}</span>
           </>
         )}
-        {assistant === false && view && <span className={styles.contextNote}>Assistant needs live mode</span>}
+        {assistant === false && view && <span className={styles.contextNote}>Offline assistant available</span>}
       </div>
       {error && (
         <div className="container" style={{ paddingTop: 32 }}>
@@ -74,7 +74,7 @@ function Dashboard() {
           <Studio view={view} assistant={assistant} />
         </div>
       )}
-      {view && assistant === false && <p className={`container ${styles.assistantNote}`}>The AI assistant needs live mode (a gateway key and a free model); demo mode shows the dashboard only.</p>}
+      {view && assistant === false && <p className={`container ${styles.assistantNote}`}>The offline assistant offers fixed dashboard actions without an account or model.</p>}
     </div>
   );
 }
@@ -94,7 +94,7 @@ function PortfolioStudio({ assistant }: { assistant: boolean | null }) {
         </Link>
         <span className={styles.contextName}>Portfolio dashboard</span>
         {views && <span className="chip chip-sm">{pluralise(views.length, "run")}</span>}
-        {assistant === false && <span className={styles.contextNote}>Assistant needs a gateway key</span>}
+        {assistant === false && <span className={styles.contextNote}>Offline assistant available</span>}
       </div>
       {error && (
         <div className="container" style={{ paddingTop: 32 }}>

@@ -27,7 +27,7 @@ export function StatusPills({ stacked = false }: { stacked?: boolean }) {
   const model =
     config.mode === "live"
       ? { label: "Live model", title: `A live model reads licences${config.model ? ` (${config.model})` : ""}. Built-in scenarios still replay recorded output.`, tone: "tone-agent" }
-      : { label: "Replayed demo", title: "No model is connected. Built-in scenarios replay recorded model output; the rules engine and payments run for real.", tone: "tone-neutral" };
+      : { label: "Replayed demo", title: "Built-in scenarios replay recorded model output. The rules engine checks the results; the payment mode is shown separately.", tone: "tone-neutral" };
   const PayIcon = pay.icon;
   return (
     <div className={`${styles.pills} ${stacked ? styles.pillsStacked : ""}`}>

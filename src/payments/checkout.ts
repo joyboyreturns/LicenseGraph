@@ -52,6 +52,10 @@ export async function startCheckout(
   if (!verdict.ok) throw new PaymentRefused("Bundle failed verification", verdict.violations);
 
   if (!approval) throw new PaymentRefused("Bundle has not been approved");
+  if (approval.digestVersion !== 2 || typeof approval.approvedBy !== "string" || !approval.approvedBy.trim() ||
+      typeof approval.approvedAt !== "string" || !Number.isFinite(Date.parse(approval.approvedAt))) {
+    throw new PaymentRefused("Bundle approval is invalid");
+  }
   const digest = bundleDigest(bundle);
   if (approval.bundleDigest !== digest) throw new PaymentRefused("Approval does not match this bundle");
 

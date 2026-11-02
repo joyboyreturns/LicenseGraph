@@ -27,6 +27,10 @@ test("a licence PDF is read in the browser and its text fills the licence box", 
   // A PDF that is only a picture is explained, not loaded as an empty licence.
   await chooser.setInputFiles({ name: "scan.pdf", mimeType: "application/pdf", buffer: Buffer.from(makePdf([[]])) });
   await expect(page.getByText(/no selectable text/)).toBeVisible({ timeout: 20_000 });
+  await chooser.setInputFiles({ name: "empty.txt", mimeType: "text/plain", buffer: Buffer.from("  ") });
+  await expect(page.getByText(/contains no readable text/)).toBeVisible();
+  await expect(box).toHaveValue(/Grant: The Licensee may use the Track/);
+  await expect(page.getByRole("button", { name: "Run the game trailer instead" })).toBeVisible();
   expect(uploads).toEqual([]);
   expect(errors).toEqual([]);
 });

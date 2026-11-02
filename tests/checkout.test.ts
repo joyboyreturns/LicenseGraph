@@ -3,17 +3,12 @@ import type { Bundle, LicenseOffer, Project } from "../src/core/types";
 import { approve, bundleDigest, PaymentRefused, startCheckout } from "../src/payments/checkout";
 import { paymentRequestId } from "../src/payments/request-id";
 
+import { offerWithEvidence } from "./support/offer";
+
 const project: Project = { name: "Promo film", commercial: true, territories: ["US"], termMonths: 12, budgetCents: 50_000 };
 
-const offer = (over: Partial<LicenseOffer> = {}): LicenseOffer => ({
-  id: "o1",
-  assetId: "song",
-  priceCents: 20_000,
-  currency: "USD",
-  terms: { commercialUse: true, territories: ["WORLD"], termMonths: 24 },
-  evidence: [{ documentId: "d1", quote: "Worldwide commercial use, 24 months." }],
-  ...over,
-});
+const offer = (over: Partial<LicenseOffer> = {}): LicenseOffer =>
+  offerWithEvidence("Worldwide commercial use, 24 months.", over);
 
 const good: Bundle = { offers: [offer()] };
 const created = { id: "ORD1", status: "PAYER_ACTION_REQUIRED", approveUrl: "https://pp/approve" };
@@ -22,6 +17,19 @@ const makeClient = () => ({ createOrder: vi.fn().mockResolvedValue(created) });
 const input = (bundle: Bundle, approval = approve(bundle, "owner")) => ({ project, requiredAssetIds: ["song"], bundle, approval });
 
 describe("startCheckout", () => {
+  it("refuses incomplete or legacy approval records before creating an order", async () => {
+    const client = makeClient();
+    const valid = approve(good, "owner");
+    for (const approval of [
+      { ...valid, approvedBy: "  " },
+      { ...valid, approvedAt: "invalid" },
+      { ...valid, digestVersion: undefined },
+    ]) {
+      await expect(startCheckout(client, input(good, approval))).rejects.toThrow("Bundle approval is invalid");
+    }
+    expect(client.createOrder).not.toHaveBeenCalled();
+  });
+
   it("creates an order for a verified, approved bundle", async () => {
     const client = makeClient();
     const order = await startCheckout(client, input(good));

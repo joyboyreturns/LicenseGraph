@@ -2,6 +2,10 @@
 
 Checked on 29 October 2026 against the working tree based on revision `c26b30d`, including the assistant corrections delivered with this update. This report separates repeatable offline verification from provider checks and release work. Passing tests demonstrate the cases below; they do not establish that licence interpretations are legally correct or guarantee a competition result.
 
+## Sandbox follow-up, 2 November 2026
+
+A human approved the documentary bundle and the buyer approved its itemised PayPal Sandbox order. PayPal reported a completed USD 329.00 capture; all three creator payout items reported SUCCESS. The issued passport passed all nine server verification checks and its signature was valid. This was a test-money transaction on a local instance; it does not verify a deployed webhook or the future judging environment. A bounded live proposer request and a single-attempt photo extraction also passed after the gateway's free-price check.
+
 ## Current verification evidence
 
 | Check | Result and scope |
@@ -67,7 +71,7 @@ The implemented offline journeys pass. The following are not satisfied by those 
 
 - [x] Hosting choice confirmed by the owner: home Ubuntu server with Tailscale Funnel.
 - [ ] Deploy and verify the final judging address after 5 November 2026, as requested by the owner. This audit does not publish infrastructure.
-- [ ] Record a buyer approving an order from the current application on PayPal Sandbox; verify capture and each creator's individual SUCCESS receipt. The earlier capture milestone is recorded in `docs/PLAN.md`, but is not a new end-to-end check of the updated payout flow.
+- [x] Complete a local buyer-approved PayPal Sandbox purchase and verify capture and each creator payout status (2 November; see follow-up above). Record a separate video if needed for the submission.
 - [ ] Register the deployed Sandbox webhook and verify a genuine provider delivery, including the return-page-independent capture path.
 - [ ] Obtain/set the dashboard trial key before the production build, and verify its validity through judging. A key was not configured in this checkout during the audit.
 - [x] Verify a locally rendered dashboard-assistant response using the approved fixture-only payload and configured free model (two calls).

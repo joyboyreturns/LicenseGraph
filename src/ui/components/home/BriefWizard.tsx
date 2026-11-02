@@ -147,7 +147,16 @@ export function BriefWizard({ scenarios, onStartScenario, starting }: { scenario
         return;
       }
     } else {
-      full = await file.text();
+      try {
+        full = await file.text();
+      } catch {
+        setProblems([`${file.name} could not be read. Try another file or paste the licence text.`]);
+        return;
+      }
+    }
+    if (!full.trim()) {
+      setProblems([`${file.name} contains no readable text. Try a text-based PDF or paste the licence text.`]);
+      return;
     }
     if (full.length > MAX_DOC) notes.push(`${file.name} is longer than ${MAX_DOC.toLocaleString()} characters; only the start was kept. Check that the terms you need are in it.`);
     setProblems(notes);
@@ -461,7 +470,7 @@ export function BriefWizard({ scenarios, onStartScenario, starting }: { scenario
           {noModel && !runError && (
             <p className="callout tone-warn">
               <AlertTriangle aria-hidden />
-              <span>This server has no model connected, so it cannot read your own licences yet; the server will say so when you run. The built-in scenarios work without one.</span>
+              <span>This server has no model connected, so it cannot read your own licences yet. The recorded scenarios work without one. <button type="button" className="btn btn-sm" onClick={() => onStartScenario("game-trailer")} disabled={starting !== null}>Run the game trailer instead</button></span>
             </p>
           )}
           {problems.length > 0 && (

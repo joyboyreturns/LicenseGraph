@@ -1,6 +1,24 @@
 import { expect, test } from "@playwright/test";
 import { startScenario } from "./helpers";
 
+test("the home page explains the free demo and starts the recommended game scenario", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByText("No account or real payment needed")).toBeVisible();
+  await expect(page.getByText("Payments are simulated; no money moves.")).toBeVisible();
+  await page.getByRole("button", { name: "Explore the game trailer demo" }).click();
+  await expect(page).toHaveURL(/\/run\//);
+  await expect(page.getByText("SCENARIO · GAME LAUNCH TRAILER")).toBeVisible();
+});
+
+test("a run refreshes when the viewer returns after approval in another tab", async ({ page }) => {
+  const url = await startScenario(page, "Documentary promo");
+  const id = new URL(url).pathname.split("/").pop();
+  const approved = await page.request.post(`/api/sessions/${id}/approve`, { data: { approvedBy: "Judge" } });
+  expect(approved.ok()).toBe(true);
+  await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+  await expect(page.getByRole("button", { name: /Create the order/ }).first()).toBeVisible();
+});
+
 test("a plain-English brief is read, and assumptions are shown separately from what the text said", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));

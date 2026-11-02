@@ -2,17 +2,12 @@ import { describe, expect, it } from "vitest";
 import { verifyBundle } from "../src/core/rules";
 import type { LicenseOffer, Project } from "../src/core/types";
 
+import { offerWithEvidence } from "./support/offer";
+
 const project: Project = { name: "Promo film", commercial: true, territories: ["US", "IN"], termMonths: 12, budgetCents: 50_000 };
 
-const offer = (over: Partial<LicenseOffer> = {}): LicenseOffer => ({
-  id: "o1",
-  assetId: "song",
-  priceCents: 20_000,
-  currency: "USD",
-  terms: { commercialUse: true, territories: ["WORLD"], termMonths: 24 },
-  evidence: [{ documentId: "d1", quote: "Licensed worldwide for commercial use for 24 months." }],
-  ...over,
-});
+const offer = (over: Partial<LicenseOffer> = {}): LicenseOffer =>
+  offerWithEvidence("Licensed worldwide for commercial use for 24 months.", over);
 
 describe("verifyBundle", () => {
   it("accepts a compliant bundle", () => {

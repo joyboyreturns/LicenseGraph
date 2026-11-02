@@ -106,5 +106,14 @@ export function useSession(id: string) {
     }
   }, [fetchOnce, schedule]);
 
+  // Another tab or the PayPal return can advance the same run while this page is idle.
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") void refresh();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, [refresh]);
+
   return { load, accept, refresh, transientError };
 }

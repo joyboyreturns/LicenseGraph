@@ -34,7 +34,8 @@ export function Home() {
       .catch((e: Error) => setScenarioError(e.message));
   }, []);
 
-  const payLabel = config?.paymentsMode === "simulator" ? "Settled on a labelled payment simulator" : "Settled on the PayPal Sandbox";
+  const simulated = config?.paymentsMode === "simulator";
+  const payLabel = simulated ? "No account or real payment needed" : config?.paymentsMode === "paypal-sandbox" ? "PayPal Sandbox · test money only" : "Payment mode shown above";
 
   return (
     <>
@@ -49,17 +50,15 @@ export function Home() {
               AI moves at machine speed. <em>Creator rights and payments should too.</em>
             </h1>
             <p className={styles.lead}>
-              An AI agent reads every licence and proposes the cheapest bundle. A deterministic rules engine verifies it against your project and rejects anything that breaks a term. You approve, PayPal pays the creators, and a Licence Passport lets anyone check the result.
+              Find a licence bundle that fits your project, see the evidence behind each term, and check the result before you approve. A Licence Passport makes the purchase and creator payments independently verifiable.
             </p>
             <div className={styles.ctas}>
-              <button type="button" className="btn btn-primary btn-lg" onClick={() => start("documentary")} disabled={starting !== null}>
-                {starting === "documentary" ? <Spinner label="Starting" /> : <Play aria-hidden />}
-                Run the 60-second demo
+              <button type="button" className="btn btn-primary btn-lg" onClick={() => start("game-trailer")} disabled={starting !== null}>
+                {starting === "game-trailer" ? <Spinner label="Starting" /> : <Play aria-hidden />}
+                Explore the game trailer demo
               </button>
-              <a href="#describe" className="btn btn-lg">
-                Describe your project <ArrowRight aria-hidden />
-              </a>
             </div>
+            <p className="small ink-2">Follow recorded proposals through rejection and verification, then approve the bundle yourself. {simulated ? "Payment is simulated; no money moves." : "Payment mode is shown above."}</p>
             <p className="small ink-2" style={{ margin: "14px 0 0" }}>
               New here? <Link prefetch={false} href="/tour">Take the ten-minute tour</Link>: seven things to try, and what to look for in each.
             </p>
@@ -85,7 +84,7 @@ export function Home() {
         <div className={styles.sectionHead}>
           <p className="eyebrow">How it works</p>
           <h2 id="how-title" className="section-title">
-            The model proposes. Code decides. People approve. PayPal pays.
+            The model proposes. Code decides. People approve.
           </h2>
         </div>
         <ol className={styles.stages}>
@@ -98,8 +97,8 @@ export function Home() {
                 <span className={styles.stageNum}>0{n}</span>
               </span>
               <h3 className={styles.stageTitle}>{title}</h3>
-              <p className={styles.stageText}>{text}</p>
-              <span className={styles.stageActor}>{actor}</span>
+              <p className={styles.stageText}>{n === 5 && simulated ? "The simulator records the capture and creator payouts. A Licence Passport records the result." : text}</p>
+              <span className={styles.stageActor}>{n === 5 && simulated ? "Payment simulator" : actor}</span>
             </li>
           ))}
         </ol>
@@ -111,7 +110,7 @@ export function Home() {
           <h2 id="scenarios-title" className="section-title">
             Four projects, four ways the cheapest licence goes wrong
           </h2>
-          <p className={styles.sectionLead}>Each scenario replays recorded model output, so it is instant and repeatable. The rules engine, approval and payment steps run for real.</p>
+          <p className={styles.sectionLead}>Each scenario replays recorded model output. The rules engine checks it again and a person approves the result. {simulated ? "Payments are simulated; no money moves." : config?.paymentsMode === "paypal-sandbox" ? "Payments use PayPal Sandbox test accounts." : "Payment availability is shown above."}</p>
         </div>
         <ScenarioCards scenarios={scenarios} error={scenarioError} onStart={start} starting={starting} />
       </section>
@@ -134,7 +133,7 @@ export function Home() {
             <h2 id="agents-title" className="section-title">
               Agents can shop. Only people can spend.
             </h2>
-            <p className={styles.sectionLead}>Any AI agent can connect over the Model Context Protocol to check licences, find the exact cheapest bundle and start a purchase. Approval and payment need a person with the claim link, and PayPal moves the money.</p>
+            <p className={styles.sectionLead}>Any AI agent can connect over the Model Context Protocol to check licences, find the exact cheapest bundle and start a purchase. Approval and payment need a person with the claim link.</p>
           </div>
           <Link prefetch={false} href="/agents" className="btn btn-primary btn-lg">
             Connect an agent <ArrowRight aria-hidden />

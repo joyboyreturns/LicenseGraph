@@ -44,3 +44,17 @@ test("the dashboard assistant executes a validated tool, renders the widget and 
   expect(calls).toBe(2);
   expect(errors).toEqual([]);
 });
+
+test("offline suggestions add a widget and retain it after reload", async ({ page }) => {
+  const { id } = await (await page.request.post("/api/sessions", { data: { scenarioId: "game-trailer" } })).json();
+  await page.goto(`/dashboard?session=${id}`);
+  await page.getByRole("table", { name: /How many times each rule rejected each asset/ }).waitFor();
+  await page.getByRole("button", { name: "What was rejected?" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Added Rule violations" })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => {
+    const raw = localStorage.getItem("licensegraph.studio.run.v1");
+    return raw ? JSON.parse(raw).pages.some((p: { widgets: Record<string, { format?: { title?: { text?: string } } }> }) => Object.values(p.widgets).some((w) => w.format?.title?.text === "Rule violations")) : false;
+  })).toBe(true);
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Reset to the original layout" })).toBeVisible();
+});

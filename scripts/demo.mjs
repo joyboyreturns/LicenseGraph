@@ -8,6 +8,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { existsSync, rmSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { demoEnvironment } from "./demo-env.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
@@ -36,20 +37,7 @@ if (needsBuild) {
 if (flag("build-only")) process.exit(0);
 
 // Empty values override any .env on this machine, so the demo never touches real accounts or models.
-const env = {
-  ...process.env,
-  LICENSEGRAPH_MODE: "demo",
-  LICENSEGRAPH_PAYMENTS: "simulator",
-  AI_GATEWAY_API_KEY: "",
-  LICENSEGRAPH_MODEL: "",
-  PAYPAL_CLIENT_ID: "",
-  PAYPAL_CLIENT_SECRET: "",
-  LICENSEGRAPH_DATA_DIR: dataDir,
-  // Offline demo passports are signed too, with a key anyone can read here: it proves the mechanism, not an issuer.
-  LICENSEGRAPH_PASSPORT_SECRET: process.env.LICENSEGRAPH_PASSPORT_SECRET || "licensegraph-offline-demo-secret",
-  APP_URL: process.env.APP_URL ?? `http://localhost:${port}`,
-  ...(flag("fail-first-payout") ? { LICENSEGRAPH_SIMULATOR_FAIL_FIRST_PAYOUT: "1" } : {}),
-};
+const env = demoEnvironment(process.env, { dataDir, port, failFirstPayout: flag("fail-first-payout") });
 
 console.log(`LicenseGraph demo: ${env.APP_URL}  (offline: replayed scenarios, payment simulator, no money moves)`);
 const server = spawn(process.execPath, [next, "start", "-p", port], { cwd: root, env, stdio: "inherit" });
