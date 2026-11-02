@@ -2,11 +2,12 @@
 
 import { AlertTriangle, ArrowLeft, ArrowRight, Check, CircleAlert, FileUp, Plus, Sparkles, Trash2, Wand2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type { SessionView } from "@/src/app-logic/session";
 import type { Project } from "@/src/core/types";
 import type { BriefResult } from "@/src/intake/brief";
 import { api, errorMessage } from "@/src/ui/lib/api";
+import { projectFromDraft, type ProjectDraft as Draft } from "@/src/ui/lib/project-draft";
 import { assetLabel, mediumName } from "@/src/ui/lib/format";
 import { useConfig } from "../Providers";
 import { AssetIcon, Spinner } from "../bits";
@@ -32,18 +33,6 @@ interface DocDraft {
   fileName?: string;
 }
 
-interface Draft {
-  name: string;
-  commercial: boolean;
-  worldwide: boolean;
-  territories: string;
-  termMonths: string;
-  budget: string;
-  mediums: string[];
-  cannotCredit: boolean;
-  needsSublicensing: boolean;
-  requiresExclusive: boolean;
-}
 
 function draftFrom(p: Project): Draft {
   const world = p.territories.includes("WORLD");
@@ -81,6 +70,12 @@ export function BriefWizard({ scenarios, onStartScenario, starting }: { scenario
   const [running, setRunning] = useState(false);
   const [runError, setRunError] = useState<string | null>(null);
   const [problems, setProblems] = useState<string[]>([]);
+  const requirementsError = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (step !== 2 || !problems.length) return;
+    requirementsError.current?.focus({ preventScroll: true });
+    requirementsError.current?.scrollIntoView({ block: "center" });
+  }, [step, problems]);
 
   const read = async () => {
     setReading(true);
@@ -99,7 +94,10 @@ export function BriefWizard({ scenarios, onStartScenario, starting }: { scenario
     }
   };
 
-  const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setDraft((d) => (d ? { ...d, [k]: v } : d));
+  const set = <K extends keyof Draft>(k: K, v: Draft[K]) => {
+    setProblems([]);
+    setDraft((d) => (d ? { ...d, [k]: v } : d));
+  };
 
   const toggleAsset = (a: string) => {
     setAssets((list) => (list.includes(a) ? list.filter((x) => x !== a) : [...list, a]));
@@ -111,6 +109,12 @@ export function BriefWizard({ scenarios, onStartScenario, starting }: { scenario
   };
 
   const goLicences = () => {
+    if (!draft) return;
+    const checked = projectFromDraft(draft);
+    const issues = checked.ok ? [] : checked.problems;
+    if (!assets.length) issues.push("Choose at least one asset the project needs.");
+    setProblems(issues);
+    if (issues.length) return;
     // Make sure every asset has at least one licence slot.
     setDocs((d) => {
       const kept = d.filter((x) => assets.includes(x.assetId));
@@ -182,32 +186,17 @@ export function BriefWizard({ scenarios, onStartScenario, starting }: { scenario
 
   const submit = async () => {
     if (!draft) return;
-    const issues: string[] = [];
-    const term = Number(draft.termMonths);
-    const territories = draft.worldwide ? ["WORLD"] : draft.territories.split(/[,\s]+/).map((t) => t.trim().toUpperCase()).filter(Boolean);
-    if (!draft.name.trim()) issues.push("Give the project a name.");
-    if (!territories.length) issues.push("Choose worldwide or list at least one country code.");
-    if (!Number.isInteger(term) || term <= 0) issues.push("The term must be a whole number of months.");
+    const checked = projectFromDraft(draft);
+    const issues = checked.ok ? [] : [...checked.problems];
     if (!assets.length) issues.push("Choose at least one asset the project needs.");
     for (const a of assets) if (!docs.some((d) => d.assetId === a && d.text.trim())) issues.push(`Add licence text for the ${assetLabel(a).toLowerCase()}.`);
-    if (draft.budget.trim() && !(Number(draft.budget) > 0)) issues.push("The budget must be a positive number, or left empty.");
     setProblems(issues);
-    if (issues.length) return;
+    if (issues.length || !checked.ok) return;
 
     setRunning(true);
     setRunError(null);
     try {
-      const project: Project = {
-        name: draft.name.trim(),
-        commercial: draft.commercial,
-        territories,
-        termMonths: term,
-        budgetCents: draft.budget.trim() ? Math.round(Number(draft.budget) * 100) : undefined,
-        mediums: draft.mediums.length ? draft.mediums : undefined,
-        canCredit: draft.cannotCredit ? false : undefined,
-        needsSublicensing: draft.needsSublicensing || undefined,
-        requiresExclusive: draft.requiresExclusive || undefined,
-      };
+      const project = checked.project;
       const documents = docs
         .filter((d) => assets.includes(d.assetId) && d.text.trim())
         .map((d, i) => ({ id: `doc-${i + 1}-${d.assetId}`, assetId: d.assetId, text: d.text, licensor: licensorOf(d) }));
@@ -310,6 +299,16 @@ export function BriefWizard({ scenarios, onStartScenario, starting }: { scenario
             <Sparkles aria-hidden /> {intake.source === "model" ? "Read by the model, checked against the offline reader." : "Read by the offline reader (rules of thumb, no model). Check every field."}
           </p>
 
+          {problems.length > 0 && (
+            <div ref={requirementsError} tabIndex={-1} className="callout tone-bad" role="alert">
+              <CircleAlert aria-hidden />
+              <ul className={styles.problems}>
+                {problems.map((p) => (
+                  <li key={p}>{p}</li>
+                ))}
+              </ul>
+            </div>
+          )}
           <div className={styles.grid}>
             <div className={styles.full}>
               <label className="label" htmlFor={`${ids}-name`}>
@@ -318,12 +317,18 @@ export function BriefWizard({ scenarios, onStartScenario, starting }: { scenario
               <input id={`${ids}-name`} className="input" value={draft.name} maxLength={120} onChange={(e) => set("name", e.target.value)} />
             </div>
             <fieldset className={styles.fieldset}>
-              <legend className="label">Use</legend>
-              <div className={styles.segment} role="radiogroup">
-                <button type="button" role="radio" aria-checked={draft.commercial} onClick={() => set("commercial", true)}>
+              <legend id={`${ids}-use`} className="label">Use</legend>
+              <div className={styles.segment} role="radiogroup" aria-labelledby={`${ids}-use`} onKeyDown={(e) => {
+                if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(e.key)) return;
+                e.preventDefault();
+                const nextCommercial = e.key === "Home" ? true : e.key === "End" ? false : !draft.commercial;
+                set("commercial", nextCommercial);
+                e.currentTarget.querySelectorAll("button")[nextCommercial ? 0 : 1]?.focus();
+              }}>
+                <button type="button" role="radio" tabIndex={draft.commercial ? 0 : -1} aria-checked={draft.commercial} onClick={() => set("commercial", true)}>
                   Commercial
                 </button>
-                <button type="button" role="radio" aria-checked={!draft.commercial} onClick={() => set("commercial", false)}>
+                <button type="button" role="radio" tabIndex={draft.commercial ? -1 : 0} aria-checked={!draft.commercial} onClick={() => set("commercial", false)}>
                   Non-commercial
                 </button>
               </div>
@@ -332,13 +337,13 @@ export function BriefWizard({ scenarios, onStartScenario, starting }: { scenario
               <label className="label" htmlFor={`${ids}-term`}>
                 Term (months)
               </label>
-              <input id={`${ids}-term`} className="input" inputMode="numeric" value={draft.termMonths} onChange={(e) => set("termMonths", e.target.value.replace(/[^\d]/g, ""))} />
+              <input id={`${ids}-term`} className="input" inputMode="numeric" value={draft.termMonths} maxLength={8} onChange={(e) => set("termMonths", e.target.value)} />
             </div>
             <div>
               <label className="label" htmlFor={`${ids}-budget`}>
                 Budget (USD, optional)
               </label>
-              <input id={`${ids}-budget`} className="input" inputMode="decimal" placeholder="No budget" value={draft.budget} onChange={(e) => set("budget", e.target.value.replace(/[^\d.]/g, ""))} />
+              <input id={`${ids}-budget`} className="input" inputMode="decimal" placeholder="No budget" value={draft.budget} maxLength={32} onChange={(e) => set("budget", e.target.value)} />
             </div>
             <div className={styles.full}>
               <span className="label" id={`${ids}-terr`}>

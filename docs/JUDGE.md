@@ -24,7 +24,7 @@ This launcher overrides any local model/payment credentials. Built-in scenarios 
 ## Further exploration and recovery
 
 - Other scenarios remain in the case library. **Exclusive theme tune** demonstrates refusal and negotiation. **Work the alternatives** on each run contains questions, history, negotiation and what-if tools.
-- Custom intake: describe a project, inspect found versus assumed requirements, then add text or a text-based PDF. Review loaded text and later extracted evidence. Unsupported, empty and unreadable files show recovery guidance and preserve the previous text. Scanned PDFs require transcription; OCR is not provided.
+- Custom intake: describe a project, inspect found versus assumed requirements, then add text or a text-based PDF. Requirements are validated before the file step. Enter USD budgets with at most two decimal places; malformed input is kept for correction, and errors receive focus. The use selector supports arrow keys and Home/End. Review loaded text and later extracted evidence. Unsupported, empty and unreadable files show recovery guidance and preserve the previous text. Scanned PDFs require transcription; OCR is not provided.
 - Without live extraction, use **Use the recorded game trailer**. The brief reader and recorded journeys remain usable offline.
 - A pending or ambiguous payout is not permission to send another batch. Inspect individual outcomes and reconcile first. To demonstrate a certain failed submission and its explicit retry, use `npm run demo -- --port 3401 --data-dir .data-demo-failure --fail-first-payout`. Capture stays recorded when payouts fail.
 - A shared link is readable, but only the creating browser can approve or pay. Keep the same browser for the primary journey. Signing in is unnecessary.

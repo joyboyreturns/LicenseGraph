@@ -134,3 +134,20 @@ describe("parseBrief with a model", () => {
     expect((await parseBrief(text)).source).toBe("local");
   });
 });
+
+describe("promoted products and distribution media", () => {
+  it.each([
+    'Launch trailer for our game "Neon Drift", for web, social and broadcast TV.',
+    'A game launch trailer for web, social and TV.',
+    'A mobile game trailer for web, social and TV.',
+    'A trailer for our mobile app, for web, social and TV.',
+  ])("does not treat the promoted product as an extra distribution medium: %s", (brief) => {
+    expect(p(brief).mediums).toEqual(["web", "broadcast", "social"]);
+  });
+
+  it("keeps explicit in-game and app use even when the project also has a trailer", () => {
+    expect(p('In-game music with a trailer for web.').mediums).toContain("app");
+    expect(p('A trailer for our game, for web, also embedded in our mobile app.').mediums).toContain("app");
+    expect(p('Music for our game.').mediums).toContain("app");
+  });
+});

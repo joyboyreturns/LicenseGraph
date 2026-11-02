@@ -33,18 +33,19 @@ export function useSession(id: string) {
   const failures = useRef(0);
 
   const fetchOnce = useCallback(async (): Promise<SessionView | null> => {
+    clearTimeout(timer.current);
     controller.current?.abort();
     const c = new AbortController();
     controller.current = c;
     try {
       const view = await api<SessionView>(`/api/sessions/${encodeURIComponent(id)}`, { signal: c.signal });
-      if (!alive.current) return null;
+      if (!alive.current || c.signal.aborted) return null;
       failures.current = 0;
       setTransientError(null);
       setLoad({ status: "ready", view });
       return view;
     } catch (e) {
-      if (!alive.current || (e instanceof DOMException && e.name === "AbortError")) return null;
+      if (!alive.current || c.signal.aborted || (e instanceof DOMException && e.name === "AbortError")) return null;
       if (e instanceof ApiError && e.status === 404) {
         setLoad({ status: "not-found" });
         return null;
@@ -66,7 +67,7 @@ export function useSession(id: string) {
       timer.current = setTimeout(async () => {
         try {
           const next = await fetchOnce();
-          schedule(next);
+          if (next) schedule(next);
         } catch {
           schedule(null, true);
         }
@@ -79,7 +80,7 @@ export function useSession(id: string) {
     alive.current = true;
     setLoad({ status: "loading" });
     fetchOnce()
-      .then((v) => schedule(v))
+      .then((v) => { if (v) schedule(v); })
       .catch(() => schedule(null, true));
     return () => {
       alive.current = false;
@@ -91,6 +92,12 @@ export function useSession(id: string) {
   /** Use the view an action returned, and resume polling if it now has something pending. */
   const accept = useCallback(
     (view: SessionView) => {
+      // An in-flight GET can describe the state before this approval or payment completed.
+      // Invalidate it so neither its response nor its retry can replace the accepted action.
+      controller.current?.abort();
+      controller.current = null;
+      failures.current = 0;
+      setTransientError(null);
       setLoad({ status: "ready", view });
       schedule(view);
     },
@@ -100,7 +107,7 @@ export function useSession(id: string) {
   const refresh = useCallback(async () => {
     try {
       const v = await fetchOnce();
-      schedule(v);
+      if (v) schedule(v);
     } catch {
       schedule(null, true);
     }

@@ -203,7 +203,7 @@ npm run test:gateway   # live extraction; defaults to up to 3 attempts per fixtu
 npm run test:proposer  # one live proposal, free-model guard required
 ```
 
-The latest full audit passed **771 unit/property/API tests** and **73 browser journeys**, with **27 credential-dependent tests skipped** in the offline suite. Three real Sandbox order tests also passed separately; they do not cover buyer approval, capture or creator settlement. A separate, approved local live-assistant check created and saved a KPI in two free-model calls. A broader live extraction check passed 16 fixtures before a provider timeout stopped it; live reliability is still a recording/release check. See [the dated readiness report](docs/READINESS.md) for the exact scope and live-check results.
+The latest full audit passed **807 unit/property/API tests** and **76 browser journeys**, with **27 credential-dependent tests skipped** in the offline suite. Three real Sandbox order tests also passed separately; they do not cover buyer approval, capture or creator settlement. A separate, approved local live-assistant check created and saved a KPI in two free-model calls. A broader live extraction check passed 16 fixtures before a provider timeout stopped it; live reliability is still a recording/release check. See [the dated readiness report](docs/READINESS.md) for the exact scope and live-check results.
 
 The suite covers the rules, the payment gate, payouts and their failure and retry, ledger and passport tamper detection (forged prices, terms, quotes, capture ids, edited ledger events), persistence, API routes and run ownership, the offline simulator, a check that browser-bound modules never import Node code, and full browser journeys including the mobile layout.
 

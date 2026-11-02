@@ -47,7 +47,13 @@ export function placesIn(text: string): string[] {
 
 /** Media a text mentions. */
 export function mediaIn(text: string): string[] {
-  return [...new Set(MEDIA.filter(([re]) => re.test(text)).map(([, m]) => m))];
+  // A trailer promotes a game or app; that does not imply permission to embed its assets in one.
+  // Remove only explicit promotion phrases, retaining separate in-game or app distribution cues.
+  const promotion = String.raw`(?:trailers?|teasers?|promos?|ads?|advertisements?|campaigns?)`;
+  const distribution = text
+    .replace(new RegExp(String.raw`\b${promotion}\s+for\s+(?:(?:our|my|the|a|an)\s+)?(?:mobile\s+)?(?:apps?|games?)\b`, "gi"), " ")
+    .replace(new RegExp(String.raw`(?<![\w-])(?:mobile\s+)?(?:apps?|games?)\s+(?:launch\s+)?${promotion}\b`, "gi"), " ");
+  return [...new Set(MEDIA.filter(([re, medium]) => re.test(medium === "app" ? distribution : text)).map(([, m]) => m))];
 }
 
 /** "non-exclusive", "not exclusive" and "don't need exclusivity" say the opposite of requiring it; this removes them. */

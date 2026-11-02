@@ -2,6 +2,18 @@
 
 Latest local workbench verification: 2 November 2026. Earlier audit and provider evidence from 29 October 2026, based on revision `c26b30d`, is retained below. This report separates repeatable offline verification from provider checks and release work. Passing tests demonstrate the cases below; they do not establish that licence interpretations are legally correct or guarantee a competition result.
 
+## Reliability follow-up, 2 November 2026
+
+Three additional regressions were reproduced against the earlier production build, then fixed:
+
+- A delayed run refresh could replace the UI's newly approved state with an older verified snapshot. Accepting an approval or payment response now aborts superseded reads; aborted reads cannot publish an old state or cancel the new state's polling schedule. The server approval/payment gates are unchanged.
+- The offline brief reader treated a trailer **for** a game or app as requiring rights **inside** that product. It now separates explicit promotion phrases from distribution media while retaining separately stated in-game or app use. The custom Neon Drift example selects web, social and broadcast without adding app distribution.
+- Custom intake stripped characters from budget and term input and delayed validation until file intake. It now preserves the entered text, validates requirements before the licence step and again on submission, and converts decimal budgets to exact integer cents without rounding. Invalid syntax, fractional/oversized terms and unsafe cent values are refused. Country aliases are normalized consistently, and zero-dollar budget limits remain representable. The use selector supports arrow keys and Home/End; requirements errors receive focus and scroll into view on phones.
+
+Validation: `npm install` passed; `npm test` passed **807 tests** with **27 credential-dependent skips**; `npm run typecheck` and the production build passed. The complete offline browser suite passed **76 tests**. A final production rebuild and focused browser run passed all **3 reliability tests**, including the subsequent phone error-summary focus change and automated accessibility scan. Tests are in `tests/brief.test.ts`, `tests/ui/project-draft.test.ts` and `tests/e2e/reliability.spec.ts`; the browser test confirms that a USD 0.29 budget is submitted as exactly 29 cents and that invalid input stays editable. Intake validation was also inspected at 1440px/390px in light/dark themes without horizontal overflow.
+
+No API contracts, core verifier rules, evidence requirements, model pricing guards or payment boundaries changed. No live model or payment requests were made. The previous workbench commit also passed [GitHub CI](https://github.com/joyboyreturns/LicenseGraph/actions/runs/41450689170); that remote result predates this follow-up.
+
 ## Clearance workbench refresh, 2 November 2026
 
 This refresh makes the recorded game trailer the primary judge journey. Home, the run, portfolio/dashboard, custom intake, settlement, checkout and passport now share a teal-and-paper visual system. The run leads with the current decision and project brief, source quotation cards precede approval, and optional exploration follows the purchase decision. Buyer capture and individual creator outcomes remain separate. The passport leads with the purchase, environment and independent content checks.
