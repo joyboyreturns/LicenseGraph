@@ -62,6 +62,7 @@ export const Res = {
   StaffQueue: named("StaffQueue", z.object({
     licensors: z.array(z.looseObject({ id: uuid, version: z.number().int(), status: z.string(), recipientConfirmed: z.boolean() })), offers: z.array(QueuedOffer), disputes: z.array(z.looseObject({ id: uuid, runId: uuid, status: z.string() })),
     operations: z.array(z.looseObject({ id: uuid, kind: z.string(), status: z.literal("reconcile") })),
+    webhooks: z.array(z.object({ eventId: z.string(), status: z.enum(["queued", "reconcile"]), attempts: z.number().int(), receivedAt: z.string(), lastAttemptAt: z.string().nullable() })),
   })),
   DisputeResolved: named("DisputeResolved", z.object({ id: uuid, status: z.string(), operation: Operation.optional() })),
   Reconciled: named("Reconciled", z.object({ id: uuid, status: z.literal("succeeded"), runId: uuid })),

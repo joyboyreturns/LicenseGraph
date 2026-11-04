@@ -42,6 +42,15 @@ openssl rand -hex 32                   # paste into LICENSEGRAPH_PASSPORT_SECRET
 
 ## 3. Run it as a service
 
+The quickest way on a home server is the installer, which needs no root and is safe to run again (it keeps your data and settings):
+
+```bash
+scp release.tar.gz you@server:/tmp/
+ssh you@server 'bash -s' < deploy/install-home-server.sh /tmp/release.tar.gz 3110
+```
+
+It picks Node 22 if present, writes a user service with a 256 MB memory ceiling bound to `127.0.0.1`, creates `~/.config/licensegraph.env` once (mode 600; add `APP_URL` and the PayPal Sandbox keys there) and checks `/api/health`. The system-wide unit below is the alternative if you prefer root-managed services.
+
 ```bash
 sudo cp deploy/licensegraph.service /etc/systemd/system/      # add deploy/licensegraph-worker.service only for the signed-in mode
 # the unit assumes /opt/licensegraph; edit WorkingDirectory and EnvironmentFile if you used another folder

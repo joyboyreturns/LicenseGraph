@@ -397,6 +397,10 @@ describe.skipIf(!enabled)("private marketplace integration", () => {
         expect(await applyWebhook(rt(), tx, event)).toBe(false);
       });
       expect((await db.pool.query("SELECT status FROM licensegraph.webhook_deliveries WHERE event_id=$1", [event.id])).rows[0].status).toBe("queued");
+      // Staff can see that an unmatched event is waiting, without the payload.
+      const waiting = (await (await call("/api/marketplace/staff/reviews", "GET", undefined, await browser(staff))).json()) as { webhooks: { eventId: string }[] };
+      expect(waiting.webhooks.map((w) => w.eventId)).toContain(event.id);
+      expect(JSON.stringify(waiting.webhooks)).not.toContain("PAYMENT.CAPTURE.REVERSED");
       sim.approveOrder((await runs.read(id))!.session.order!.id);
       const capture = await db.transaction((tx) => queue.enqueue(tx, id, "capture", "initial"));
       expect((await runJob(capture.id)).status).toBe("succeeded");

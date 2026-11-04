@@ -24,6 +24,7 @@ type Reviews = {
   offers: Offer[];
   disputes: { id: string; runId: string; status: string; details: { reason: string; evidence: string } }[];
   operations: { id: string; run_id: string; kind: string; status: string }[];
+  webhooks: { eventId: string; status: string; attempts: number; receivedAt: string; lastAttemptAt: string | null }[];
 };
 type Snapshot = {
   catalog: Offer[];
@@ -586,6 +587,15 @@ export function Workspace() {
                       />
                     </article>
                   ))}
+                  {data.reviews?.webhooks.map((w) => (
+                    <article key={w.eventId} className={styles.review}>
+                      <h3>Unmatched PayPal event · {w.status}</h3>
+                      <p>
+                        Event <code>{w.eventId}</code> matched no purchase when it arrived on {new Date(w.receivedAt).toLocaleString()}. The worker retries it
+                        {w.attempts ? ` (${w.attempts} so far)` : ""}; after a day it needs a staff look. Nothing was discarded.
+                      </p>
+                    </article>
+                  ))}
                   {data.reviews?.operations.map((o) => (
                     <article key={o.id} className={styles.review}>
                       <h3>Reconciliation: {o.kind}</h3>
@@ -616,7 +626,8 @@ export function Workspace() {
                   {!data.reviews?.licensors.length &&
                     !data.reviews?.offers.length &&
                     !data.reviews?.disputes.length &&
-                    !data.reviews?.operations.length && <p>No cases need review.</p>}
+                    !data.reviews?.operations.length &&
+                    !data.reviews?.webhooks.length && <p>No cases need review.</p>}
                 </>
               )}
             </section>

@@ -17,6 +17,10 @@ export async function handleStaff({ rt, principal, request, area, id, action }: 
       const operations = await rt.db.pool.query(
         "SELECT id,run_id,kind,status,stage,error_code FROM licensegraph.operations WHERE status='reconcile' LIMIT 200",
       );
+      // Metadata only: the sealed payload stays in the database. These are financial events that matched no purchase yet.
+      const webhooks = await rt.db.pool.query(
+        "SELECT event_id,status,attempts,created_at,last_attempt_at FROM licensegraph.webhook_deliveries WHERE status IN ('queued','reconcile') ORDER BY created_at LIMIT 200",
+      );
       return json({
         licensors: readable("staff_licensors", licensors.rows, (row) => ({
           id: row.id,
@@ -38,6 +42,13 @@ export async function handleStaff({ rt, principal, request, area, id, action }: 
           details: rt.cipher.open(row.sealed, `dispute:${row.id}`),
         })),
         operations: operations.rows,
+        webhooks: webhooks.rows.map((row) => ({
+          eventId: row.event_id,
+          status: row.status,
+          attempts: row.attempts,
+          receivedAt: row.created_at,
+          lastAttemptAt: row.last_attempt_at,
+        })),
       });
     }
     if (id === "licensors" && action && request.method === "POST") {

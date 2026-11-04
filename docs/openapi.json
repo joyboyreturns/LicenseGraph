@@ -4977,13 +4977,54 @@
               ],
               "additionalProperties": {}
             }
+          },
+          "webhooks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "eventId": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "queued",
+                    "reconcile"
+                  ]
+                },
+                "attempts": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "receivedAt": {
+                  "type": "string"
+                },
+                "lastAttemptAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "eventId",
+                "status",
+                "attempts",
+                "receivedAt",
+                "lastAttemptAt"
+              ],
+              "additionalProperties": false
+            }
           }
         },
         "required": [
           "licensors",
           "offers",
           "disputes",
-          "operations"
+          "operations",
+          "webhooks"
         ],
         "additionalProperties": false
       },
