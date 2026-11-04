@@ -36,7 +36,7 @@ The 70 skips are 27 live-provider tests that need credentials (not run) and the 
 
 **Not verified:**
 
-- The two new CI jobs (PostgreSQL, and the private browser flows against Keycloak and Mailpit) have not run on GitHub.
+- CI: the PostgreSQL, private-browser and offline jobs passed on GitHub for revision `c4fa778` (run 41828974773). That is the only revision with all three green.
 - A restore onto a different machine.
 - Real email delivery, a managed identity provider, TLS, hosting. Keycloak ran in development mode.
 - Multi-instance behaviour under real load; the multi-worker and crash cases are covered by lease and fault-injection tests in one process.
