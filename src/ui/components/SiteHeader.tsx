@@ -28,10 +28,19 @@ export function StatusPills({ stacked = false }: { stacked?: boolean }) {
   const model =
     config.mode === "live"
       ? { label: "Live model", title: `A live model reads licences${config.model ? ` (${config.model})` : ""}. Built-in scenarios still replay recorded output.`, tone: "tone-agent" }
-      : { label: "Replayed demo", title: "Built-in scenarios replay recorded model output. The rules engine checks the results; the payment mode is shown separately.", tone: "tone-neutral" };
+      : config.privateWorkspace
+        ? { label: "Reviewed offers only", title: "No model is configured on this server. You can buy staff-reviewed marketplace offers; analysing your own licence documents is unavailable.", tone: "tone-neutral" }
+        : { label: "Replayed demo", title: "Built-in scenarios replay recorded model output. The rules engine checks the results; the payment mode is shown separately.", tone: "tone-neutral" };
   const PayIcon = pay.icon;
   return (
     <div className={`${styles.pills} ${stacked ? styles.pillsStacked : ""}`}>
+      {config.privateWorkspace && (
+        <span className="chip chip-sm tone-engine" title="Signed-in workspace. Your runs and documents are private to your account until you share them.">
+          <ShieldCheck aria-hidden />
+          Private workspace
+          <span className="visually-hidden">. Your runs and documents are private to your account until you share them.</span>
+        </span>
+      )}
       <span className={`chip chip-sm ${model.tone}`} title={model.title}>
         <Radio aria-hidden />
         {model.label}

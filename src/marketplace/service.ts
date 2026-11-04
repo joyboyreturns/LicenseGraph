@@ -1,6 +1,6 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { AccessError, staffOnly, type Principal } from "../auth/identity";
-import { approveSession, viewOf } from "../app-logic/session";
+import { approveSession, viewOf, type Session } from "../app-logic/session";
 import { canonicalJson } from "../core/digest";
 import { verifyBundle } from "../core/rules";
 import type { LicenseOffer } from "../core/types";
@@ -10,6 +10,9 @@ import { JobQueue } from "../storage/jobs";
 import { ConflictError, RunRepository, type StoredRun } from "../storage/runs";
 import type { Transaction } from "../storage/database";
 import { disputeSubmission, licensorSubmission, marketplaceOfferSchema, type AuthorizationV3, type LicensorDetails, type RecipientSnapshot } from "./types";
+
+/** True once the provider has reported a refund or reversal the application did not itself request. */
+export const paymentReversed = (session: Session) => session.ledger.events().some((e) => e.kind === "payment_reversed");
 
 export class Marketplace {
   constructor(readonly runs: RunRepository, readonly queue: JobQueue) {}
@@ -84,16 +87,28 @@ export class Marketplace {
       return { id, version, status: "pending" };
     });
   }
-  async reviewOffer(principal: Principal, id: string, version: number, decision: "approved" | "rejected") {
+  async reviewOffer(principal: Principal, id: string, version: number, decision: "approved" | "rejected", reason: string) {
     staffOnly(principal);
+    if (reason.trim().length < 10) throw new ConflictError("A review reason of at least ten characters is required.");
     return this.db.transaction(async (tx) => {
       const row = (await tx.query(`SELECT o.*,l.user_id,l.status AS licensor_status,l.version AS current_version FROM licensegraph.offers o JOIN licensegraph.licensors l ON l.id=o.licensor_id WHERE o.id=$1 AND o.version=$2 FOR UPDATE OF o,l`, [id, version])).rows[0];
       if (!row) throw new AccessError("Offer not found.", 404);
       if (row.user_id === principal.id) throw new AccessError("You cannot review your own offer.");
       if (decision === "approved" && (row.licensor_status !== "approved" || row.current_version !== row.licensor_version)) throw new ConflictError("The licensor must be approved at the offer's version.");
       await tx.query("UPDATE licensegraph.offers SET status=$1,reviewed_by=$2,reviewed_at=now() WHERE id=$3 AND version=$4", [decision, principal.id, id, version]);
-      await this.runs.audit(tx, principal.id, `offer_${decision}`, id, { version });
+      await this.runs.audit(tx, principal.id, `offer_${decision}`, id, { version, reason: reason.trim() });
       return { id, version, status: decision };
+    });
+  }
+  /** The seller withdraws a version. Purchases already authorized keep their immutable snapshot; new runs cannot select it. */
+  async withdrawOffer(principal: Principal, id: string, version: number) {
+    return this.db.transaction(async (tx) => {
+      const row = (await tx.query("SELECT o.status,l.user_id FROM licensegraph.offers o JOIN licensegraph.licensors l ON l.id=o.licensor_id WHERE o.id=$1 AND o.version=$2 FOR UPDATE OF o", [id, version])).rows[0];
+      if (!row || row.user_id !== principal.id) throw new AccessError("Offer not found.", 404);
+      if (!["pending", "approved"].includes(row.status)) throw new ConflictError("Only a pending or approved offer can be withdrawn.");
+      await tx.query("UPDATE licensegraph.offers SET status='withdrawn' WHERE id=$1 AND version=$2", [id, version]);
+      await this.runs.audit(tx, principal.id, "offer_withdrawn", id, { version });
+      return { id, version, status: "withdrawn" };
     });
   }
   async recipients(tx: Transaction, offers: LicenseOffer[]): Promise<RecipientSnapshot[]> {
@@ -155,6 +170,7 @@ export class Marketplace {
     return this.db.transaction(async (tx) => {
       const loaded = await this.owned(runId, principal, tx);
       if (!loaded.session.capture || loaded.session.refund) throw new ConflictError("A captured purchase is required.");
+      if (paymentReversed(loaded.session)) throw new ConflictError("The provider reported a reversal. Payouts are blocked until staff reconcile it.");
       const disputed = await tx.query("SELECT 1 FROM licensegraph.disputes WHERE run_id=$1 AND status IN ('open','escalated')", [runId]);
       if (disputed.rowCount) throw new ConflictError("Resolve the dispute before releasing payouts.");
       await tx.query("UPDATE licensegraph.purchases SET accepted_at=now() WHERE run_id=$1 AND payout_state='held'", [runId]);
@@ -166,7 +182,7 @@ export class Marketplace {
     if (!Number.isInteger(days) || days < 1 || days > 30) throw new ConflictError("Share links last between 1 and 30 days.");
     return this.db.transaction(async (tx) => {
       const loaded = await this.owned(runId, principal, tx);
-      if (!loaded.session.capture || loaded.session.refund) throw new ConflictError("Only captured purchases can be shared.");
+      if (!loaded.session.capture || loaded.session.refund || paymentReversed(loaded.session)) throw new ConflictError("Only captured, un-reversed purchases can be shared.");
       const token = randomBytes(32).toString("base64url");
       const id = randomUUID();
       const expiresAt = new Date(Date.now() + days * 86_400_000);

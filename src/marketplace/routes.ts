@@ -1,24 +1,7 @@
-/** Private workspace endpoints. Kept explicit so discovery and route coverage can verify them. */
-export const MARKETPLACE_ROUTES = [
-  { path: "/api/marketplace/ready", methods: ["get"], summary: "Check database readiness", public: true },
-  { path: "/api/marketplace/shared/{token}", methods: ["get"], summary: "Read an unexpired, revocable share", public: true },
-  { path: "/api/marketplace/catalog", methods: ["get"], summary: "List reviewed marketplace offers" },
-  { path: "/api/marketplace/operations/{id}", methods: ["get"], summary: "Read an owned background operation" },
-  { path: "/api/marketplace/licensor", methods: ["get","post"], summary: "Read or submit your licensor profile" },
-  { path: "/api/marketplace/licensor/confirm", methods: ["post"], summary: "Confirm the verified account email as recipient" },
-  { path: "/api/marketplace/licensor/purchases", methods: ["get"], summary: "Read purchases involving your reviewed offers" },
-  { path: "/api/marketplace/offers", methods: ["get","post"], summary: "List or submit immutable offer versions" },
-  { path: "/api/marketplace/runs/{id}/accept", methods: ["post"], summary: "Accept a captured purchase and request payout release" },
-  { path: "/api/marketplace/runs/{id}/disputes", methods: ["post"], summary: "Open a dispute with private evidence" },
-  { path: "/api/marketplace/runs/{id}/shares", methods: ["get","post"], summary: "List or create explicit receipt or passport grants" },
-  { path: "/api/marketplace/shares/{id}", methods: ["delete"], summary: "Revoke an owned sharing grant" },
-  { path: "/api/marketplace/link-legacy", methods: ["post"], summary: "Link an imported run using its original browser ownership" },
-  { path: "/api/marketplace/agent-tokens", methods: ["get","post"], summary: "List or issue limited agent credentials" },
-  { path: "/api/marketplace/agent-tokens/{id}", methods: ["delete"], summary: "Revoke an agent credential" },
-  { path: "/api/marketplace/staff/reviews", methods: ["get"], summary: "Read the staff review and reconciliation queue" },
-  { path: "/api/marketplace/staff/licensors/{id}", methods: ["post"], summary: "Review or suspend a licensor with a reason" },
-  { path: "/api/marketplace/staff/offers/{id}", methods: ["post"], summary: "Review an immutable offer version" },
-  { path: "/api/marketplace/staff/disputes/{id}", methods: ["post"], summary: "Resolve or escalate a dispute" },
-  { path: "/api/marketplace/staff/reconcile/{id}", methods: ["post"], summary: "Reconcile an uncertain operation against Sandbox records" },
-  { path: "/api/marketplace/staff/assign-legacy", methods: ["post"], summary: "Assign an unowned imported run with an audit reason" },
-] as const;
+import { ROUTE_SPECS } from "./contract";
+
+/** Private workspace endpoints, grouped by path. Kept explicit so discovery and route coverage can verify them. */
+export const MARKETPLACE_ROUTES = [...new Set(ROUTE_SPECS.map((spec) => spec.path))].map((path) => {
+  const specs = ROUTE_SPECS.filter((spec) => spec.path === path);
+  return { path, methods: specs.map((spec) => spec.method), summary: specs[0]!.summary, ...(specs.every((spec) => spec.auth === "public") ? { public: true as const } : {}) };
+});

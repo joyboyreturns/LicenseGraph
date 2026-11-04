@@ -60,3 +60,30 @@ export function checkSignature(p: Passport, secret: string | undefined): "valid"
 
 /** Legacy signer, kept so passports issued before the change still have a test fixture. */
 export const signWithHmac = (p: Passport, secret: string): Passport => ({ ...p, signature: { algorithm: "HMAC-SHA256", value: hmac(secret, p) } });
+
+export interface PublishedKey { keyId: string; algorithm: "Ed25519"; publicKey: string; use: "licence-passport-signature"; status: "current" | "retired" }
+
+/**
+ * Public keys that verify passports this server has issued. A retired key stays published after rotation so passports
+ * signed before the change keep verifying offline; only the current secret signs new ones.
+ */
+export function publishedKeys(current: string | undefined, retired: readonly string[] = []): PublishedKey[] {
+  const seen = new Set<string>();
+  const keys: PublishedKey[] = [];
+  for (const [secret, status] of [...(current ? [[current, "current"] as const] : []), ...retired.map((s) => [s, "retired"] as const)]) {
+    const { publicKey, keyId } = passportKey(secret);
+    if (seen.has(keyId)) continue;
+    seen.add(keyId);
+    keys.push({ keyId, algorithm: "Ed25519", publicKey, use: "licence-passport-signature", status });
+  }
+  return keys;
+}
+
+/** Retired secrets from LICENSEGRAPH_PASSPORT_RETIRED_SECRETS, a JSON array. Malformed configuration is an error, not an empty list. */
+export function retiredSecretsFromEnv(env: Record<string, string | undefined> = process.env): string[] {
+  const raw = env.LICENSEGRAPH_PASSPORT_RETIRED_SECRETS;
+  if (!raw) return [];
+  const parsed: unknown = JSON.parse(raw);
+  if (!Array.isArray(parsed) || parsed.some((s) => typeof s !== "string" || s.length < 8)) throw new Error("LICENSEGRAPH_PASSPORT_RETIRED_SECRETS must be a JSON array of secrets.");
+  return parsed as string[];
+}

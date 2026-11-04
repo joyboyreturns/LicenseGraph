@@ -32,7 +32,7 @@ const migrate = spawnSync(process.execPath, ["--import", "tsx", "scripts/databas
 });
 if (migrate.status !== 0) process.exit(migrate.status ?? 1);
 
-const files = process.argv.slice(2).length ? process.argv.slice(2) : ["tests/storage.integration.test.ts", "tests/marketplace.integration.test.ts"];
+const files = process.argv.slice(2).length ? process.argv.slice(2) : ["tests/storage.integration.test.ts", "tests/marketplace.integration.test.ts", "tests/operations.integration.test.ts"];
 const result = spawnSync(process.execPath, ["./node_modules/vitest/vitest.mjs", "run", "--no-file-parallelism", ...files], {
   stdio: "inherit",
   env: { ...process.env, DATABASE_URL: testUrl, RUN_DATABASE_TESTS: "1" },

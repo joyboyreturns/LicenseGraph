@@ -4,7 +4,7 @@
     "title": "LicenseGraph API",
     "version": "1.0.0",
     "summary": "Check creative licences against a project, then pay the creators.",
-    "description": "An AI agent reads licences and proposes the cheapest bundle. A deterministic rules engine verifies it against the project and rejects anything that breaks a term. A person approves, PayPal Orders and Payouts settle in the Sandbox, and a Licence Passport lets anyone check the result.\n\nMoney moves only after a person approves. A run an agent starts with `handoff: true` cannot be approved or paid until a person takes control with the one-time claim link. Approve, pay, capture, payouts and refund need the `lg_owner` cookie of the browser that started (or claimed) the run.",
+    "description": "An AI agent reads licences and proposes the cheapest bundle. A deterministic rules engine verifies it against the project and rejects anything that breaks a term. A person approves, PayPal Orders and Payouts settle in the Sandbox, and a Licence Passport lets anyone check the result.\n\nMoney moves only after a person approves. A run an agent starts with `handoff: true` cannot be approved or paid until a person takes control with the one-time claim link. Approve, pay, capture, payouts and refund need the `lg_owner` cookie of the browser that started (or claimed) the run.\n\n**Two modes.** Offline mode (default): runs belong to an anonymous browser (`lg_owner` cookie), replay recorded model output, and payments use the labelled simulator or PayPal Sandbox. Private workspace mode (PostgreSQL and OIDC sign-in configured): `/api/sessions`, `/api/passports`, `/api/portfolio` and `/api/mcp` calls are scoped to the signed-in account or a limited agent bearer credential, the `lg_owner` and anyone-with-the-link statements below do not apply, long operations return `202` with a durable operation to poll, and the `/api/marketplace/*` paths are available. Passports are private until the owner creates an explicit share.",
     "license": {
       "name": "MIT",
       "identifier": "MIT"
@@ -28,6 +28,10 @@
     {
       "name": "Agents",
       "description": "Model Context Protocol endpoint for AI agents."
+    },
+    {
+      "name": "Private marketplace",
+      "description": "Signed-in workspace: reviewed licensors and offers, durable purchases, disputes and explicit sharing. Requires the private workspace configuration."
     },
     {
       "name": "Intake",
@@ -176,93 +180,60 @@
     "/api/marketplace/ready": {
       "get": {
         "operationId": "get_api_marketplace_ready",
+        "tags": [
+          "Private marketplace"
+        ],
         "summary": "Check database readiness",
-        "description": "Private workspace endpoint. Browser writes require a same-origin Origin header. Staff endpoints require MFA and the staff role. Uncertain submitted operations cannot be blindly retried. Receipt grants redact source text and personal details; full passports need a separate grant.",
+        "description": "No sign-in needed. Available only when the private workspace (PostgreSQL and sign-in) is configured; in the anonymous offline mode these paths return 503.",
         "parameters": [],
         "security": [],
         "responses": {
           "200": {
-            "description": "Action result.",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "201": {
-            "description": "Record or grant created.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "202": {
-            "description": "Operation durably queued. Poll its operation ID and the run; do not issue a new transfer identity.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid bounded input.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Sign-in required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Role, ownership, agent scope or origin refused.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Record not visible.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "State conflict or reconciliation required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/MarketplaceReady"
                 }
               }
             }
           },
           "503": {
-            "description": "Required service unavailable.",
+            "description": "Migrations have not been applied.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/marketplace/health": {
+      "get": {
+        "operationId": "get_api_marketplace_health",
+        "tags": [
+          "Private marketplace"
+        ],
+        "summary": "Report worker, queue and reconciliation health",
+        "description": "No sign-in needed. Available only when the private workspace (PostgreSQL and sign-in) is configured; in the anonymous offline mode these paths return 503.",
+        "parameters": [],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarketplaceHealth"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Degraded: queued work with no live worker, or work older than two minutes (the body still has the counts).",
             "content": {
               "application/json": {
                 "schema": {
@@ -276,9 +247,12 @@
     },
     "/api/marketplace/shared/{token}": {
       "get": {
-        "operationId": "get_api_marketplace_shared__token_",
+        "operationId": "get_api_marketplace_shared_token_",
+        "tags": [
+          "Private marketplace"
+        ],
         "summary": "Read an unexpired, revocable share",
-        "description": "Private workspace endpoint. Browser writes require a same-origin Origin header. Staff endpoints require MFA and the staff role. Uncertain submitted operations cannot be blindly retried. Receipt grants redact source text and personal details; full passports need a separate grant.",
+        "description": "No sign-in needed. A receipt omits source text and personal details. A full passport is returned only for a separate full-passport grant. A refunded or reversed purchase is not shared. Available only when the private workspace (PostgreSQL and sign-in) is configured; in the anonymous offline mode these paths return 503.",
         "parameters": [
           {
             "name": "token",
@@ -292,87 +266,25 @@
         "security": [],
         "responses": {
           "200": {
-            "description": "Action result.",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "201": {
-            "description": "Record or grant created.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "202": {
-            "description": "Operation durably queued. Poll its operation ID and the run; do not issue a new transfer identity.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid bounded input.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Sign-in required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Role, ownership, agent scope or origin refused.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/SharedReceipt"
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  ]
                 }
               }
             }
           },
           "404": {
-            "description": "Record not visible.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "State conflict or reconciliation required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Required service unavailable.",
+            "description": "No such record, or it belongs to another account (the two are indistinguishable).",
             "content": {
               "application/json": {
                 "schema": {
@@ -387,8 +299,11 @@
     "/api/marketplace/catalog": {
       "get": {
         "operationId": "get_api_marketplace_catalog",
+        "tags": [
+          "Private marketplace"
+        ],
         "summary": "List reviewed marketplace offers",
-        "description": "Private workspace endpoint. Browser writes require a same-origin Origin header. Staff endpoints require MFA and the staff role. Uncertain submitted operations cannot be blindly retried. Receipt grants redact source text and personal details; full passports need a separate grant.",
+        "description": "Browser session, or a limited agent bearer credential (read only). Only offers approved at their licensor's current reviewed version. A record that cannot be read is left out, not shown partially. Available only when the private workspace (PostgreSQL and sign-in) is configured; in the anonymous offline mode these paths return 503.",
         "parameters": [],
         "security": [
           {
@@ -400,47 +315,17 @@
         ],
         "responses": {
           "200": {
-            "description": "Action result.",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "201": {
-            "description": "Record or grant created.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "202": {
-            "description": "Operation durably queued. Poll its operation ID and the run; do not issue a new transfer identity.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid bounded input.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/Catalog"
                 }
               }
             }
           },
           "401": {
-            "description": "Sign-in required.",
+            "description": "Sign in first.",
             "content": {
               "application/json": {
                 "schema": {
@@ -450,37 +335,7 @@
             }
           },
           "403": {
-            "description": "Role, ownership, agent scope or origin refused.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Record not visible.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "State conflict or reconciliation required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Required service unavailable.",
+            "description": "Not allowed for this credential or role, or a cross-origin write.",
             "content": {
               "application/json": {
                 "schema": {
@@ -494,9 +349,12 @@
     },
     "/api/marketplace/operations/{id}": {
       "get": {
-        "operationId": "get_api_marketplace_operations__id_",
+        "operationId": "get_api_marketplace_operations_id_",
+        "tags": [
+          "Private marketplace"
+        ],
         "summary": "Read an owned background operation",
-        "description": "Private workspace endpoint. Browser writes require a same-origin Origin header. Staff endpoints require MFA and the staff role. Uncertain submitted operations cannot be blindly retried. Receipt grants redact source text and personal details; full passports need a separate grant.",
+        "description": "Browser session, or a limited agent bearer credential (read only). Available only when the private workspace (PostgreSQL and sign-in) is configured; in the anonymous offline mode these paths return 503.",
         "parameters": [
           {
             "name": "id",
@@ -517,47 +375,17 @@
         ],
         "responses": {
           "200": {
-            "description": "Action result.",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "201": {
-            "description": "Record or grant created.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "202": {
-            "description": "Operation durably queued. Poll its operation ID and the run; do not issue a new transfer identity.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid bounded input.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/Operation"
                 }
               }
             }
           },
           "401": {
-            "description": "Sign-in required.",
+            "description": "Sign in first.",
             "content": {
               "application/json": {
                 "schema": {
@@ -567,7 +395,7 @@
             }
           },
           "403": {
-            "description": "Role, ownership, agent scope or origin refused.",
+            "description": "Not allowed for this credential or role, or a cross-origin write.",
             "content": {
               "application/json": {
                 "schema": {
@@ -577,27 +405,7 @@
             }
           },
           "404": {
-            "description": "Record not visible.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "State conflict or reconciliation required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Required service unavailable.",
+            "description": "No such record, or it belongs to another account (the two are indistinguishable).",
             "content": {
               "application/json": {
                 "schema": {
@@ -612,60 +420,30 @@
     "/api/marketplace/licensor": {
       "get": {
         "operationId": "get_api_marketplace_licensor",
-        "summary": "Read or submit your licensor profile",
-        "description": "Private workspace endpoint. Browser writes require a same-origin Origin header. Staff endpoints require MFA and the staff role. Uncertain submitted operations cannot be blindly retried. Receipt grants redact source text and personal details; full passports need a separate grant.",
+        "tags": [
+          "Private marketplace"
+        ],
+        "summary": "Read your licensor profile",
+        "description": "Browser session only (`lg_account` cookie, same-origin writes). Agent bearer credentials are refused with 403. Available only when the private workspace (PostgreSQL and sign-in) is configured; in the anonymous offline mode these paths return 503.",
         "parameters": [],
         "security": [
           {
             "accountCookie": []
-          },
-          {
-            "agentBearer": []
           }
         ],
         "responses": {
           "200": {
-            "description": "Action result.",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "201": {
-            "description": "Record or grant created.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "202": {
-            "description": "Operation durably queued. Poll its operation ID and the run; do not issue a new transfer identity.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid bounded input.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/LicensorProfile"
                 }
               }
             }
           },
           "401": {
-            "description": "Sign-in required.",
+            "description": "Sign in first.",
             "content": {
               "application/json": {
                 "schema": {
@@ -675,37 +453,7 @@
             }
           },
           "403": {
-            "description": "Role, ownership, agent scope or origin refused.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Record not visible.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "State conflict or reconciliation required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Required service unavailable.",
+            "description": "Not allowed for this credential or role, or a cross-origin write.",
             "content": {
               "application/json": {
                 "schema": {
@@ -718,50 +466,40 @@
       },
       "post": {
         "operationId": "post_api_marketplace_licensor",
-        "summary": "Read or submit your licensor profile",
-        "description": "Private workspace endpoint. Browser writes require a same-origin Origin header. Staff endpoints require MFA and the staff role. Uncertain submitted operations cannot be blindly retried. Receipt grants redact source text and personal details; full passports need a separate grant.",
+        "tags": [
+          "Private marketplace"
+        ],
+        "summary": "Submit or resubmit your licensor profile",
+        "description": "Browser session only (`lg_account` cookie, same-origin writes). Agent bearer credentials are refused with 403. Resubmitting creates a new version that needs a fresh review and recipient confirmation. Available only when the private workspace (PostgreSQL and sign-in) is configured; in the anonymous offline mode these paths return 503.",
         "parameters": [],
         "security": [
           {
             "accountCookie": []
-          },
-          {
-            "agentBearer": []
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LicensorSubmission"
+              }
+            }
+          }
+        },
         "responses": {
-          "200": {
-            "description": "Action result.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
           "201": {
-            "description": "Record or grant created.",
+            "description": "Created.",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "202": {
-            "description": "Operation durably queued. Poll its operation ID and the run; do not issue a new transfer identity.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
+                  "$ref": "#/components/schemas/Submitted"
                 }
               }
             }
           },
           "400": {
-            "description": "Invalid bounded input.",
+            "description": "The body does not match the schema, or a required reason is missing.",
             "content": {
               "application/json": {
                 "schema": {
@@ -771,7 +509,7 @@
             }
           },
           "401": {
-            "description": "Sign-in required.",
+            "description": "Sign in first.",
             "content": {
               "application/json": {
                 "schema": {
@@ -781,37 +519,7 @@
             }
           },
           "403": {
-            "description": "Role, ownership, agent scope or origin refused.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Record not visible.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "State conflict or reconciliation required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Required service unavailable.",
+            "description": "Not allowed for this credential or role, or a cross-origin write.",
             "content": {
               "application/json": {
                 "schema": {
@@ -826,60 +534,30 @@
     "/api/marketplace/licensor/confirm": {
       "post": {
         "operationId": "post_api_marketplace_licensor_confirm",
+        "tags": [
+          "Private marketplace"
+        ],
         "summary": "Confirm the verified account email as recipient",
-        "description": "Private workspace endpoint. Browser writes require a same-origin Origin header. Staff endpoints require MFA and the staff role. Uncertain submitted operations cannot be blindly retried. Receipt grants redact source text and personal details; full passports need a separate grant.",
+        "description": "Browser session only (`lg_account` cookie, same-origin writes). Agent bearer credentials are refused with 403. Proves control of the account email only; PayPal account ownership is not verified. Available only when the private workspace (PostgreSQL and sign-in) is configured; in the anonymous offline mode these paths return 503.",
         "parameters": [],
         "security": [
           {
             "accountCookie": []
-          },
-          {
-            "agentBearer": []
           }
         ],
         "responses": {
           "200": {
-            "description": "Action result.",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "201": {
-            "description": "Record or grant created.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "202": {
-            "description": "Operation durably queued. Poll its operation ID and the run; do not issue a new transfer identity.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid bounded input.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/RecipientConfirmed"
                 }
               }
             }
           },
           "401": {
-            "description": "Sign-in required.",
+            "description": "Sign in first.",
             "content": {
               "application/json": {
                 "schema": {
@@ -889,7 +567,7 @@
             }
           },
           "403": {
-            "description": "Role, ownership, agent scope or origin refused.",
+            "description": "Not allowed for this credential or role, or a cross-origin write.",
             "content": {
               "application/json": {
                 "schema": {
@@ -899,27 +577,7 @@
             }
           },
           "404": {
-            "description": "Record not visible.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "State conflict or reconciliation required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Required service unavailable.",
+            "description": "No such record, or it belongs to another account (the two are indistinguishable).",
             "content": {
               "application/json": {
                 "schema": {
@@ -934,60 +592,30 @@
     "/api/marketplace/licensor/purchases": {
       "get": {
         "operationId": "get_api_marketplace_licensor_purchases",
+        "tags": [
+          "Private marketplace"
+        ],
         "summary": "Read purchases involving your reviewed offers",
-        "description": "Private workspace endpoint. Browser writes require a same-origin Origin header. Staff endpoints require MFA and the staff role. Uncertain submitted operations cannot be blindly retried. Receipt grants redact source text and personal details; full passports need a separate grant.",
+        "description": "Browser session only (`lg_account` cookie, same-origin writes). Agent bearer credentials are refused with 403. Available only when the private workspace (PostgreSQL and sign-in) is configured; in the anonymous offline mode these paths return 503.",
         "parameters": [],
         "security": [
           {
             "accountCookie": []
-          },
-          {
-            "agentBearer": []
           }
         ],
         "responses": {
           "200": {
-            "description": "Action result.",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "201": {
-            "description": "Record or grant created.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "202": {
-            "description": "Operation durably queued. Poll its operation ID and the run; do not issue a new transfer identity.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid bounded input.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/LicensorPurchases"
                 }
               }
             }
           },
           "401": {
-            "description": "Sign-in required.",
+            "description": "Sign in first.",
             "content": {
               "application/json": {
                 "schema": {
@@ -997,37 +625,7 @@
             }
           },
           "403": {
-            "description": "Role, ownership, agent scope or origin refused.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Record not visible.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "State conflict or reconciliation required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Required service unavailable.",
+            "description": "Not allowed for this credential or role, or a cross-origin write.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1042,60 +640,30 @@
     "/api/marketplace/offers": {
       "get": {
         "operationId": "get_api_marketplace_offers",
-        "summary": "List or submit immutable offer versions",
-        "description": "Private workspace endpoint. Browser writes require a same-origin Origin header. Staff endpoints require MFA and the staff role. Uncertain submitted operations cannot be blindly retried. Receipt grants redact source text and personal details; full passports need a separate grant.",
+        "tags": [
+          "Private marketplace"
+        ],
+        "summary": "List your offer versions",
+        "description": "Browser session only (`lg_account` cookie, same-origin writes). Agent bearer credentials are refused with 403. Available only when the private workspace (PostgreSQL and sign-in) is configured; in the anonymous offline mode these paths return 503.",
         "parameters": [],
         "security": [
           {
             "accountCookie": []
-          },
-          {
-            "agentBearer": []
           }
         ],
         "responses": {
           "200": {
-            "description": "Action result.",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "201": {
-            "description": "Record or grant created.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "202": {
-            "description": "Operation durably queued. Poll its operation ID and the run; do not issue a new transfer identity.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid bounded input.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/MyOffers"
                 }
               }
             }
           },
           "401": {
-            "description": "Sign-in required.",
+            "description": "Sign in first.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1105,37 +673,7 @@
             }
           },
           "403": {
-            "description": "Role, ownership, agent scope or origin refused.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Record not visible.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "State conflict or reconciliation required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Required service unavailable.",
+            "description": "Not allowed for this credential or role, or a cross-origin write.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1148,50 +686,40 @@
       },
       "post": {
         "operationId": "post_api_marketplace_offers",
-        "summary": "List or submit immutable offer versions",
-        "description": "Private workspace endpoint. Browser writes require a same-origin Origin header. Staff endpoints require MFA and the staff role. Uncertain submitted operations cannot be blindly retried. Receipt grants redact source text and personal details; full passports need a separate grant.",
+        "tags": [
+          "Private marketplace"
+        ],
+        "summary": "Submit an immutable offer version",
+        "description": "Browser session only (`lg_account` cookie, same-origin writes). Agent bearer credentials are refused with 403. Available only when the private workspace (PostgreSQL and sign-in) is configured; in the anonymous offline mode these paths return 503.",
         "parameters": [],
         "security": [
           {
             "accountCookie": []
-          },
-          {
-            "agentBearer": []
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OfferSubmission"
+              }
+            }
+          }
+        },
         "responses": {
-          "200": {
-            "description": "Action result.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
           "201": {
-            "description": "Record or grant created.",
+            "description": "Created.",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "202": {
-            "description": "Operation durably queued. Poll its operation ID and the run; do not issue a new transfer identity.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
+                  "$ref": "#/components/schemas/Submitted"
                 }
               }
             }
           },
           "400": {
-            "description": "Invalid bounded input.",
+            "description": "The body does not match the schema, or a required reason is missing.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1201,7 +729,7 @@
             }
           },
           "401": {
-            "description": "Sign-in required.",
+            "description": "Sign in first.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1211,17 +739,7 @@
             }
           },
           "403": {
-            "description": "Role, ownership, agent scope or origin refused.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Record not visible.",
+            "description": "An approved licensor profile is required.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1231,7 +749,54 @@
             }
           },
           "409": {
-            "description": "State conflict or reconciliation required.",
+            "description": "A stated term has no located quotation, or a quotation is not in the source text.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/marketplace/offers/{id}": {
+      "delete": {
+        "operationId": "delete_api_marketplace_offers_id_",
+        "tags": [
+          "Private marketplace"
+        ],
+        "summary": "Withdraw an offer version (query: version)",
+        "description": "Browser session only (`lg_account` cookie, same-origin writes). Agent bearer credentials are refused with 403. Runs already authorized keep their immutable snapshot; new runs cannot select a withdrawn version. Available only when the private workspace (PostgreSQL and sign-in) is configured; in the anonymous offline mode these paths return 503.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "accountCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Submitted"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in first.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1240,8 +805,28 @@
               }
             }
           },
-          "503": {
-            "description": "Required service unavailable.",
+          "403": {
+            "description": "Not allowed for this credential or role, or a cross-origin write.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such record, or it belongs to another account (the two are indistinguishable).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The record is not in a state that allows this action.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1255,9 +840,12 @@
     },
     "/api/marketplace/runs/{id}/accept": {
       "post": {
-        "operationId": "post_api_marketplace_runs__id__accept",
+        "operationId": "post_api_marketplace_runs_id_accept",
+        "tags": [
+          "Private marketplace"
+        ],
         "summary": "Accept a captured purchase and request payout release",
-        "description": "Private workspace endpoint. Browser writes require a same-origin Origin header. Staff endpoints require MFA and the staff role. Uncertain submitted operations cannot be blindly retried. Receipt grants redact source text and personal details; full passports need a separate grant.",
+        "description": "Browser session only (`lg_account` cookie, same-origin writes). Agent bearer credentials are refused with 403. Queues the payout operation. Poll `/api/marketplace/operations/{id}`; the release is re-checked (dispute, reversal, licensor status) immediately before submission. Returns 202: the work is durably queued, not finished. Poll `GET /api/marketplace/operations/{id}` and the run. Repeating the request never creates a second money movement. Available only when the private workspace (PostgreSQL and sign-in) is configured; in the anonymous offline mode these paths return 503.",
         "parameters": [
           {
             "name": "id",
@@ -1271,54 +859,21 @@
         "security": [
           {
             "accountCookie": []
-          },
-          {
-            "agentBearer": []
           }
         ],
         "responses": {
-          "200": {
-            "description": "Action result.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "201": {
-            "description": "Record or grant created.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
           "202": {
-            "description": "Operation durably queued. Poll its operation ID and the run; do not issue a new transfer identity.",
+            "description": "Operation queued.",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid bounded input.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/Operation"
                 }
               }
             }
           },
           "401": {
-            "description": "Sign-in required.",
+            "description": "Sign in first.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1328,7 +883,7 @@
             }
           },
           "403": {
-            "description": "Role, ownership, agent scope or origin refused.",
+            "description": "Not allowed for this credential or role, or a cross-origin write.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1338,7 +893,7 @@
             }
           },
           "404": {
-            "description": "Record not visible.",
+            "description": "No such record, or it belongs to another account (the two are indistinguishable).",
             "content": {
               "application/json": {
                 "schema": {
@@ -1348,17 +903,7 @@
             }
           },
           "409": {
-            "description": "State conflict or reconciliation required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Required service unavailable.",
+            "description": "The record is not in a state that allows this action.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1372,9 +917,12 @@
     },
     "/api/marketplace/runs/{id}/disputes": {
       "post": {
-        "operationId": "post_api_marketplace_runs__id__disputes",
+        "operationId": "post_api_marketplace_runs_id_disputes",
+        "tags": [
+          "Private marketplace"
+        ],
         "summary": "Open a dispute with private evidence",
-        "description": "Private workspace endpoint. Browser writes require a same-origin Origin header. Staff endpoints require MFA and the staff role. Uncertain submitted operations cannot be blindly retried. Receipt grants redact source text and personal details; full passports need a separate grant.",
+        "description": "Browser session only (`lg_account` cookie, same-origin writes). Agent bearer credentials are refused with 403. Unsent payouts are held. If transfers may already have been submitted the dispute opens as `escalated`. Available only when the private workspace (PostgreSQL and sign-in) is configured; in the anonymous offline mode these paths return 503.",
         "parameters": [
           {
             "name": "id",
@@ -1388,44 +936,31 @@
         "security": [
           {
             "accountCookie": []
-          },
-          {
-            "agentBearer": []
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DisputeSubmission"
+              }
+            }
+          }
+        },
         "responses": {
-          "200": {
-            "description": "Action result.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
           "201": {
-            "description": "Record or grant created.",
+            "description": "Created.",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "202": {
-            "description": "Operation durably queued. Poll its operation ID and the run; do not issue a new transfer identity.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
+                  "$ref": "#/components/schemas/DisputeOpened"
                 }
               }
             }
           },
           "400": {
-            "description": "Invalid bounded input.",
+            "description": "The body does not match the schema, or a required reason is missing.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1435,7 +970,7 @@
             }
           },
           "401": {
-            "description": "Sign-in required.",
+            "description": "Sign in first.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1445,7 +980,7 @@
             }
           },
           "403": {
-            "description": "Role, ownership, agent scope or origin refused.",
+            "description": "Not allowed for this credential or role, or a cross-origin write.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1455,7 +990,7 @@
             }
           },
           "404": {
-            "description": "Record not visible.",
+            "description": "No such record, or it belongs to another account (the two are indistinguishable).",
             "content": {
               "application/json": {
                 "schema": {
@@ -1465,17 +1000,7 @@
             }
           },
           "409": {
-            "description": "State conflict or reconciliation required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Required service unavailable.",
+            "description": "The record is not in a state that allows this action.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1489,9 +1014,12 @@
     },
     "/api/marketplace/runs/{id}/shares": {
       "get": {
-        "operationId": "get_api_marketplace_runs__id__shares",
-        "summary": "List or create explicit receipt or passport grants",
-        "description": "Private workspace endpoint. Browser writes require a same-origin Origin header. Staff endpoints require MFA and the staff role. Uncertain submitted operations cannot be blindly retried. Receipt grants redact source text and personal details; full passports need a separate grant.",
+        "operationId": "get_api_marketplace_runs_id_shares",
+        "tags": [
+          "Private marketplace"
+        ],
+        "summary": "List sharing grants for a run",
+        "description": "Browser session only (`lg_account` cookie, same-origin writes). Agent bearer credentials are refused with 403. Available only when the private workspace (PostgreSQL and sign-in) is configured; in the anonymous offline mode these paths return 503.",
         "parameters": [
           {
             "name": "id",
@@ -1505,54 +1033,21 @@
         "security": [
           {
             "accountCookie": []
-          },
-          {
-            "agentBearer": []
           }
         ],
         "responses": {
           "200": {
-            "description": "Action result.",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "201": {
-            "description": "Record or grant created.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "202": {
-            "description": "Operation durably queued. Poll its operation ID and the run; do not issue a new transfer identity.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid bounded input.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/Shares"
                 }
               }
             }
           },
           "401": {
-            "description": "Sign-in required.",
+            "description": "Sign in first.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1562,7 +1057,7 @@
             }
           },
           "403": {
-            "description": "Role, ownership, agent scope or origin refused.",
+            "description": "Not allowed for this credential or role, or a cross-origin write.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1572,27 +1067,7 @@
             }
           },
           "404": {
-            "description": "Record not visible.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "State conflict or reconciliation required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Required service unavailable.",
+            "description": "No such record, or it belongs to another account (the two are indistinguishable).",
             "content": {
               "application/json": {
                 "schema": {
@@ -1604,9 +1079,12 @@
         }
       },
       "post": {
-        "operationId": "post_api_marketplace_runs__id__shares",
-        "summary": "List or create explicit receipt or passport grants",
-        "description": "Private workspace endpoint. Browser writes require a same-origin Origin header. Staff endpoints require MFA and the staff role. Uncertain submitted operations cannot be blindly retried. Receipt grants redact source text and personal details; full passports need a separate grant.",
+        "operationId": "post_api_marketplace_runs_id_shares",
+        "tags": [
+          "Private marketplace"
+        ],
+        "summary": "Create an explicit receipt or passport grant",
+        "description": "Browser session only (`lg_account` cookie, same-origin writes). Agent bearer credentials are refused with 403. Available only when the private workspace (PostgreSQL and sign-in) is configured; in the anonymous offline mode these paths return 503.",
         "parameters": [
           {
             "name": "id",
@@ -1620,44 +1098,31 @@
         "security": [
           {
             "accountCookie": []
-          },
-          {
-            "agentBearer": []
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShareRequest"
+              }
+            }
+          }
+        },
         "responses": {
-          "200": {
-            "description": "Action result.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
           "201": {
-            "description": "Record or grant created.",
+            "description": "Created.",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "202": {
-            "description": "Operation durably queued. Poll its operation ID and the run; do not issue a new transfer identity.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
+                  "$ref": "#/components/schemas/ShareCreated"
                 }
               }
             }
           },
           "400": {
-            "description": "Invalid bounded input.",
+            "description": "The body does not match the schema, or a required reason is missing.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1667,7 +1132,7 @@
             }
           },
           "401": {
-            "description": "Sign-in required.",
+            "description": "Sign in first.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1677,7 +1142,7 @@
             }
           },
           "403": {
-            "description": "Role, ownership, agent scope or origin refused.",
+            "description": "Not allowed for this credential or role, or a cross-origin write.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1687,7 +1152,7 @@
             }
           },
           "404": {
-            "description": "Record not visible.",
+            "description": "No such record, or it belongs to another account (the two are indistinguishable).",
             "content": {
               "application/json": {
                 "schema": {
@@ -1697,17 +1162,7 @@
             }
           },
           "409": {
-            "description": "State conflict or reconciliation required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Required service unavailable.",
+            "description": "The record is not in a state that allows this action.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1721,9 +1176,12 @@
     },
     "/api/marketplace/shares/{id}": {
       "delete": {
-        "operationId": "delete_api_marketplace_shares__id_",
+        "operationId": "delete_api_marketplace_shares_id_",
+        "tags": [
+          "Private marketplace"
+        ],
         "summary": "Revoke an owned sharing grant",
-        "description": "Private workspace endpoint. Browser writes require a same-origin Origin header. Staff endpoints require MFA and the staff role. Uncertain submitted operations cannot be blindly retried. Receipt grants redact source text and personal details; full passports need a separate grant.",
+        "description": "Browser session only (`lg_account` cookie, same-origin writes). Agent bearer credentials are refused with 403. Revocation cannot recall a passport someone already downloaded. Available only when the private workspace (PostgreSQL and sign-in) is configured; in the anonymous offline mode these paths return 503.",
         "parameters": [
           {
             "name": "id",
@@ -1737,54 +1195,21 @@
         "security": [
           {
             "accountCookie": []
-          },
-          {
-            "agentBearer": []
           }
         ],
         "responses": {
           "200": {
-            "description": "Action result.",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "201": {
-            "description": "Record or grant created.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "202": {
-            "description": "Operation durably queued. Poll its operation ID and the run; do not issue a new transfer identity.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid bounded input.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/Revoked"
                 }
               }
             }
           },
           "401": {
-            "description": "Sign-in required.",
+            "description": "Sign in first.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1794,7 +1219,7 @@
             }
           },
           "403": {
-            "description": "Role, ownership, agent scope or origin refused.",
+            "description": "Not allowed for this credential or role, or a cross-origin write.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1804,27 +1229,7 @@
             }
           },
           "404": {
-            "description": "Record not visible.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "State conflict or reconciliation required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Required service unavailable.",
+            "description": "No such record, or it belongs to another account (the two are indistinguishable).",
             "content": {
               "application/json": {
                 "schema": {
@@ -1839,60 +1244,40 @@
     "/api/marketplace/link-legacy": {
       "post": {
         "operationId": "post_api_marketplace_link_legacy",
+        "tags": [
+          "Private marketplace"
+        ],
         "summary": "Link an imported run using its original browser ownership",
-        "description": "Private workspace endpoint. Browser writes require a same-origin Origin header. Staff endpoints require MFA and the staff role. Uncertain submitted operations cannot be blindly retried. Receipt grants redact source text and personal details; full passports need a separate grant.",
+        "description": "Browser session only (`lg_account` cookie, same-origin writes). Agent bearer credentials are refused with 403. Available only when the private workspace (PostgreSQL and sign-in) is configured; in the anonymous offline mode these paths return 503.",
         "parameters": [],
         "security": [
           {
             "accountCookie": []
-          },
-          {
-            "agentBearer": []
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LinkLegacy"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
-            "description": "Action result.",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "201": {
-            "description": "Record or grant created.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "202": {
-            "description": "Operation durably queued. Poll its operation ID and the run; do not issue a new transfer identity.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid bounded input.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/Linked"
                 }
               }
             }
           },
           "401": {
-            "description": "Sign-in required.",
+            "description": "Sign in first.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1902,37 +1287,7 @@
             }
           },
           "403": {
-            "description": "Role, ownership, agent scope or origin refused.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Record not visible.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "State conflict or reconciliation required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Required service unavailable.",
+            "description": "This run cannot be linked from this browser.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1947,60 +1302,30 @@
     "/api/marketplace/agent-tokens": {
       "get": {
         "operationId": "get_api_marketplace_agent_tokens",
-        "summary": "List or issue limited agent credentials",
-        "description": "Private workspace endpoint. Browser writes require a same-origin Origin header. Staff endpoints require MFA and the staff role. Uncertain submitted operations cannot be blindly retried. Receipt grants redact source text and personal details; full passports need a separate grant.",
+        "tags": [
+          "Private marketplace"
+        ],
+        "summary": "List your limited agent credentials",
+        "description": "Browser session only (`lg_account` cookie, same-origin writes). Agent bearer credentials are refused with 403. Available only when the private workspace (PostgreSQL and sign-in) is configured; in the anonymous offline mode these paths return 503.",
         "parameters": [],
         "security": [
           {
             "accountCookie": []
-          },
-          {
-            "agentBearer": []
           }
         ],
         "responses": {
           "200": {
-            "description": "Action result.",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "201": {
-            "description": "Record or grant created.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "202": {
-            "description": "Operation durably queued. Poll its operation ID and the run; do not issue a new transfer identity.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid bounded input.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/AgentTokens"
                 }
               }
             }
           },
           "401": {
-            "description": "Sign-in required.",
+            "description": "Sign in first.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2010,37 +1335,7 @@
             }
           },
           "403": {
-            "description": "Role, ownership, agent scope or origin refused.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Record not visible.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "State conflict or reconciliation required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Required service unavailable.",
+            "description": "Not allowed for this credential or role, or a cross-origin write.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2053,50 +1348,40 @@
       },
       "post": {
         "operationId": "post_api_marketplace_agent_tokens",
-        "summary": "List or issue limited agent credentials",
-        "description": "Private workspace endpoint. Browser writes require a same-origin Origin header. Staff endpoints require MFA and the staff role. Uncertain submitted operations cannot be blindly retried. Receipt grants redact source text and personal details; full passports need a separate grant.",
+        "tags": [
+          "Private marketplace"
+        ],
+        "summary": "Issue a limited agent credential",
+        "description": "Browser session only (`lg_account` cookie, same-origin writes). Agent bearer credentials are refused with 403. Valid for seven days. It can create catalogue runs and read runs, passports, operations and the catalogue; it cannot approve, claim, pay, release, share or use staff routes. Available only when the private workspace (PostgreSQL and sign-in) is configured; in the anonymous offline mode these paths return 503.",
         "parameters": [],
         "security": [
           {
             "accountCookie": []
-          },
-          {
-            "agentBearer": []
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentTokenRequest"
+              }
+            }
+          }
+        },
         "responses": {
-          "200": {
-            "description": "Action result.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
           "201": {
-            "description": "Record or grant created.",
+            "description": "Created.",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "202": {
-            "description": "Operation durably queued. Poll its operation ID and the run; do not issue a new transfer identity.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
+                  "$ref": "#/components/schemas/AgentTokenCreated"
                 }
               }
             }
           },
           "400": {
-            "description": "Invalid bounded input.",
+            "description": "The body does not match the schema, or a required reason is missing.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2106,7 +1391,7 @@
             }
           },
           "401": {
-            "description": "Sign-in required.",
+            "description": "Sign in first.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2116,37 +1401,7 @@
             }
           },
           "403": {
-            "description": "Role, ownership, agent scope or origin refused.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Record not visible.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "State conflict or reconciliation required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Required service unavailable.",
+            "description": "Not allowed for this credential or role, or a cross-origin write.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2160,9 +1415,12 @@
     },
     "/api/marketplace/agent-tokens/{id}": {
       "delete": {
-        "operationId": "delete_api_marketplace_agent_tokens__id_",
+        "operationId": "delete_api_marketplace_agent_tokens_id_",
+        "tags": [
+          "Private marketplace"
+        ],
         "summary": "Revoke an agent credential",
-        "description": "Private workspace endpoint. Browser writes require a same-origin Origin header. Staff endpoints require MFA and the staff role. Uncertain submitted operations cannot be blindly retried. Receipt grants redact source text and personal details; full passports need a separate grant.",
+        "description": "Browser session only (`lg_account` cookie, same-origin writes). Agent bearer credentials are refused with 403. Available only when the private workspace (PostgreSQL and sign-in) is configured; in the anonymous offline mode these paths return 503.",
         "parameters": [
           {
             "name": "id",
@@ -2176,54 +1434,21 @@
         "security": [
           {
             "accountCookie": []
-          },
-          {
-            "agentBearer": []
           }
         ],
         "responses": {
           "200": {
-            "description": "Action result.",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "201": {
-            "description": "Record or grant created.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "202": {
-            "description": "Operation durably queued. Poll its operation ID and the run; do not issue a new transfer identity.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid bounded input.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/Revoked"
                 }
               }
             }
           },
           "401": {
-            "description": "Sign-in required.",
+            "description": "Sign in first.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2233,37 +1458,7 @@
             }
           },
           "403": {
-            "description": "Role, ownership, agent scope or origin refused.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Record not visible.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "State conflict or reconciliation required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Required service unavailable.",
+            "description": "Not allowed for this credential or role, or a cross-origin write.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2278,60 +1473,30 @@
     "/api/marketplace/staff/reviews": {
       "get": {
         "operationId": "get_api_marketplace_staff_reviews",
+        "tags": [
+          "Private marketplace"
+        ],
         "summary": "Read the staff review and reconciliation queue",
-        "description": "Private workspace endpoint. Browser writes require a same-origin Origin header. Staff endpoints require MFA and the staff role. Uncertain submitted operations cannot be blindly retried. Receipt grants redact source text and personal details; full passports need a separate grant.",
+        "description": "Browser session of a staff account that signed in with a second factor. Staff cannot act on their own records. Available only when the private workspace (PostgreSQL and sign-in) is configured; in the anonymous offline mode these paths return 503.",
         "parameters": [],
         "security": [
           {
             "accountCookie": []
-          },
-          {
-            "agentBearer": []
           }
         ],
         "responses": {
           "200": {
-            "description": "Action result.",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "201": {
-            "description": "Record or grant created.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "202": {
-            "description": "Operation durably queued. Poll its operation ID and the run; do not issue a new transfer identity.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid bounded input.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/StaffQueue"
                 }
               }
             }
           },
           "401": {
-            "description": "Sign-in required.",
+            "description": "Sign in first.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2341,37 +1506,7 @@
             }
           },
           "403": {
-            "description": "Role, ownership, agent scope or origin refused.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Record not visible.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "State conflict or reconciliation required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Required service unavailable.",
+            "description": "Not allowed for this credential or role, or a cross-origin write.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2385,9 +1520,12 @@
     },
     "/api/marketplace/staff/licensors/{id}": {
       "post": {
-        "operationId": "post_api_marketplace_staff_licensors__id_",
+        "operationId": "post_api_marketplace_staff_licensors_id_",
+        "tags": [
+          "Private marketplace"
+        ],
         "summary": "Review or suspend a licensor with a reason",
-        "description": "Private workspace endpoint. Browser writes require a same-origin Origin header. Staff endpoints require MFA and the staff role. Uncertain submitted operations cannot be blindly retried. Receipt grants redact source text and personal details; full passports need a separate grant.",
+        "description": "Browser session of a staff account that signed in with a second factor. Staff cannot act on their own records. Available only when the private workspace (PostgreSQL and sign-in) is configured; in the anonymous offline mode these paths return 503.",
         "parameters": [
           {
             "name": "id",
@@ -2401,44 +1539,31 @@
         "security": [
           {
             "accountCookie": []
-          },
-          {
-            "agentBearer": []
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LicensorReview"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
-            "description": "Action result.",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "201": {
-            "description": "Record or grant created.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "202": {
-            "description": "Operation durably queued. Poll its operation ID and the run; do not issue a new transfer identity.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
+                  "$ref": "#/components/schemas/Submitted"
                 }
               }
             }
           },
           "400": {
-            "description": "Invalid bounded input.",
+            "description": "The body does not match the schema, or a required reason is missing.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2448,7 +1573,7 @@
             }
           },
           "401": {
-            "description": "Sign-in required.",
+            "description": "Sign in first.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2458,7 +1583,7 @@
             }
           },
           "403": {
-            "description": "Role, ownership, agent scope or origin refused.",
+            "description": "Staff cannot review their own profile.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2468,7 +1593,7 @@
             }
           },
           "404": {
-            "description": "Record not visible.",
+            "description": "No such record, or it belongs to another account (the two are indistinguishable).",
             "content": {
               "application/json": {
                 "schema": {
@@ -2478,17 +1603,7 @@
             }
           },
           "409": {
-            "description": "State conflict or reconciliation required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Required service unavailable.",
+            "description": "The record is not in a state that allows this action.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2502,9 +1617,12 @@
     },
     "/api/marketplace/staff/offers/{id}": {
       "post": {
-        "operationId": "post_api_marketplace_staff_offers__id_",
+        "operationId": "post_api_marketplace_staff_offers_id_",
+        "tags": [
+          "Private marketplace"
+        ],
         "summary": "Review an immutable offer version",
-        "description": "Private workspace endpoint. Browser writes require a same-origin Origin header. Staff endpoints require MFA and the staff role. Uncertain submitted operations cannot be blindly retried. Receipt grants redact source text and personal details; full passports need a separate grant.",
+        "description": "Browser session of a staff account that signed in with a second factor. Staff cannot act on their own records. The reason (at least ten characters) is stored in the audit trail. Available only when the private workspace (PostgreSQL and sign-in) is configured; in the anonymous offline mode these paths return 503.",
         "parameters": [
           {
             "name": "id",
@@ -2518,44 +1636,31 @@
         "security": [
           {
             "accountCookie": []
-          },
-          {
-            "agentBearer": []
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OfferReview"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
-            "description": "Action result.",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "201": {
-            "description": "Record or grant created.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "202": {
-            "description": "Operation durably queued. Poll its operation ID and the run; do not issue a new transfer identity.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
+                  "$ref": "#/components/schemas/Submitted"
                 }
               }
             }
           },
           "400": {
-            "description": "Invalid bounded input.",
+            "description": "The body does not match the schema, or a required reason is missing.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2565,7 +1670,7 @@
             }
           },
           "401": {
-            "description": "Sign-in required.",
+            "description": "Sign in first.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2575,7 +1680,7 @@
             }
           },
           "403": {
-            "description": "Role, ownership, agent scope or origin refused.",
+            "description": "Staff cannot review their own offer.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2585,7 +1690,7 @@
             }
           },
           "404": {
-            "description": "Record not visible.",
+            "description": "No such record, or it belongs to another account (the two are indistinguishable).",
             "content": {
               "application/json": {
                 "schema": {
@@ -2595,17 +1700,7 @@
             }
           },
           "409": {
-            "description": "State conflict or reconciliation required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Required service unavailable.",
+            "description": "The record is not in a state that allows this action.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2619,9 +1714,12 @@
     },
     "/api/marketplace/staff/disputes/{id}": {
       "post": {
-        "operationId": "post_api_marketplace_staff_disputes__id_",
+        "operationId": "post_api_marketplace_staff_disputes_id_",
+        "tags": [
+          "Private marketplace"
+        ],
         "summary": "Resolve or escalate a dispute",
-        "description": "Private workspace endpoint. Browser writes require a same-origin Origin header. Staff endpoints require MFA and the staff role. Uncertain submitted operations cannot be blindly retried. Receipt grants redact source text and personal details; full passports need a separate grant.",
+        "description": "Browser session of a staff account that signed in with a second factor. Staff cannot act on their own records. `release` and `refund` queue operations only while funds are certainly unsent; otherwise escalate. Available only when the private workspace (PostgreSQL and sign-in) is configured; in the anonymous offline mode these paths return 503.",
         "parameters": [
           {
             "name": "id",
@@ -2635,44 +1733,31 @@
         "security": [
           {
             "accountCookie": []
-          },
-          {
-            "agentBearer": []
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DisputeResolution"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
-            "description": "Action result.",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "201": {
-            "description": "Record or grant created.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "202": {
-            "description": "Operation durably queued. Poll its operation ID and the run; do not issue a new transfer identity.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
+                  "$ref": "#/components/schemas/DisputeResolved"
                 }
               }
             }
           },
           "400": {
-            "description": "Invalid bounded input.",
+            "description": "The body does not match the schema, or a required reason is missing.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2682,7 +1767,7 @@
             }
           },
           "401": {
-            "description": "Sign-in required.",
+            "description": "Sign in first.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2692,7 +1777,7 @@
             }
           },
           "403": {
-            "description": "Role, ownership, agent scope or origin refused.",
+            "description": "Not allowed for this credential or role, or a cross-origin write.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2702,7 +1787,7 @@
             }
           },
           "404": {
-            "description": "Record not visible.",
+            "description": "No such record, or it belongs to another account (the two are indistinguishable).",
             "content": {
               "application/json": {
                 "schema": {
@@ -2712,17 +1797,7 @@
             }
           },
           "409": {
-            "description": "State conflict or reconciliation required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Required service unavailable.",
+            "description": "The record is not in a state that allows this action.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2736,9 +1811,12 @@
     },
     "/api/marketplace/staff/reconcile/{id}": {
       "post": {
-        "operationId": "post_api_marketplace_staff_reconcile__id_",
+        "operationId": "post_api_marketplace_staff_reconcile_id_",
+        "tags": [
+          "Private marketplace"
+        ],
         "summary": "Reconcile an uncertain operation against Sandbox records",
-        "description": "Private workspace endpoint. Browser writes require a same-origin Origin header. Staff endpoints require MFA and the staff role. Uncertain submitted operations cannot be blindly retried. Receipt grants redact source text and personal details; full passports need a separate grant.",
+        "description": "Browser session of a staff account that signed in with a second factor. Staff cannot act on their own records. Reads the named existing provider record and checks it against the authorized purchase. It never creates a new transfer identity. Available only when the private workspace (PostgreSQL and sign-in) is configured; in the anonymous offline mode these paths return 503.",
         "parameters": [
           {
             "name": "id",
@@ -2752,44 +1830,31 @@
         "security": [
           {
             "accountCookie": []
-          },
-          {
-            "agentBearer": []
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Reconciliation"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
-            "description": "Action result.",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "201": {
-            "description": "Record or grant created.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "202": {
-            "description": "Operation durably queued. Poll its operation ID and the run; do not issue a new transfer identity.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
+                  "$ref": "#/components/schemas/Reconciled"
                 }
               }
             }
           },
           "400": {
-            "description": "Invalid bounded input.",
+            "description": "The body does not match the schema, or a required reason is missing.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2799,7 +1864,7 @@
             }
           },
           "401": {
-            "description": "Sign-in required.",
+            "description": "Sign in first.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2809,17 +1874,7 @@
             }
           },
           "403": {
-            "description": "Role, ownership, agent scope or origin refused.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Record not visible.",
+            "description": "Not allowed for this credential or role, or a cross-origin write.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2829,17 +1884,7 @@
             }
           },
           "409": {
-            "description": "State conflict or reconciliation required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Required service unavailable.",
+            "description": "The record is not in a state that allows this action.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2854,50 +1899,40 @@
     "/api/marketplace/staff/assign-legacy": {
       "post": {
         "operationId": "post_api_marketplace_staff_assign_legacy",
+        "tags": [
+          "Private marketplace"
+        ],
         "summary": "Assign an unowned imported run with an audit reason",
-        "description": "Private workspace endpoint. Browser writes require a same-origin Origin header. Staff endpoints require MFA and the staff role. Uncertain submitted operations cannot be blindly retried. Receipt grants redact source text and personal details; full passports need a separate grant.",
+        "description": "Browser session of a staff account that signed in with a second factor. Staff cannot act on their own records. Available only when the private workspace (PostgreSQL and sign-in) is configured; in the anonymous offline mode these paths return 503.",
         "parameters": [],
         "security": [
           {
             "accountCookie": []
-          },
-          {
-            "agentBearer": []
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignLegacy"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
-            "description": "Action result.",
+            "description": "Success.",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "201": {
-            "description": "Record or grant created.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "202": {
-            "description": "Operation durably queued. Poll its operation ID and the run; do not issue a new transfer identity.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
+                  "$ref": "#/components/schemas/Assigned"
                 }
               }
             }
           },
           "400": {
-            "description": "Invalid bounded input.",
+            "description": "The body does not match the schema, or a required reason is missing.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2907,7 +1942,7 @@
             }
           },
           "401": {
-            "description": "Sign-in required.",
+            "description": "Sign in first.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2917,17 +1952,7 @@
             }
           },
           "403": {
-            "description": "Role, ownership, agent scope or origin refused.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Record not visible.",
+            "description": "Not allowed for this credential or role, or a cross-origin write.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2937,17 +1962,7 @@
             }
           },
           "409": {
-            "description": "State conflict or reconciliation required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Required service unavailable.",
+            "description": "The record is not in a state that allows this action.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4654,6 +3669,1400 @@
       }
     },
     "schemas": {
+      "LicensorSubmission": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "recipientEmail": {
+            "type": "string",
+            "maxLength": 254,
+            "format": "email",
+            "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+          },
+          "identityEvidence": {
+            "type": "string",
+            "minLength": 20,
+            "maxLength": 50000
+          },
+          "rightsEvidence": {
+            "type": "string",
+            "minLength": 20,
+            "maxLength": 100000
+          },
+          "declaration": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "name",
+          "recipientEmail",
+          "identityEvidence",
+          "rightsEvidence",
+          "declaration"
+        ],
+        "additionalProperties": false,
+        "description": "Identity and rights evidence for staff review. Review records a decision; it does not certify copyright ownership."
+      },
+      "OfferSubmission": {
+        "type": "object",
+        "properties": {
+          "offer": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 55
+              },
+              "assetId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 55
+              },
+              "priceCents": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              },
+              "currency": {
+                "type": "string",
+                "minLength": 3,
+                "maxLength": 3
+              },
+              "terms": {
+                "type": "object",
+                "properties": {
+                  "commercialUse": {
+                    "type": "boolean"
+                  },
+                  "territories": {
+                    "minItems": 1,
+                    "maxItems": 250,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^(WORLD|[A-Z]{2})$"
+                    }
+                  },
+                  "termMonths": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "string",
+                        "const": "perpetual"
+                      }
+                    ]
+                  },
+                  "mediums": {
+                    "anyOf": [
+                      {
+                        "maxItems": 20,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "maxLength": 40
+                        }
+                      },
+                      {
+                        "type": "string",
+                        "const": "ALL"
+                      }
+                    ]
+                  },
+                  "attributionRequired": {
+                    "type": "boolean"
+                  },
+                  "sublicensing": {
+                    "type": "boolean"
+                  },
+                  "exclusive": {
+                    "type": "boolean"
+                  },
+                  "fixedEndDate": {
+                    "type": "string"
+                  },
+                  "offerValidUntil": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "commercialUse",
+                  "territories",
+                  "termMonths"
+                ],
+                "additionalProperties": false
+              },
+              "evidence": {
+                "minItems": 1,
+                "maxItems": 20,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "documentId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 55
+                    },
+                    "field": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 40
+                    },
+                    "quote": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 2000
+                    },
+                    "start": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "end": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "documentId",
+                    "field",
+                    "quote",
+                    "start",
+                    "end"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "id",
+              "assetId",
+              "priceCents",
+              "currency",
+              "terms",
+              "evidence"
+            ],
+            "additionalProperties": false
+          },
+          "document": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 55
+              },
+              "assetId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 55
+              },
+              "text": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 20000
+              },
+              "licensor": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "email": {
+                    "type": "string",
+                    "maxLength": 127,
+                    "pattern": "^[^\\s@]{1,64}@[^\\s@]{1,190}\\.[^\\s@]{2,}$"
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "assetId",
+              "text"
+            ],
+            "additionalProperties": false
+          },
+          "existingId": {
+            "description": "Submit a new version of this offer instead of a new offer.",
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "offer",
+          "document"
+        ],
+        "additionalProperties": false,
+        "description": "Every stated term, and the price, needs its own evidence entry whose quote is located in the source text at start..end."
+      },
+      "CatalogRun": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              },
+              "commercial": {
+                "type": "boolean"
+              },
+              "territories": {
+                "minItems": 1,
+                "maxItems": 250,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^(WORLD|[A-Z]{2})$"
+                }
+              },
+              "termMonths": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 1200
+              },
+              "budgetCents": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "currency": {
+                "type": "string"
+              },
+              "mediums": {
+                "maxItems": 20,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 40
+                }
+              },
+              "canCredit": {
+                "type": "boolean"
+              },
+              "needsSublicensing": {
+                "type": "boolean"
+              },
+              "requiresExclusive": {
+                "type": "boolean"
+              },
+              "endDate": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "commercial",
+              "territories",
+              "termMonths"
+            ],
+            "additionalProperties": false
+          },
+          "requiredAssetIds": {
+            "minItems": 1,
+            "maxItems": 12,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 55
+            }
+          },
+          "offerRefs": {
+            "minItems": 1,
+            "maxItems": 12,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "version": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "id",
+                "version"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "handoff": {
+            "description": "An agent starts the run for a person; the response carries a one-time claim link.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "project",
+          "requiredAssetIds",
+          "offerRefs"
+        ],
+        "additionalProperties": false,
+        "description": "Start a run from reviewed marketplace offers."
+      },
+      "DisputeSubmission": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 10000
+          },
+          "evidence": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100000
+          }
+        },
+        "required": [
+          "reason",
+          "evidence"
+        ],
+        "additionalProperties": false
+      },
+      "ShareRequest": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "receipt",
+              "passport"
+            ]
+          },
+          "days": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30
+          }
+        },
+        "required": [
+          "kind",
+          "days"
+        ],
+        "additionalProperties": false,
+        "description": "A receipt omits source text and personal details. A passport is complete and needs this separate, explicit grant."
+      },
+      "AgentTokenRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "LinkLegacy": {
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "runId"
+        ],
+        "additionalProperties": false
+      },
+      "LicensorReview": {
+        "type": "object",
+        "properties": {
+          "decision": {
+            "type": "string",
+            "enum": [
+              "approved",
+              "rejected",
+              "suspended"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000
+          }
+        },
+        "required": [
+          "decision",
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "OfferReview": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "approved",
+              "rejected"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 4000
+          }
+        },
+        "required": [
+          "version",
+          "decision",
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "DisputeResolution": {
+        "type": "object",
+        "properties": {
+          "decision": {
+            "type": "string",
+            "enum": [
+              "release",
+              "refund",
+              "escalate"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 4000
+          }
+        },
+        "required": [
+          "decision",
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "Reconciliation": {
+        "type": "object",
+        "properties": {
+          "providerId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9-]{1,120}$"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 4000
+          }
+        },
+        "required": [
+          "providerId",
+          "reason"
+        ],
+        "additionalProperties": false,
+        "description": "Names an existing provider record. Reconciliation only reads it; it never sends or repeats a payment."
+      },
+      "AssignLegacy": {
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "ownerId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 4000
+          }
+        },
+        "required": [
+          "runId",
+          "ownerId",
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "MarketplaceReady": {
+        "type": "object",
+        "properties": {
+          "ready": {
+            "type": "boolean",
+            "const": true
+          },
+          "payments": {
+            "type": "string",
+            "const": "sandbox-only"
+          }
+        },
+        "required": [
+          "ready",
+          "payments"
+        ],
+        "additionalProperties": false
+      },
+      "MarketplaceHealth": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "degraded"
+            ]
+          },
+          "ready_jobs": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "oldest_ready_seconds": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "running_jobs": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "reconcile_jobs": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "unmatched_webhooks": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "live_workers": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "status",
+          "ready_jobs",
+          "oldest_ready_seconds",
+          "running_jobs",
+          "reconcile_jobs",
+          "unmatched_webhooks",
+          "live_workers",
+          "reasons"
+        ],
+        "additionalProperties": false,
+        "description": "Counts only. 503 with status `degraded` when queued work exists and no worker has reported recently."
+      },
+      "Operation": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "runId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "pipeline",
+              "order",
+              "capture",
+              "payout",
+              "refund",
+              "refresh",
+              "webhook"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "succeeded",
+              "failed",
+              "reconcile",
+              "canceled"
+            ]
+          },
+          "stage": {
+            "type": "string",
+            "enum": [
+              "waiting",
+              "prepared",
+              "submitted",
+              "recorded"
+            ]
+          },
+          "code": {
+            "description": "For example ORDER_NOT_APPROVED: the provider refused before acting and the request may be repeated by a person.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "runId",
+          "kind",
+          "status",
+          "stage"
+        ],
+        "additionalProperties": false,
+        "description": "A durable background operation. `reconcile` means the outcome is uncertain and only staff may resolve it, by reading existing provider records."
+      },
+      "CatalogOffer": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "status": {
+            "type": "string"
+          },
+          "offer": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "assetId": {
+                "type": "string"
+              },
+              "priceCents": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "currency": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "assetId",
+              "priceCents",
+              "currency"
+            ],
+            "additionalProperties": {}
+          },
+          "document": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "assetId": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "assetId",
+              "text"
+            ],
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "offer",
+          "document"
+        ],
+        "additionalProperties": false
+      },
+      "LicensorProfile": {
+        "type": "object",
+        "properties": {
+          "licensor": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "version": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "pending",
+                      "approved",
+                      "rejected",
+                      "suspended"
+                    ]
+                  },
+                  "recipientConfirmed": {
+                    "type": "boolean"
+                  },
+                  "reason": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "details": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160
+                      },
+                      "recipientEmail": {
+                        "type": "string",
+                        "maxLength": 254,
+                        "format": "email",
+                        "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                      },
+                      "identityEvidence": {
+                        "type": "string",
+                        "minLength": 20,
+                        "maxLength": 50000
+                      },
+                      "rightsEvidence": {
+                        "type": "string",
+                        "minLength": 20,
+                        "maxLength": 100000
+                      },
+                      "declaration": {
+                        "type": "boolean",
+                        "const": true
+                      }
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "id",
+                  "version",
+                  "status",
+                  "recipientConfirmed",
+                  "reason",
+                  "details"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "licensor"
+        ],
+        "additionalProperties": false
+      },
+      "Submitted": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "status"
+        ],
+        "additionalProperties": false
+      },
+      "RecipientConfirmed": {
+        "type": "object",
+        "properties": {
+          "confirmed": {
+            "type": "boolean",
+            "const": true
+          },
+          "assurance": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "confirmed",
+          "assurance"
+        ],
+        "additionalProperties": false
+      },
+      "LicensorPurchases": {
+        "type": "object",
+        "properties": {
+          "purchases": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "run_id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "payout_state": {
+                  "type": "string"
+                },
+                "captured_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "run_id",
+                "payout_state",
+                "captured_at"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "purchases"
+        ],
+        "additionalProperties": false
+      },
+      "DisputeOpened": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "escalated"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "status"
+        ],
+        "additionalProperties": false
+      },
+      "ShareCreated": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "token": {
+            "type": "string",
+            "minLength": 43,
+            "maxLength": 43
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "receipt",
+              "passport"
+            ]
+          },
+          "expiresAt": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "token",
+          "kind",
+          "expiresAt",
+          "url"
+        ],
+        "additionalProperties": false,
+        "description": "The token is shown once; only its hash is stored."
+      },
+      "Shares": {
+        "type": "object",
+        "properties": {
+          "shares": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "receipt",
+                    "passport"
+                  ]
+                },
+                "expires_at": {
+                  "type": "string"
+                },
+                "revoked_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "kind",
+                "expires_at",
+                "revoked_at"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "shares"
+        ],
+        "additionalProperties": false
+      },
+      "Revoked": {
+        "type": "object",
+        "properties": {
+          "revoked": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "revoked"
+        ],
+        "additionalProperties": false
+      },
+      "SharedReceipt": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "receipt"
+          },
+          "status": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "totalCents": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "environment": {
+            "type": "string",
+            "const": "sandbox"
+          },
+          "bundleCommitment": {
+            "type": "string"
+          },
+          "ledgerCommitment": {
+            "type": "string"
+          },
+          "verification": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "status",
+          "currency",
+          "totalCents",
+          "environment",
+          "bundleCommitment",
+          "verification"
+        ],
+        "additionalProperties": false
+      },
+      "AgentTokenCreated": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "token": {
+            "type": "string",
+            "minLength": 43,
+            "maxLength": 43
+          },
+          "scope": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "expiresInDays": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "id",
+          "token",
+          "scope",
+          "expiresInDays"
+        ],
+        "additionalProperties": false,
+        "description": "Shown once."
+      },
+      "AgentTokens": {
+        "type": "object",
+        "properties": {
+          "tokens": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "expires_at": {
+                  "type": "string"
+                },
+                "revoked_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "expires_at",
+                "revoked_at"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "tokens"
+        ],
+        "additionalProperties": false
+      },
+      "Linked": {
+        "type": "object",
+        "properties": {
+          "linked": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "linked"
+        ],
+        "additionalProperties": false
+      },
+      "Assigned": {
+        "type": "object",
+        "properties": {
+          "assigned": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "assigned"
+        ],
+        "additionalProperties": false
+      },
+      "StaffQueue": {
+        "type": "object",
+        "properties": {
+          "licensors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "version": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "status": {
+                  "type": "string"
+                },
+                "recipientConfirmed": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "id",
+                "version",
+                "status",
+                "recipientConfirmed"
+              ],
+              "additionalProperties": {}
+            }
+          },
+          "offers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "version": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "offer": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": {}
+                },
+                "document": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": {}
+                }
+              },
+              "required": [
+                "id",
+                "version",
+                "offer",
+                "document"
+              ],
+              "additionalProperties": {}
+            }
+          },
+          "disputes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "runId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "status": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "runId",
+                "status"
+              ],
+              "additionalProperties": {}
+            }
+          },
+          "operations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string",
+                  "const": "reconcile"
+                }
+              },
+              "required": [
+                "id",
+                "kind",
+                "status"
+              ],
+              "additionalProperties": {}
+            }
+          }
+        },
+        "required": [
+          "licensors",
+          "offers",
+          "disputes",
+          "operations"
+        ],
+        "additionalProperties": false
+      },
+      "DisputeResolved": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "status": {
+            "type": "string"
+          },
+          "operation": {
+            "$ref": "#/components/schemas/Operation"
+          }
+        },
+        "required": [
+          "id",
+          "status"
+        ],
+        "additionalProperties": false
+      },
+      "Reconciled": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "status": {
+            "type": "string",
+            "const": "succeeded"
+          },
+          "runId": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "runId"
+        ],
+        "additionalProperties": false
+      },
+      "Catalog": {
+        "type": "object",
+        "properties": {
+          "offers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CatalogOffer"
+            }
+          }
+        },
+        "required": [
+          "offers"
+        ],
+        "additionalProperties": false
+      },
+      "MyOffers": {
+        "type": "object",
+        "properties": {
+          "offers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CatalogOffer"
+            }
+          }
+        },
+        "required": [
+          "offers"
+        ],
+        "additionalProperties": false
+      },
       "Project": {
         "type": "object",
         "properties": {

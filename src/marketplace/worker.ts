@@ -21,6 +21,8 @@ export class MarketplaceWorker {
     }, 10_000);
     let loaded: StoredRun | undefined;
     let submitted = false;
+    // Set only when the provider definitely refused before acting (a buyer who has not approved yet): safe to try again.
+    let definiteRefusal: string | undefined;
     const checkpoint = async (session: Session) => {
       if (leaseLost) throw new ConflictError("Operation lease lost.");
       await this.market.db.transaction(async (tx) => {
@@ -93,7 +95,12 @@ export class MarketplaceWorker {
         } else if (job.kind === "capture") {
           const payments = { ...this.deps.payments, createPayout: undefined, captureOrder: async (id: string) => {
             await prepare(); submitted = true;
-            return this.deps.payments!.captureOrder(id, job.externalKey!);
+            try { return await this.deps.payments!.captureOrder(id, job.externalKey!); }
+            catch (error) {
+              // PayPal answers 422 ORDER_NOT_APPROVED before capturing anything: a normal waiting state, not an unknown capture.
+              if (error instanceof Error && error.message.includes("ORDER_NOT_APPROVED")) { definiteRefusal = "ORDER_NOT_APPROVED"; submitted = false; }
+              throw error;
+            }
           } };
           await completePayment(s, { ...this.deps, payments });
         } else if (job.kind === "payout") {
@@ -149,6 +156,7 @@ export class MarketplaceWorker {
             if (job.kind === "pipeline") { loaded.session.phase = "failed"; loaded.session.failure = "The background run stopped. Review its history and start a new run; no automatic model retry was sent."; }
             await this.market.runs.save(loaded, tx);
           }
+          if (definiteRefusal) { await this.market.queue.failRetryable(tx, job, definiteRefusal); return; }
           if (submitted && job.kind !== "pipeline") await tx.query("UPDATE licensegraph.purchases SET payout_state='reconcile' WHERE run_id=$1 AND payout_state<>'refunded'", [job.runId]);
           await this.market.queue.finish(tx, job, submitted && job.kind !== "pipeline" ? "reconcile" : "failed", code);
         });

@@ -122,3 +122,19 @@ The primary account-free journey starts with the featured game-trailer case. The
 The dashboard offers fixed, validated widget actions without a model. Phone dashboards stack widgets at full width and start with side panels closed; phone layout persistence uses a separate browser-storage key so a narrow view cannot overwrite a desktop arrangement. The optional live assistant retains the existing server-side free-model guard. The presentation does not change API contracts or the rules, approval, capture and payout boundaries.
 
 Custom requirements are validated by a browser-safe draft converter before file intake and again before submission. Decimal budget text becomes integer cents without fractional multiplication or silent rounding. The offline brief reader distinguishes the product promoted by a trailer from the media that will carry the trailer. Run refreshes invalidate in-flight reads when an action response is accepted, preventing an older snapshot from replacing a newly approved or paid state in the UI.
+
+## Private marketplace mode
+
+Setting `LICENSEGRAPH_STORAGE=postgres` (with a database, storage keys and an OIDC issuer) switches the server into a signed-in mode. The offline product is untouched: without those variables nothing below is loaded, and the built-in scenarios use a separate simulator-only runtime and data directory so a replayed run can never contain private documents.
+
+**Request path.** `src/marketplace/http.ts` is a dispatcher placed in front of the existing API route families. In private mode a request is answered there or refused; it never falls back to public data. Authentication is a server-side session (hashed token in an HttpOnly cookie) created after an OIDC authorization-code flow with PKCE, state and nonce, and only for a verified email. A limited bearer credential can create catalogue runs and read; it cannot approve, claim, pay, release, share or review. Browser writes must be same-origin. Staff need the role and a second-factor claim, and cannot act on their own records.
+
+**Storage.** `src/storage/` holds the transaction helper, migrations with checksums, an AES-256-GCM envelope per record bound to a record-specific identity (a copied ciphertext does not open elsewhere), and the run repository with optimistic revisions. Ledger events, source documents, purchase authorizations, audit events and offer versions are immutable by trigger. Jobs (`operations`) are leased; an expired running job goes to `reconcile`, not to replay.
+
+**Marketplace.** Licensors submit identity and rights evidence; staff review it and a version change withdraws approval. A changed account email or lost licensor role also withdraws approval and ends sessions and agent credentials. Offers are immutable versions whose every stated term has a quotation located in the source text. A purchase approval (authorization v3) binds the account, project, offers and evidence, documents, recipient snapshots and release policy; its digest is written into the approved ledger event, and the existing `verifyBundle` still decides compliance independently.
+
+**Money.** Order, capture, payout and refund are durable jobs with fixed provider request identities. Capture does not pay creators: payouts are held until the buyer accepts or seven days pass, and an open dispute, a reversal, a suspended licensor or a changed recipient blocks release. Disputes can be released, refunded (only while funds are certainly unsent) or escalated. Reconciliation after uncertainty reads existing Sandbox records only.
+
+**Sharing.** A receipt link (no source text, no personal details) and a full-passport link are separate, expiring, revocable grants; neither exists by default. Revocation cannot recall a file someone already downloaded.
+
+**Contract.** `src/marketplace/contract.ts` is the single source for marketplace request bodies, response shapes, authentication class and status codes. The OpenAPI document is generated from it.

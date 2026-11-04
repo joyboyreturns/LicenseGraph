@@ -9,6 +9,7 @@ interface SimOrder {
   returnUrl?: string;
   cancelUrl?: string;
   approved: boolean;
+  customId?: string;
   captured?: CapturedOrder;
 }
 
@@ -34,12 +35,12 @@ export function createPayPalSimulator(options: { appUrl: () => string; now?: () 
   let failNext = options.failFirstPayout ?? false;
 
   return {
-    async createOrder(input: { amountCents: number; currency: string; requestId: string; returnUrl?: string; cancelUrl?: string }): Promise<CreatedOrder> {
+    async createOrder(input: { amountCents: number; currency: string; requestId: string; returnUrl?: string; cancelUrl?: string; customId?: string }): Promise<CreatedOrder> {
       const existing = byRequest.get(input.requestId);
       const id = existing ?? `SIM-${randomUUID().slice(0, 12).toUpperCase()}`;
       if (!existing) {
         centsToValue(input.amountCents); // same validation as the real client
-        orders.set(id, { id, amountCents: input.amountCents, currency: input.currency, returnUrl: input.returnUrl, cancelUrl: input.cancelUrl, approved: false });
+        orders.set(id, { id, amountCents: input.amountCents, currency: input.currency, returnUrl: input.returnUrl, cancelUrl: input.cancelUrl, customId: input.customId, approved: false });
         byRequest.set(input.requestId, id);
       }
       return { id, status: "PAYER_ACTION_REQUIRED", approveUrl: `${options.appUrl()}/simulator/checkout?order=${id}` };
@@ -79,6 +80,13 @@ export function createPayPalSimulator(options: { appUrl: () => string; now?: () 
       if (!payout) throw new Error(`PayPal /v1/payments/payouts/${batchId} failed: 404 (simulator)`);
       const settled = now() - payout.createdAt >= settleAfterMs;
       return { batchId, status: settled ? "SUCCESS" : "PROCESSING", items: payout.items.map((i) => ({ itemId: i.itemId, status: settled ? "SUCCESS" : "PENDING", receiver: i.receiver })) };
+    },
+
+    /** Read-only, like the Sandbox record lookup: never creates or changes anything. */
+    async inspectOrder(orderId: string): Promise<{ id: string; status: string; customId?: string; amount: { currency: string; value: string }; capture?: CapturedOrder }> {
+      const order = orders.get(orderId);
+      if (!order) throw new Error(`PayPal /v2/checkout/orders/${orderId} failed: 404 RESOURCE_NOT_FOUND (simulator)`);
+      return { id: order.id, status: order.captured ? "COMPLETED" : order.approved ? "APPROVED" : "PAYER_ACTION_REQUIRED", customId: order.customId, amount: { currency: order.currency, value: centsToValue(order.amountCents) }, ...(order.captured ? { capture: order.captured } : {}) };
     },
 
     /** Simulator only: what the buyer's "Approve" button does. Returns where to send the browser next. */

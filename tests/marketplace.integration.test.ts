@@ -8,6 +8,8 @@ import { fixtures } from "../src/demo/fixtures";
 import { extractOffer } from "../src/extraction/extract";
 import { Marketplace } from "../src/marketplace/service";
 import { MarketplaceWorker } from "../src/marketplace/worker";
+import { CatalogList, MyOffers, Res, ROUTE_SPECS } from "../src/marketplace/contract";
+import { applyWebhook, processPendingWebhooks, type PayPalEvent } from "../src/marketplace/webhooks";
 import type { PrivateRuntime } from "../src/marketplace/runtime";
 import { privateRequest } from "../src/marketplace/http";
 import { createPayPalSimulator } from "../src/payments/simulator";
@@ -89,7 +91,7 @@ describe.skipIf(!enabled)("private marketplace integration", () => {
     const f = fixtures[0]!;
     const offer = (await extractOffer(demoModel, f.doc)).offer!;
     const published = await market.publishOffer(seller, offer, f.doc);
-    await market.reviewOffer(staff, published.id, published.version, "approved");
+    await market.reviewOffer(staff, published.id, published.version, "approved", "Quotes match the licence text.");
     offerRef = { id: published.id, version: published.version };
     const row = (await db.pool.query("SELECT sealed FROM licensegraph.offers WHERE id=$1 AND version=$2", [published.id,published.version])).rows[0];
     candidate = cipher.open(row.sealed, `offer:${published.id}:${published.version}`);
@@ -313,5 +315,340 @@ describe.skipIf(!enabled)("private marketplace integration", () => {
     for (const [path, body] of [[`/api/marketplace/runs/${id}/shares`, { kind: "receipt" }], [`/api/marketplace/runs/${id}/disputes`, { reason: "Not my run", evidence: "None at all." }], [`/api/marketplace/runs/${id}/accept`, {}]] as const) {
       expect([400, 403, 404], path).toContain((await call(path, "POST", body, strangerToken)).status);
     }
+  });
+
+  describe("Stage 2 behaviours", () => {
+    const rt = () => (globalThis as unknown as { __licensegraphPrivate: PrivateRuntime }).__licensegraphPrivate;
+    const offerBody = (over: Record<string, unknown> = {}, quoteFor: Record<string, string> = {}) => {
+      const text = "Licence fee: USD 90.00. Commercial use is permitted. Territory: Worldwide. Term: 12 months. Attribution is required. Sublicensing is not permitted.";
+      const q = (field: string, quote: string) => ({ documentId: "source", field, quote: quoteFor[field] ?? quote, start: text.indexOf(quote), end: text.indexOf(quote) + quote.length });
+      return { offer: { id: "draft", assetId: "asset-http", priceCents: 9000, currency: "USD", terms: { commercialUse: true, territories: ["WORLD"], termMonths: 12, attributionRequired: true, sublicensing: false, ...over },
+        evidence: [q("price", "USD 90.00"), q("commercialUse", "Commercial use is permitted"), q("territories", "Territory: Worldwide"), q("term", "Term: 12 months"), q("attributionRequired", "Attribution is required"), q("sublicensing", "Sublicensing is not permitted")] },
+      document: { id: "source", assetId: "asset-http", text } };
+    };
+    let sellerToken: string, staffToken: string;
+    beforeAll(async () => { sellerToken = await browser(seller); staffToken = await browser(staff); });
+
+    it("accepts a fully quoted offer over HTTP, then requires a reasoned review and records it in the audit trail", async () => {
+      const created = await call("/api/marketplace/offers", "POST", offerBody(), sellerToken);
+      expect(created.status).toBe(201);
+      const { id, version } = await created.json() as { id: string; version: number };
+      const noReason = await call(`/api/marketplace/staff/offers/${id}`, "POST", { version, decision: "approved" }, staffToken);
+      expect(noReason.status).toBe(400);
+      const reviewed = await call(`/api/marketplace/staff/offers/${id}`, "POST", { version, decision: "approved", reason: "Every quotation matches the source text." }, staffToken);
+      expect(reviewed.status).toBe(200);
+      const audit = await db.pool.query("SELECT sealed,id FROM licensegraph.audit_events WHERE action='offer_approved' AND resource_id=$1", [id]);
+      expect(rt().cipher.open<{ reason: string }>(audit.rows[0].sealed, `audit:${audit.rows[0].id}`).reason).toBe("Every quotation matches the source text.");
+    });
+
+    it("rejects, over HTTP, an offer whose stated term has no quotation or whose quotation is not in the source", async () => {
+      const body = offerBody();
+      body.offer.evidence = body.offer.evidence.filter((e) => e.field !== "sublicensing");
+      expect((await call("/api/marketplace/offers", "POST", body, sellerToken)).status).toBe(409);
+      const forged = offerBody({}, { attributionRequired: "Attribution is never required" });
+      expect((await call("/api/marketplace/offers", "POST", forged, sellerToken)).status).toBe(409);
+      const strangerSeller = await call("/api/marketplace/offers", "POST", offerBody(), strangerToken);
+      expect(strangerSeller.status).toBe(403);
+    });
+
+    it("lets a seller create a new version and withdraw one, and keeps withdrawn offers out of the catalogue", async () => {
+      const first = await (await call("/api/marketplace/offers", "POST", offerBody(), sellerToken)).json() as { id: string; version: number };
+      await call(`/api/marketplace/staff/offers/${first.id}`, "POST", { version: first.version, decision: "approved", reason: "Quotes verified against source." }, staffToken);
+      const second = await (await call("/api/marketplace/offers", "POST", { ...offerBody(), existingId: first.id }, sellerToken)).json() as { version: number };
+      expect(second.version).toBe(first.version + 1);
+      expect((await call(`/api/marketplace/offers/${first.id}?version=${first.version}`, "DELETE", undefined, strangerToken)).status).toBe(404);
+      expect((await call(`/api/marketplace/offers/${first.id}?version=${first.version}`, "DELETE", undefined, sellerToken)).status).toBe(200);
+      const catalog = await (await call("/api/marketplace/catalog")).json() as { offers: { id: string; version: number }[] };
+      expect(catalog.offers.some((o) => o.id === first.id && o.version === first.version)).toBe(false);
+    });
+
+    it("lets a catalogue selection request a person handoff", async () => {
+      const response = await call("/api/sessions", "POST", { project: { name: "Handoff", commercial: true, territories: ["US"], termMonths: 6 }, requiredAssetIds: [candidate.offer.assetId], offerRefs: [offerRef], handoff: true });
+      expect(response.status).toBe(202);
+      expect((await response.json() as { handoff?: { claimUrl: string } }).handoff?.claimUrl).toContain("/claim/");
+    });
+
+    it("treats ORDER_NOT_APPROVED as a retryable waiting state, not an unknown capture", async () => {
+      const id = await readyRun();
+      await market.approve(buyer, id);
+      const order = await db.transaction((tx) => queue.enqueue(tx, id, "order", "initial"));
+      expect((await runJob(order.id)).status).toBe("succeeded");
+      const early = await call(`/api/sessions/${id}/capture`, "POST", {});
+      expect(early.status).toBe(202);
+      const job = await runJob((await early.json() as { operation: { id: string } }).operation.id);
+      expect(job).toMatchObject({ status: "failed", errorCode: "ORDER_NOT_APPROVED", stage: "prepared" });
+      expect((await db.pool.query("SELECT payout_state FROM licensegraph.purchases WHERE run_id=$1", [id])).rows[0].payout_state).not.toBe("reconcile");
+      sim.approveOrder((await runs.read(id))!.session.order!.id);
+      const again = await call(`/api/sessions/${id}/capture`, "POST", {});
+      expect(again.status).toBe(202);
+      expect((await runJob((await again.json() as { operation: { id: string } }).operation.id)).status).toBe("succeeded");
+      expect((await runs.read(id))!.session.phase).toBe("captured");
+    });
+
+    it("keeps an unmatched financial webhook queued until its purchase exists, then applies it once and blocks release and sharing", async () => {
+      const id = await readyRun();
+      await market.approve(buyer, id);
+      const order = await db.transaction((tx) => queue.enqueue(tx, id, "order", "initial"));
+      await runJob(order.id);
+      const captureId = `CAP-${randomUUID()}`;
+      const event: PayPalEvent = { id: `WH-${randomUUID()}`, event_type: "PAYMENT.CAPTURE.REVERSED", resource: { supplementary_data: { related_ids: { capture_id: captureId } } } };
+      await db.transaction(async (tx) => {
+        await tx.query("INSERT INTO licensegraph.webhook_deliveries(event_id,sealed) VALUES ($1,$2)", [event.id, rt().cipher.seal(event, `webhook:${event.id}`)]);
+        expect(await applyWebhook(rt(), tx, event)).toBe(false);
+      });
+      expect((await db.pool.query("SELECT status FROM licensegraph.webhook_deliveries WHERE event_id=$1", [event.id])).rows[0].status).toBe("queued");
+      sim.approveOrder((await runs.read(id))!.session.order!.id);
+      const capture = await db.transaction((tx) => queue.enqueue(tx, id, "capture", "initial"));
+      expect((await runJob(capture.id)).status).toBe("succeeded");
+      const real = (await runs.read(id))!.session.capture!.captureId;
+      const grant = await market.share(buyer, id, "receipt", 1);
+      await db.pool.query("UPDATE licensegraph.webhook_deliveries SET sealed=$2,created_at=now()-interval '1 minute',last_attempt_at=now()-interval '1 minute' WHERE event_id=$1", [event.id, rt().cipher.seal({ ...event, resource: { supplementary_data: { related_ids: { capture_id: real } } } }, `webhook:${event.id}`)]);
+      expect(await processPendingWebhooks(rt())).toBeGreaterThanOrEqual(1);
+      expect(await processPendingWebhooks(rt())).toBe(0);
+      expect((await db.pool.query("SELECT status FROM licensegraph.webhook_deliveries WHERE event_id=$1", [event.id])).rows[0].status).toBe("processed");
+      const session = (await runs.read(id))!.session;
+      expect(session.ledger.events().filter((e) => e.kind === "payment_reversed")).toHaveLength(1);
+      await expect(market.accept(buyer, id)).rejects.toThrow(/reversal/);
+      await expect(market.share(buyer, id, "receipt", 1)).rejects.toThrow(/un-reversed/);
+      expect((await call(`/api/marketplace/shared/${grant.token}`, "GET", undefined, strangerToken)).status).toBe(404);
+      expect((await db.pool.query("SELECT payout_state FROM licensegraph.purchases WHERE run_id=$1", [id])).rows[0].payout_state).toBe("reconcile");
+    });
+
+    it("releases payouts after the seven-day hold without buyer action, and not a moment earlier", async () => {
+      const id = await capturedRun();
+      const payout = (await db.pool.query("SELECT id FROM licensegraph.operations WHERE run_id=$1 AND kind='payout'", [id])).rows[0].id as string;
+      await db.pool.query("UPDATE licensegraph.operations SET available_at=now() WHERE id=$1", [payout]);
+      expect((await runJob(payout)).status).toBe("failed");
+      expect((await runs.read(id))!.session.payouts).toBeUndefined();
+      await db.pool.query("UPDATE licensegraph.purchases SET release_at=now()-interval '1 second' WHERE run_id=$1", [id]);
+      const retry = await call(`/api/sessions/${id}/payouts`, "POST", {});
+      expect(retry.status).toBe(202);
+      expect((await runJob((await retry.json() as { operation: { id: string } }).operation.id)).status).toBe("succeeded");
+      expect((await runs.read(id))!.session.payouts!.lines).toHaveLength(1);
+    });
+    it("does not let a stale worker record state after its lease expired, and recovers by reading the existing provider record only", async () => {
+      const id = await readyRun();
+      await market.approve(buyer, id);
+      const order = await db.transaction((tx) => queue.enqueue(tx, id, "order", "initial"));
+      await runJob(order.id);
+      const orderId = (await runs.read(id))!.session.order!.id;
+      sim.approveOrder(orderId);
+      let captures = 0;
+      const slow = { ...sim, captureOrder: async (oid: string, key: string) => {
+        captures += 1;
+        const result = await sim.captureOrder(oid, key);
+        // The lease runs out while the provider call is in flight, as after a long stall or a paused process.
+        await db.pool.query("UPDATE licensegraph.operations SET lease_until=now()-interval '1 second' WHERE run_id=$1 AND kind='capture'", [id]);
+        return result;
+      } };
+      const stale = new MarketplaceWorker(market, { ...deps, payments: slow as typeof sim });
+      const capture = await db.transaction((tx) => queue.enqueue(tx, id, "capture", "initial"));
+      const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
+      try { await stale.once(); } finally { errors.mockRestore(); }
+      expect(captures).toBe(1);
+      // The stale worker wrote nothing: the run is still waiting at order_created, and the job is not marked done.
+      expect((await runs.read(id))!.session.phase).toBe("order_created");
+      await worker.once();
+      expect((await queue.get(capture.id))).toMatchObject({ status: "reconcile" });
+      // Nothing was sent again: the provider was asked to capture exactly once.
+      expect(captures).toBe(1);
+      const staffToken = await browser(staff);
+      const wrong = await call(`/api/marketplace/staff/reconcile/${capture.id}`, "POST", { providerId: "SIM-DOES-NOT-EXIST", reason: "Checking the original order record." }, staffToken);
+      expect(wrong.status).toBeGreaterThanOrEqual(400);
+      expect((await queue.get(capture.id))).toMatchObject({ status: "reconcile" });
+      const ok = await call(`/api/marketplace/staff/reconcile/${capture.id}`, "POST", { providerId: orderId, reason: "Checked the original order record." }, staffToken);
+      expect(ok.status).toBe(200);
+      expect(captures).toBe(1);
+      const recovered = (await runs.read(id))!.session;
+      expect(recovered.phase).toBe("captured");
+      expect(recovered.capture?.captureId).toMatch(/^SIMCAP-/);
+      expect((await queue.get(capture.id))!.status).toBe("succeeded");
+    });
+  });
+  describe("dispute outcomes and races", () => {
+    const drain = async (runId: string) => {
+      for (let i = 0; i < 12; i++) {
+        await db.pool.query("UPDATE licensegraph.operations SET available_at=now() WHERE run_id=$1 AND status='queued' AND kind IN ('payout','refund')", [runId]);
+        if (!(await worker.once())) break;
+      }
+    };
+    const resolve = async (disputeId: string, decision: string) => call(`/api/marketplace/staff/disputes/${disputeId}`, "POST", { decision, reason: "Reviewed the private evidence." }, await browser(staff));
+    const dispute = async (runId: string) => (await market.dispute(buyer, runId, { reason: "The delivered rights do not match the source.", evidence: "Source comparison text." })).id as string;
+
+    it("pays the authorized recipient when staff release a disputed purchase", async () => {
+      const id = await capturedRun();
+      const d = await dispute(id);
+      expect((await resolve(d, "release")).status).toBe(200);
+      await drain(id);
+      expect((await runs.read(id))!.session.payouts!.lines.map((l) => l.email)).toEqual([seller.email]);
+      expect((await db.pool.query("SELECT status FROM licensegraph.disputes WHERE id=$1", [d])).rows[0].status).toBe("released");
+    });
+
+    it("refunds the buyer in full when staff refund a disputed purchase, and no creator is paid", async () => {
+      const id = await capturedRun();
+      const d = await dispute(id);
+      expect((await resolve(d, "refund")).status).toBe(200);
+      await drain(id);
+      const session = (await runs.read(id))!.session;
+      expect(session.phase).toBe("refunded");
+      expect(session.payouts).toBeUndefined();
+      expect((await db.pool.query("SELECT payout_state FROM licensegraph.purchases WHERE run_id=$1", [id])).rows[0].payout_state).toBe("refunded");
+      expect((await db.pool.query("SELECT status FROM licensegraph.disputes WHERE id=$1", [d])).rows[0].status).toBe("refunded");
+    });
+
+    it("keeps payouts blocked while a dispute is escalated, and a second resolution is refused", async () => {
+      const id = await capturedRun();
+      const d = await dispute(id);
+      expect((await resolve(d, "escalate")).status).toBe(200);
+      await expect(market.accept(buyer, id)).rejects.toThrow(/dispute/);
+      await drain(id);
+      expect((await runs.read(id))!.session.payouts).toBeUndefined();
+      expect((await resolve(d, "release")).status).toBe(200);
+      expect((await resolve(d, "release")).status).toBe(409);
+    });
+
+    it("refuses a refund once payouts may have been submitted, and requires escalation instead", async () => {
+      const id = await capturedRun();
+      const release = await market.accept(buyer, id);
+      await runJob(release.id);
+      const late = await dispute(id);
+      expect((await resolve(late, "refund")).status).toBe(409);
+      expect((await resolve(late, "escalate")).status).toBe(200);
+    });
+
+    it("never both pays creators and holds a dispute, however accept and dispute interleave", async () => {
+      for (let round = 0; round < 3; round++) {
+        const id = await capturedRun();
+        await Promise.allSettled([market.accept(buyer, id), dispute(id)]);
+        await drain(id);
+        const open = await db.pool.query("SELECT 1 FROM licensegraph.disputes WHERE run_id=$1 AND status IN ('open','escalated')", [id]);
+        const paid = Boolean((await runs.read(id))!.session.payouts);
+        expect(open.rowCount && paid, `round ${round}`).toBeFalsy();
+      }
+    });
+
+    it("never both refunds the buyer and pays creators, however accept and refund interleave", async () => {
+      for (let round = 0; round < 3; round++) {
+        const id = await capturedRun();
+        await Promise.allSettled([market.accept(buyer, id), call(`/api/sessions/${id}/refund`, "POST", {})]);
+        await drain(id);
+        const session = (await runs.read(id))!.session;
+        expect(session.phase === "refunded" && Boolean(session.payouts), `round ${round}`).toBe(false);
+      }
+    });
+
+    it("blocks release when the licensor is suspended after approval", async () => {
+      const other = await approvedSeller();
+      const f = fixtures[0]!;
+      const offer = (await extractOffer(demoModel, f.doc)).offer!;
+      const published = await market.publishOffer(other.person, offer, f.doc);
+      await market.reviewOffer(staff, published.id, published.version, "approved", "Quotes match the source.");
+      const sealed = (await db.pool.query("SELECT sealed FROM licensegraph.offers WHERE id=$1", [published.id])).rows[0].sealed;
+      const own = cipher.open<{ offer: LicenseOffer; document: SourceDocument }>(sealed, `offer:${published.id}:${published.version}`);
+      const s = createSession({ project: { name: "Suspension", commercial: true, territories: ["US"], termMonths: 6 }, requiredAssetIds: [own.offer.assetId], documents: [own.document] });
+      s.ownerId = buyer.id;
+      const job = await db.transaction(async (tx) => { await runs.create(s, buyer.id, tx); return queue.enqueue(tx, s.id, "pipeline", "initial", { offers: [own.offer] }); });
+      await runJob(job.id);
+      await market.approve(buyer, s.id);
+      const order = await db.transaction((tx) => queue.enqueue(tx, s.id, "order", "initial"));
+      await runJob(order.id);
+      sim.approveOrder((await runs.read(s.id))!.session.order!.id);
+      const capture = await db.transaction((tx) => queue.enqueue(tx, s.id, "capture", "initial"));
+      await runJob(capture.id);
+      await market.reviewLicensor(staff, other.id, "suspended", "Rights evidence withdrawn.");
+      const release = await market.accept(buyer, s.id);
+      expect((await runJob(release.id)).status).toBe("failed");
+      expect((await runs.read(s.id))!.session.payouts).toBeUndefined();
+    });
+  });
+  describe("multiple worker instances", () => {
+    it("runs each queued job exactly once when several workers drain the queue together", async () => {
+      const ids: string[] = [];
+      for (let i = 0; i < 4; i++) {
+        const s = createSession({ project: { name: `Parallel ${i}`, commercial: true, territories: ["US"], termMonths: 6 }, requiredAssetIds: [candidate.offer.assetId], documents: [candidate.document] });
+        s.ownerId = buyer.id;
+        await db.transaction(async (tx) => { await runs.create(s, buyer.id, tx); await queue.enqueue(tx, s.id, "pipeline", "initial", { offers: [candidate.offer] }); });
+        ids.push(s.id);
+      }
+      const workers = [new MarketplaceWorker(market, deps), new MarketplaceWorker(market, deps), new MarketplaceWorker(market, deps)];
+      await Promise.all(workers.map(async (w) => { for (let i = 0; i < 20; i++) if (!(await w.once())) break; }));
+      for (const id of ids) {
+        const ops = (await db.pool.query("SELECT status FROM licensegraph.operations WHERE run_id=$1 AND kind='pipeline'", [id])).rows;
+        expect(ops, id).toEqual([{ status: "succeeded" }]);
+        expect((await runs.read(id))!.session.phase).toBe("verified");
+        const events = (await runs.read(id))!.session.ledger.events();
+        expect(new Set(events.map((e) => e.seq)).size).toBe(events.length);
+      }
+    });
+
+    it("sends one provider capture even when workers and duplicate requests race for it", async () => {
+      const id = await readyRun();
+      await market.approve(buyer, id);
+      const order = await db.transaction((tx) => queue.enqueue(tx, id, "order", "initial"));
+      await runJob(order.id);
+      sim.approveOrder((await runs.read(id))!.session.order!.id);
+      let captures = 0;
+      const counting = { ...sim, captureOrder: async (oid: string, key: string) => { captures += 1; return sim.captureOrder(oid, key); } };
+      const workers = [new MarketplaceWorker(market, { ...deps, payments: counting as typeof sim }), new MarketplaceWorker(market, { ...deps, payments: counting as typeof sim })];
+      const requests = await Promise.all([1, 2, 3].map(() => call(`/api/sessions/${id}/capture`, "POST", {})));
+      expect(new Set(await Promise.all(requests.map(async (r) => ((await r.json()) as { operation: { id: string } }).operation.id))).size).toBe(1);
+      await Promise.all(workers.map(async (w) => { for (let i = 0; i < 6; i++) if (!(await w.once())) break; }));
+      expect(captures).toBe(1);
+      expect((await runs.read(id))!.session.phase).toBe("captured");
+    });
+  });
+  describe("response contract", () => {
+    const rt = () => (globalThis as unknown as { __licensegraphPrivate: PrivateRuntime }).__licensegraphPrivate;
+    const parsed = async <T extends { safeParse: (v: unknown) => { success: boolean; error?: unknown } }>(schema: T, response: Response, status = 200) => {
+      expect(response.status).toBe(status);
+      const body = await response.json();
+      const result = schema.safeParse(body);
+      expect(result.success, JSON.stringify(result.error ?? body).slice(0, 400)).toBe(true);
+      return body as Record<string, any>;
+    };
+
+    it("returns bodies matching the published response schemas on every exercised route", async () => {
+      const sToken = await browser(seller), stToken = await browser(staff);
+      await parsed(Res.Ready, await call("/api/marketplace/ready"));
+      await parsed(CatalogList, await call("/api/marketplace/catalog"));
+      await parsed(MyOffers, await call("/api/marketplace/offers", "GET", undefined, sToken));
+      await parsed(Res.LicensorProfile, await call("/api/marketplace/licensor", "GET", undefined, sToken));
+      await parsed(Res.Purchases, await call("/api/marketplace/licensor/purchases", "GET", undefined, sToken));
+      await parsed(Res.StaffQueue, await call("/api/marketplace/staff/reviews", "GET", undefined, stToken));
+
+      // Offer lifecycle: submit, review, withdraw.
+      const text = "Licence fee: USD 55.00. Commercial use is permitted. Territory: Worldwide. Term: 12 months.";
+      const q = (field: string, quote: string) => ({ documentId: "source", field, quote, start: text.indexOf(quote), end: text.indexOf(quote) + quote.length });
+      const submitted = await parsed(Res.Submitted, await call("/api/marketplace/offers", "POST", { offer: { id: "draft", assetId: "asset-contract", priceCents: 5500, currency: "USD", terms: { commercialUse: true, territories: ["WORLD"], termMonths: 12 },
+        evidence: [q("price", "USD 55.00"), q("commercialUse", "Commercial use is permitted"), q("territories", "Territory: Worldwide"), q("term", "Term: 12 months")] }, document: { id: "source", assetId: "asset-contract", text } }, sToken), 201);
+      await parsed(Res.Submitted, await call(`/api/marketplace/staff/offers/${submitted.id}`, "POST", { version: submitted.version, decision: "approved", reason: "Quotes match the source text." }, stToken));
+      await parsed(Res.Submitted, await call(`/api/marketplace/offers/${submitted.id}?version=${submitted.version}`, "DELETE", undefined, sToken));
+
+      // Purchase lifecycle: operation, disputes, shares, agent credentials.
+      const id = await capturedRun();
+      const op = (await db.pool.query("SELECT id FROM licensegraph.operations WHERE run_id=$1 LIMIT 1", [id])).rows[0].id as string;
+      await parsed(Res.Operation, await call(`/api/marketplace/operations/${op}`));
+      const share = await parsed(Res.ShareCreated, await call(`/api/marketplace/runs/${id}/shares`, "POST", { kind: "receipt", days: 1 }), 201);
+      await parsed(Res.Shares, await call(`/api/marketplace/runs/${id}/shares`));
+      const shared = await call(`/api/marketplace/shared/${share.token}`, "GET", undefined, strangerToken);
+      await parsed(Res.SharedReceipt, shared);
+      await parsed(Res.Revoked, await call(`/api/marketplace/shares/${share.id}`, "DELETE"));
+      const opened = await parsed(Res.DisputeOpened, await call(`/api/marketplace/runs/${id}/disputes`, "POST", { reason: "The rights do not match the source.", evidence: "Comparison attached." }), 201);
+      await parsed(Res.DisputeResolved, await call(`/api/marketplace/staff/disputes/${opened.id}`, "POST", { decision: "escalate", reason: "Escalated for review of evidence." }, stToken));
+      const accepted = await capturedRun();
+      await parsed(Res.Operation, await call(`/api/marketplace/runs/${accepted}/accept`, "POST", {}), 202);
+      const created = await parsed(Res.AgentTokenCreated, await call("/api/marketplace/agent-tokens", "POST", { name: "contract agent" }), 201);
+      await parsed(Res.AgentTokens, await call("/api/marketplace/agent-tokens"));
+      await parsed(Res.Revoked, await call(`/api/marketplace/agent-tokens/${created.id}`, "DELETE"));
+      const health = await call("/api/marketplace/health");
+      expect([200, 503]).toContain(health.status);
+      expect(Res.Health.safeParse(await health.json()).success).toBe(true);
+    });
+
+    it("documents a route spec for every marketplace route family the dispatcher serves", () => {
+      const documented = new Set(ROUTE_SPECS.map((r) => `${r.method} ${r.path}`));
+      for (const key of ["get /api/marketplace/catalog", "post /api/marketplace/offers", "delete /api/marketplace/offers/{id}", "post /api/marketplace/staff/reconcile/{id}", "get /api/marketplace/health"]) expect(documented.has(key), key).toBe(true);
+      expect(rt()).toBeDefined();
+    });
   });
 });

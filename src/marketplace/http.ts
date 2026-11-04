@@ -15,12 +15,14 @@ import { offerSchema } from "../mcp/tools";
 import { canonicalJson } from "../core/digest";
 import { readOwner } from "../server/owner";
 import { readWebhookHeaders } from "../payments/webhook";
-import { marketplaceOfferSchema } from "./types";
+import { Req } from "./contract";
+import { applyWebhook } from "./webhooks";
+import { paymentReversed } from "./service";
 import type { PurchaseDetails } from "./types";
 
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
 const uuid = z.uuid();
-const publicOperation = (job: Operation) => ({ id: job.id, runId: job.runId, kind: job.kind, status: job.status, stage: job.stage });
+const publicOperation = (job: Operation) => ({ id: job.id, runId: job.runId, kind: job.kind, status: job.status, stage: job.stage, ...(job.errorCode ? { code: job.errorCode } : {}) });
 
 async function readJson(request: Request): Promise<unknown> {
   const maximum = 500_000;
@@ -55,7 +57,7 @@ function summary(s: Session) {
     rounds: view.rounds, totalCents: view.bundle?.totalCents, currency: view.bundle?.currency, naiveTotalCents: view.analysis?.naiveTotalCents, blocked: view.analysis?.blockedPurchases.length ?? 0, paid: Boolean(s.capture) };
 }
 async function createRun(rt: PrivateRuntime, principal: Principal, body: unknown) {
-  const selection = z.object({ project: sessionInputSchema.shape.project, requiredAssetIds: sessionInputSchema.shape.requiredAssetIds, offerRefs: z.array(z.object({ id: z.uuid(), version: z.number().int().positive() }).strict()).min(1).max(12) }).strict();
+  const selection = Req.CatalogRun;
   const selected = selection.safeParse(body);
   return rt.db.transaction(async (tx) => {
     let session: Session;
@@ -96,7 +98,7 @@ async function queuePurchase(rt: PrivateRuntime, principal: Principal, runId: st
     }
     const job = await rt.queue.enqueue(tx, runId, kind, kind === "payout" ? "release" : "initial");
     // A failed precondition may be retried by an explicit human request. Submitted or uncertain jobs never restart here.
-    if (job.status === "failed" && job.stage !== "submitted") {
+    if (job.status === "failed" && job.stage !== "submitted" && job.stage !== "recorded") {
       await tx.query("UPDATE licensegraph.operations SET status='queued',error_code=NULL,available_at=now() WHERE id=$1 AND status='failed' AND stage<>'submitted'", [job.id]);
       job.status = "queued";
     }
@@ -132,16 +134,28 @@ export async function privateRequest(request: Request): Promise<Response | undef
       throw new AccessError("Unknown account action.", 404);
     }
     if (path === "/api/marketplace/ready") {
-      const ready = await rt.db.pool.query("SELECT version FROM public.licensegraph_migrations WHERE version=2");
+      const ready = await rt.db.pool.query("SELECT version FROM public.licensegraph_migrations WHERE version=3");
       if (!ready.rowCount) throw new AccessError("Database migrations are required.", 503);
       return json({ ready: true, payments: "sandbox-only" });
+    }
+    if (path === "/api/marketplace/health") {
+      // Counts only: no identifiers, no record contents.
+      const health = (await rt.db.pool.query(`SELECT
+        (SELECT count(*) FROM licensegraph.operations WHERE status='queued' AND available_at<=now())::int AS ready_jobs,
+        (SELECT COALESCE(EXTRACT(EPOCH FROM now()-min(available_at)),0) FROM licensegraph.operations WHERE status='queued' AND available_at<=now())::int AS oldest_ready_seconds,
+        (SELECT count(*) FROM licensegraph.operations WHERE status='running')::int AS running_jobs,
+        (SELECT count(*) FROM licensegraph.operations WHERE status='reconcile')::int AS reconcile_jobs,
+        (SELECT count(*) FROM licensegraph.webhook_deliveries WHERE status IN ('queued','reconcile'))::int AS unmatched_webhooks,
+        (SELECT count(*) FROM licensegraph.worker_heartbeats WHERE beat_at > now() - interval '60 seconds')::int AS live_workers`)).rows[0];
+      const stalled = health.ready_jobs > 0 && (health.live_workers === 0 || health.oldest_ready_seconds > 120);
+      return json({ status: stalled ? "degraded" : "ok", ...health, reasons: stalled ? [health.live_workers === 0 ? "No worker has reported in the last 60 seconds." : "Queued work is older than two minutes."] : [] }, stalled ? 503 : 200);
     }
     if (path.startsWith("/api/marketplace/shared/")) {
       const token = path.split("/").at(-1)!;
       if (!/^[A-Za-z0-9_-]{43}$/.test(token)) throw new AccessError("Share not found.", 404);
       const grant = (await rt.db.pool.query("SELECT run_id,kind FROM licensegraph.share_grants WHERE token_hash=$1 AND revoked_at IS NULL AND expires_at>now()", [hashSecret(token)])).rows[0];
       const loaded = grant && await rt.runs.read(grant.run_id);
-      if (!loaded || !loaded.session.capture || loaded.session.refund) throw new AccessError("Share not found.", 404);
+      if (!loaded || !loaded.session.capture || loaded.session.refund || paymentReversed(loaded.session)) throw new AccessError("Share not found.", 404);
       if (grant.kind === "passport") return json(await passport(rt, loaded.session));
       const s = loaded.session;
       return json({ kind: "receipt", status: s.phase, currency: s.capture!.amount.currency, totalCents: s.loop!.verdict!.totalCents, environment: "sandbox", bundleCommitment: s.approval!.bundleDigest, ledgerCommitment: s.ledger.events().at(-1)?.hash, verification: "Receipt only; full source and passport checks require an explicit full-passport grant." });
@@ -311,7 +325,7 @@ async function marketplaceRequest(rt: PrivateRuntime, principal: Principal, requ
   if (area === "agent-tokens") {
     if (request.method === "GET") return json({ tokens: (await rt.db.pool.query("SELECT id,name,expires_at,revoked_at FROM licensegraph.agent_tokens WHERE user_id=$1 ORDER BY created_at DESC", [principal.id])).rows });
     if (request.method === "POST" && !id) {
-      const body = z.object({ name: z.string().trim().min(1).max(80) }).strict().parse(await readJson(request));
+      const body = Req.AgentTokenRequest.parse(await readJson(request));
       const token = randomBytes(32).toString("base64url");
       const tokenId = randomUUID();
       await rt.db.pool.query("INSERT INTO licensegraph.agent_tokens(id,user_id,token_hash,name,expires_at) VALUES ($1,$2,$3,$4,now()+interval '7 days')", [tokenId,principal.id,hashSecret(token),body.name]);
@@ -347,8 +361,12 @@ async function marketplaceRequest(rt: PrivateRuntime, principal: Principal, requ
   }
   if (area === "licensor" && id === "confirm" && request.method === "POST") return json(await rt.market.confirmRecipient(principal));
   if (area === "offers" && request.method === "POST") {
-    const body = z.object({ offer: marketplaceOfferSchema, document: sessionInputSchema.shape.documents.element, existingId: z.uuid().optional() }).strict().parse(await readJson(request));
+    const body = Req.OfferSubmission.parse(await readJson(request));
     return json(await rt.market.publishOffer(principal, body.offer, body.document, body.existingId), 201);
+  }
+  if (area === "offers" && id && request.method === "DELETE") {
+    const version = z.coerce.number().int().positive().parse(new URL(request.url).searchParams.get("version"));
+    return json(await rt.market.withdrawOffer(principal, uuid.parse(id), version));
   }
   if (area === "offers" && request.method === "GET") {
     const rows = await rt.db.pool.query("SELECT o.* FROM licensegraph.offers o JOIN licensegraph.licensors l ON l.id=o.licensor_id WHERE l.user_id=$1 ORDER BY o.id,o.version DESC", [principal.id]);
@@ -359,7 +377,7 @@ async function marketplaceRequest(rt: PrivateRuntime, principal: Principal, requ
     if (action === "accept" && request.method === "POST") return json(publicOperation(await rt.market.accept(principal, runId)), 202);
     if (action === "disputes" && request.method === "POST") return json(await rt.market.dispute(principal, runId, await readJson(request)), 201);
     if (action === "shares" && request.method === "POST") {
-      const body = z.object({ kind: z.enum(["receipt", "passport"]), days: z.number().int().min(1).max(30) }).strict().parse(await readJson(request));
+      const body = Req.ShareRequest.parse(await readJson(request));
       const grant = await rt.market.share(principal, runId, body.kind, body.days);
       return json({ ...grant, url: `${rt.appUrl}/share/${grant.token}` }, 201);
     }
@@ -380,7 +398,7 @@ async function marketplaceRequest(rt: PrivateRuntime, principal: Principal, requ
     return json({ revoked: true });
   }
   if (area === "link-legacy" && request.method === "POST") {
-    const body = z.object({ runId: z.uuid() }).strict().parse(await readJson(request));
+    const body = Req.LinkLegacy.parse(await readJson(request));
     const owner = readOwner(request);
     if (!owner) throw new AccessError("The browser that originally owned this run is required.");
     await rt.db.transaction(async (tx) => {
@@ -403,24 +421,24 @@ async function marketplaceRequest(rt: PrivateRuntime, principal: Principal, requ
         disputes: readable("staff_disputes", disputes.rows, (row) => ({ id: row.id, runId: row.run_id, status: row.status, details: rt.cipher.open(row.sealed, `dispute:${row.id}`) })), operations: operations.rows });
     }
     if (id === "licensors" && action && request.method === "POST") {
-      const body = z.object({ decision: z.enum(["approved","rejected","suspended"]), reason: z.string().trim().min(1).max(4000) }).strict().parse(await readJson(request));
+      const body = Req.LicensorReview.parse(await readJson(request));
       return json(await rt.market.reviewLicensor(principal, uuid.parse(action), body.decision, body.reason));
     }
     if (id === "offers" && action && request.method === "POST") {
-      const body = z.object({ version: z.number().int().positive(), decision: z.enum(["approved","rejected"]) }).strict().parse(await readJson(request));
-      return json(await rt.market.reviewOffer(principal, uuid.parse(action), body.version, body.decision));
+      const body = Req.OfferReview.parse(await readJson(request));
+      return json(await rt.market.reviewOffer(principal, uuid.parse(action), body.version, body.decision, body.reason));
     }
     if (id === "disputes" && action && request.method === "POST") {
-      const body = z.object({ decision: z.enum(["release","refund","escalate"]), reason: z.string().trim().min(10).max(4000) }).strict().parse(await readJson(request));
+      const body = Req.DisputeResolution.parse(await readJson(request));
       return json(await resolveDispute(rt, principal, uuid.parse(action), body));
     }
     if (id === "reconcile" && action && request.method === "POST") {
-      const body=z.object({providerId:z.string().regex(/^[A-Za-z0-9-]{1,120}$/),reason:z.string().trim().min(10).max(4000)}).strict().parse(await readJson(request));
+      const body=Req.Reconciliation.parse(await readJson(request));
       const {reconcileOperation}=await import("./reconcile");
       return json(await reconcileOperation(rt,principal,uuid.parse(action),body.providerId,body.reason));
     }
     if (id === "assign-legacy" && request.method === "POST") {
-      const body = z.object({ runId: z.uuid(), ownerId: z.uuid(), reason: z.string().trim().min(10).max(4000) }).strict().parse(await readJson(request));
+      const body = Req.AssignLegacy.parse(await readJson(request));
       await rt.db.transaction(async (tx) => {
         const updated = await tx.query("UPDATE licensegraph.runs SET owner_id=$1,legacy_owner_hash=NULL WHERE id=$2 AND owner_id IS NULL", [body.ownerId, body.runId]);
         if (!updated.rowCount) throw new ConflictError("Only unassigned imported runs can be assigned.");
@@ -467,41 +485,7 @@ async function receiveWebhook(rt: PrivateRuntime, request: Request) {
   return rt.db.transaction(async (tx) => {
     const inserted = await tx.query("INSERT INTO licensegraph.webhook_deliveries(event_id,sealed) VALUES ($1,$2) ON CONFLICT DO NOTHING RETURNING event_id", [event.id, rt.cipher.seal(event, `webhook:${event.id}`)]);
     if (!inserted.rowCount) return json({ accepted: true, duplicate: true });
-    if (event.event_type === "CHECKOUT.ORDER.APPROVED") {
-      const purchase = (await tx.query("SELECT run_id,sealed FROM licensegraph.purchases WHERE order_id=$1", [String(event.resource.id)])).rows[0];
-      if (purchase) {
-        const details = rt.cipher.open<PurchaseDetails>(purchase.sealed, `purchase:${purchase.run_id}`);
-        const units = event.resource.purchase_units as { custom_id?: string }[] | undefined;
-        if (units?.[0]?.custom_id !== details.authorizationDigest) throw new AccessError("Webhook purchase authorization mismatch.");
-        await rt.runs.lock(purchase.run_id, tx);
-        await rt.queue.enqueue(tx, purchase.run_id, "capture", "initial");
-      }
-    } else if (event.event_type === "PAYMENT.CAPTURE.REFUNDED" || event.event_type === "PAYMENT.CAPTURE.REVERSED") {
-      const related = event.resource.supplementary_data as { related_ids?: { capture_id?: string } } | undefined;
-      const links = Array.isArray(event.resource.links) ? event.resource.links as { rel?: string; href?: string }[] : [];
-      const captureId = related?.related_ids?.capture_id ?? /\/captures\/([A-Za-z0-9-]+)/.exec(links.find((link) => link.rel === "up")?.href ?? "")?.[1];
-      const purchase = captureId && (await tx.query("SELECT run_id FROM licensegraph.purchases WHERE capture_id=$1", [captureId])).rows[0];
-      if (purchase) {
-        const loaded = await rt.runs.lock(purchase.run_id, tx);
-        if (!loaded.session.refund) {
-          loaded.session.ledger.append("payment_reversed", { eventId: event.id, captureId, reason: event.event_type });
-          await rt.runs.save(loaded, tx);
-          await tx.query("UPDATE licensegraph.purchases SET payout_state='reconcile' WHERE run_id=$1", [purchase.run_id]);
-          await tx.query("UPDATE licensegraph.operations SET status='canceled' WHERE run_id=$1 AND kind='payout' AND status='queued'", [purchase.run_id]);
-        }
-      }
-    } else if (event.event_type.startsWith("PAYMENT.PAYOUT")) {
-      const batch = event.resource.batch_header as { payout_batch_id?: string } | undefined;
-      const batchId = batch?.payout_batch_id ?? event.resource.payout_batch_id;
-      if (typeof batchId === "string") {
-        const purchase = (await tx.query("SELECT run_id FROM licensegraph.purchases WHERE payout_batch_id=$1", [batchId])).rows[0];
-        if (purchase) {
-          await rt.runs.lock(purchase.run_id, tx);
-          await rt.queue.enqueue(tx, purchase.run_id, "refresh", `webhook:${event.id}`, { attempt: 0 });
-        }
-      }
-    }
-    await tx.query("UPDATE licensegraph.webhook_deliveries SET status='processed' WHERE event_id=$1", [event.id]);
+    await applyWebhook(rt, tx, event);
     return json({ accepted: true }, 202);
   });
 }

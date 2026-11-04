@@ -123,3 +123,15 @@ Prize targets: Best Overall, Best Use of Agentic Commerce, Best Use of AG Grid. 
 - [x] Add desktop/phone and light/dark browser regression journeys with screenshots; fix dark matrix contrast and phone dashboard obstruction.
 - [x] Update the demo script, Devpost draft and local judge guide. Validation results are recorded in docs/READINESS.md.
 - Deployment, public video, final submission fields and any trial licence remain owner-supplied release items.
+
+## Private marketplace delivery (November 2026)
+
+Delivered in gated stages, each committed only after typecheck, unit, PostgreSQL, build, the 76-journey offline suite and the private browser suite passed on the tree:
+
+1. Baseline: private browser suite made repeatable; database tests isolated from the live database; unreadable records no longer take down the catalogue or the job queue.
+2. Identity and privacy: OIDC flow checks (state, nonce, PKCE, `returnTo`, replay), registration, unverified email, recovery, agent scope and expiry, claim transfer, cross-account denial on every route family, seller approval withdrawn on email or role change.
+3. Marketplace behaviour: reasoned offer review, per-term evidence over HTTP, optional terms with quotations, new versions and withdrawal, retryable `ORDER_NOT_APPROVED`, durable webhook retry, reversal blocks, worker heartbeat and health.
+4. Operations: legacy importer, backup and verified restore, key rotation with retained keys, passport key retirement, CI jobs for PostgreSQL and the private browser flows, `docs/OPERATIONS.md`.
+5. Contract and documentation: generated OpenAPI for every marketplace route.
+
+Not part of this plan: deployment, publication, a demo recording, submission, any live-money operation.

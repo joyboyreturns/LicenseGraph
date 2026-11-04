@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { MARKETPLACE_ROUTES } from "../marketplace/routes";
+import { ROUTE_SPECS, Req, Res, CatalogList, MyOffers, type RouteSpec } from "../marketplace/contract";
 import { sessionInputSchema } from "../server/session-input";
 import * as S from "./schemas";
 
@@ -42,7 +42,7 @@ const RebriefInput = z
 const RunId = z.object({ id: z.string() });
 
 const registry = z.registry<{ id?: string }>();
-for (const s of [S.Project, S.Offer, S.LedgerEvent, S.SessionView, S.RunCreated, S.RunSummary, S.Passport, S.PassportVerification, S.ApiError, S.BriefReading, S.Answer, S.Health, S.Config, S.Scenario, RunInput, ScenarioStart, IntakeInput, AskInput, ApproveInput, ClaimInput, ReviseInput, RebriefInput]) {
+for (const s of [...Object.values(Req), ...Object.values(Res), CatalogList, MyOffers, S.Project, S.Offer, S.LedgerEvent, S.SessionView, S.RunCreated, S.RunSummary, S.Passport, S.PassportVerification, S.ApiError, S.BriefReading, S.Answer, S.Health, S.Config, S.Scenario, RunInput, ScenarioStart, IntakeInput, AskInput, ApproveInput, ClaimInput, ReviseInput, RebriefInput]) {
   registry.add(s, z.globalRegistry.get(s) ?? {});
 }
 
@@ -66,6 +66,46 @@ const err = (...codes: [string, string][]) => Object.fromEntries(codes.map(([c, 
 const idParam = { name: "id", in: "path", required: true, schema: { type: "string" }, description: "The run id." };
 const owner = [{ ownerCookie: [] }];
 
+
+const AUTH_TEXT: Record<RouteSpec["auth"], string> = {
+  public: "No sign-in needed.",
+  session: "Browser session only (`lg_account` cookie, same-origin writes). Agent bearer credentials are refused with 403.",
+  "agent-read": "Browser session, or a limited agent bearer credential (read only).",
+  staff: "Browser session of a staff account that signed in with a second factor. Staff cannot act on their own records.",
+};
+const SECURITY: Record<RouteSpec["auth"], unknown[]> = { public: [], session: [{ accountCookie: [] }], "agent-read": [{ accountCookie: [] }, { agentBearer: [] }], staff: [{ accountCookie: [] }] };
+const schemaRef = (schema: unknown): Json => {
+  const id = (z.globalRegistry.get(schema as z.ZodType) as { id?: string } | undefined)?.id;
+  if (id) return ref(id);
+  const members = (schema as { def?: { options?: unknown[] } }).def?.options;
+  if (members) return { oneOf: members.map(schemaRef) };
+  return { type: "object", additionalProperties: true };
+};
+
+function marketplacePaths(): Record<string, Json> {
+  const paths: Record<string, Json> = {};
+  for (const spec of ROUTE_SPECS) {
+    const status = String(spec.status ?? 200);
+    const queued = spec.status === 202;
+    const path = (paths[spec.path] ??= {}) as Json;
+    path[spec.method] = {
+      operationId: `${spec.method}${spec.path.replace(/[^a-zA-Z0-9]+/g, "_")}`,
+      tags: ["Private marketplace"], summary: spec.summary,
+      description: [AUTH_TEXT[spec.auth], spec.note, queued ? "Returns 202: the work is durably queued, not finished. Poll `GET /api/marketplace/operations/{id}` and the run. Repeating the request never creates a second money movement." : undefined,
+        "Available only when the private workspace (PostgreSQL and sign-in) is configured; in the anonymous offline mode these paths return 503."].filter(Boolean).join(" "),
+      parameters: [...spec.path.matchAll(/\{(\w+)\}/g)].map((m) => ({ name: m[1], in: "path", required: true, schema: { type: "string" } })),
+      security: SECURITY[spec.auth],
+      ...(spec.request ? { requestBody: { required: true, content: { "application/json": { schema: schemaRef(spec.request) } } } } : {}),
+      responses: {
+        ...(spec.response ? ok(queued ? "Operation queued." : status === "201" ? "Created." : "Success.", schemaRef(spec.response), status) : {}),
+        ...(spec.auth === "public" ? {} : err(["401", "Sign in first."], ["403", "Not allowed for this credential or role, or a cross-origin write."])),
+        ...err(...(spec.errors ?? [])),
+      },
+    };
+  }
+  return paths;
+}
+
 export function buildOpenApi(serverUrl = "http://localhost:3000"): Json {
   void RunId;
   return {
@@ -76,7 +116,7 @@ export function buildOpenApi(serverUrl = "http://localhost:3000"): Json {
       summary: "Check creative licences against a project, then pay the creators.",
       description:
         "An AI agent reads licences and proposes the cheapest bundle. A deterministic rules engine verifies it against the project and rejects anything that breaks a term. A person approves, PayPal Orders and Payouts settle in the Sandbox, and a Licence Passport lets anyone check the result.\n\n" +
-        "Money moves only after a person approves. A run an agent starts with `handoff: true` cannot be approved or paid until a person takes control with the one-time claim link. Approve, pay, capture, payouts and refund need the `lg_owner` cookie of the browser that started (or claimed) the run.",
+        "Money moves only after a person approves. A run an agent starts with `handoff: true` cannot be approved or paid until a person takes control with the one-time claim link. Approve, pay, capture, payouts and refund need the `lg_owner` cookie of the browser that started (or claimed) the run.\n\n**Two modes.** Offline mode (default): runs belong to an anonymous browser (`lg_owner` cookie), replay recorded model output, and payments use the labelled simulator or PayPal Sandbox. Private workspace mode (PostgreSQL and OIDC sign-in configured): `/api/sessions`, `/api/passports`, `/api/portfolio` and `/api/mcp` calls are scoped to the signed-in account or a limited agent bearer credential, the `lg_owner` and anyone-with-the-link statements below do not apply, long operations return `202` with a durable operation to poll, and the `/api/marketplace/*` paths are available. Passports are private until the owner creates an explicit share.",
       license: { name: "MIT", identifier: "MIT" },
     },
     servers: [{ url: serverUrl, description: "This server" }],
@@ -84,6 +124,7 @@ export function buildOpenApi(serverUrl = "http://localhost:3000"): Json {
       { name: "Runs", description: "Start a run, follow it, and settle it." },
       { name: "Passports", description: "The independently checkable record of a paid run." },
       { name: "Agents", description: "Model Context Protocol endpoint for AI agents." },
+      { name: "Private marketplace", description: "Signed-in workspace: reviewed licensors and offers, durable purchases, disputes and explicit sharing. Requires the private workspace configuration." },
       { name: "Intake", description: "Plain-English helpers." },
       { name: "Service", description: "Health, configuration and demo data." },
     ],
@@ -94,13 +135,7 @@ export function buildOpenApi(serverUrl = "http://localhost:3000"): Json {
         parameters: [{ name: "action", in: "path", required: true, schema: { type: "string", enum: ["login","callback","me","logout"] } }],
         responses: { ...ok("Current identity or account result.", { type: "object" }), "303": { description: "Account redirect; HttpOnly cookies are set or cleared." }, ...err(["401","Sign-in failed or email is unverified."],["403","Cross-origin action refused."],["503","Identity or database unavailable."]) }
       }])),
-      ...Object.fromEntries(MARKETPLACE_ROUTES.map((route) => [route.path, Object.fromEntries(route.methods.map((method) => [method, {
-        operationId: `${method}${route.path.replace(/[^a-zA-Z0-9]/g, "_")}`, summary: route.summary,
-        description: "Private workspace endpoint. Browser writes require a same-origin Origin header. Staff endpoints require MFA and the staff role. Uncertain submitted operations cannot be blindly retried. Receipt grants redact source text and personal details; full passports need a separate grant.",
-        parameters: [...route.path.matchAll(/\{(\w+)\}/g)].map((match) => ({ name: match[1], in: "path", required: true, schema: { type: "string" } })),
-        security: "public" in route ? [] : [{ accountCookie: [] }, { agentBearer: [] }],
-        responses: { ...ok("Action result.", { type: "object" }), ...ok("Operation durably queued. Poll its operation ID and the run; do not issue a new transfer identity.", { type: "object" }, "202"), ...ok("Record or grant created.", { type: "object" }, "201"), ...err(["400","Invalid bounded input."],["401","Sign-in required."],["403","Role, ownership, agent scope or origin refused."],["404","Record not visible."],["409","State conflict or reconciliation required."],["503","Required service unavailable."]) }
-      }]))])),
+      ...marketplacePaths(),
       "/api/sessions": {
         post: {
           operationId: "startRun",

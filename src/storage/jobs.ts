@@ -7,14 +7,14 @@ import { ConflictError } from "./runs";
 export type OperationKind = "pipeline" | "order" | "capture" | "payout" | "refund" | "refresh" | "webhook";
 export interface Operation {
   id: string; runId: string; kind: OperationKind; status: string; stage: string;
-  leaseToken?: string; externalKey?: string; createdAt: Date; payload: unknown;
+  leaseToken?: string; externalKey?: string; errorCode?: string; createdAt: Date; payload: unknown;
 }
 
 export class JobQueue {
   constructor(readonly db: Database, readonly cipher: RecordCipher) {}
   private decode(row: Record<string, any>): Operation {
     return { id: row.id, runId: row.run_id, kind: row.kind, status: row.status, stage: row.stage, leaseToken: row.lease_token ?? undefined,
-      externalKey: row.external_key ?? undefined, createdAt: row.created_at, payload: row.sealed ? this.cipher.open(row.sealed, `operation:${row.id}`) : null };
+      externalKey: row.external_key ?? undefined, errorCode: row.error_code ?? undefined, createdAt: row.created_at, payload: row.sealed ? this.cipher.open(row.sealed, `operation:${row.id}`) : null };
   }
   async enqueue(tx: Transaction, runId: string, kind: OperationKind, dedupe: string, payload: unknown = null, availableAt = new Date()): Promise<Operation> {
     const id = randomUUID();
@@ -63,6 +63,11 @@ export class JobQueue {
   async finish(tx: Transaction, job: Operation, status: "succeeded" | "failed" | "reconcile", errorCode?: string): Promise<void> {
     await this.assertLease(tx, job);
     await tx.query("UPDATE licensegraph.operations SET status=$1,stage=CASE WHEN $1='succeeded' THEN 'recorded' ELSE stage END,error_code=$2,lease_until=NULL,updated_at=now() WHERE id=$3", [status, errorCode ?? null, job.id]);
+  }
+  /** The provider definitely refused before acting, so the operation may be tried again by a person. Never used for uncertain outcomes. */
+  async failRetryable(tx: Transaction, job: Operation, errorCode: string): Promise<void> {
+    await this.assertLease(tx, job);
+    await tx.query("UPDATE licensegraph.operations SET status='failed',stage='prepared',error_code=$1,lease_until=NULL,updated_at=now() WHERE id=$2", [errorCode, job.id]);
   }
   async get(id: string): Promise<Operation | undefined> {
     const result = await this.db.pool.query("SELECT * FROM licensegraph.operations WHERE id=$1", [id]);

@@ -25,7 +25,11 @@
     "test:database": "node --env-file-if-exists=.env.local-infra scripts/database-tests.mjs",
     "identity:setup": "node --env-file=.env.local-infra --import tsx scripts/keycloak-setup.ts",
     "identity:fixtures": "node --env-file=.env.local-infra --import tsx scripts/identity-fixtures.ts",
-    "test:marketplace-browser": "node --env-file=.env.local-infra ./node_modules/playwright/cli.js test --config playwright.marketplace.config.ts"
+    "test:marketplace-browser": "node --env-file=.env.local-infra ./node_modules/playwright/cli.js test --config playwright.marketplace.config.ts",
+    "db:import-legacy": "node --env-file-if-exists=.env.local-infra --import tsx scripts/import-legacy.ts",
+    "db:rekey": "node --env-file-if-exists=.env.local-infra --import tsx scripts/database-rekey.ts",
+    "db:backup": "node --env-file-if-exists=.env.local-infra --import tsx scripts/database-backup.ts",
+    "db:restore": "node --env-file-if-exists=.env.local-infra --import tsx scripts/database-restore.ts"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",

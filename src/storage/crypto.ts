@@ -12,6 +12,15 @@ export class RecordCipher {
     }));
     if (!this.keys.has(currentKeyId)) throw new Error("The current storage encryption key is missing.");
   }
+  /** The key an envelope was sealed with, or undefined if it is not a valid envelope. */
+  static keyIdOf(sealed: string): string | undefined {
+    const [version, keyId, , , , extra] = sealed.split(".");
+    return version === "v1" && keyId && extra === undefined ? keyId : undefined;
+  }
+  /** The same content sealed with the current key. The record identity must match the original. */
+  reseal(sealed: string, identity: string): string {
+    return this.seal(this.open(sealed, identity), identity);
+  }
   seal(value: unknown, identity: string): string {
     const nonce = randomBytes(12);
     const cipher = createCipheriv("aes-256-gcm", this.keys.get(this.currentKeyId)!, nonce);
@@ -28,4 +37,10 @@ export class RecordCipher {
     decipher.setAuthTag(Buffer.from(tag, "base64url"));
     return JSON.parse(Buffer.concat([decipher.update(Buffer.from(value, "base64url")), decipher.final()]).toString("utf8")) as T;
   }
+}
+
+/** The key id a sealed value was written with, without opening it. */
+export function sealedKeyId(sealed: string): string | undefined {
+  const [version, keyId] = sealed.split(".");
+  return version === "v1" ? keyId : undefined;
 }

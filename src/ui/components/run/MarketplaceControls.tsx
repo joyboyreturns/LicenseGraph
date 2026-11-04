@@ -12,7 +12,9 @@ export function MarketplaceControls({view,refresh}:{view:SessionView;refresh:()=
  async function action(work:()=>Promise<unknown>,message:string){setBusy(true);setError("");try{await work();setNotice(message);await refresh();}catch(e){setError(errorMessage(e));}finally{setBusy(false);}}
  return <section className={`card ${styles.panel}`} aria-label="Private purchase controls" style={{marginBlock:24}}><p className="eyebrow">Private marketplace · Sandbox only</p><h2>Purchase controls</h2><p>Approval binds your account, project brief, exact offers and recipients. Captured funds stay held until you accept the purchase or seven days pass without a dispute.</p>
   <p><Link href="/workspace">Back to your private workspace</Link></p>
-  {view.pendingOperation&&<p className="callout" role="status">{view.pendingOperation.kind}: {view.pendingOperation.status.replaceAll("_"," ")}{view.pendingOperation.status==="reconcile"?". The outcome is uncertain. Staff must reconcile existing provider records before another money action.":""}</p>}
+  {view.pendingOperation&&(view.pendingOperation.status==="failed"&&view.pendingOperation.error_code==="ORDER_NOT_APPROVED"
+   ?<p className="callout" role="status">Waiting for you to approve the order at PayPal. Nothing was captured. Approve it there, then complete the payment again.</p>
+   :<p className="callout" role="status">{view.pendingOperation.kind}: {view.pendingOperation.status.replaceAll("_"," ")}{view.pendingOperation.status==="reconcile"?". The outcome is uncertain. Staff must reconcile existing provider records before another money action.":""}</p>)}
   {view.purchase&&<p>Payout status: <strong>{view.purchase.payout_state}</strong>{view.purchase.release_at&&` · release eligible ${new Date(view.purchase.release_at).toLocaleString()}`}</p>}
   {error&&<p className="callout tone-bad" role="alert">{error}</p>}{notice&&<p role="status" className="callout">{notice}</p>}
   <fieldset disabled={busy} className={styles.all}><legend className="visually-hidden">Purchase and sharing actions</legend>

@@ -106,13 +106,27 @@ npm run test:e2e
 
 The browser suite builds the app and runs against the offline demo. It covers purchases, rejected bundles, payout failures, refunds, ownership, passport tampering, and desktop/phone accessibility checks. Credential-dependent tests are skipped by default. Dated results and separate provider checks are in [READINESS.md](docs/READINESS.md).
 
+## Private workspace (optional)
+
+For signed-in accounts, a reviewed-offer marketplace, held creator payouts and disputes, start the local services and the worker:
+
+```sh
+npm run infra:init && docker-compose --env-file .env.local-infra up -d
+npm run db:migrate && npm run identity:setup && npm run identity:fixtures
+npm run build && npm start      # and, in another terminal: npm run worker
+npm run test:database           # PostgreSQL suites, in a throwaway database
+npm run test:marketplace-browser  # sign-in, MFA, registration and recovery against local Keycloak and Mailpit
+```
+
+Model and payment credentials are cleared for these tests. Payments stay on PayPal Sandbox or the simulator.
+
 ## Limits
 
 This is still a prototype. Matching a quotation proves the text exists; it doesn't prove the extraction is the right legal interpretation, the document is genuine, or the seller owns the rights. Source review matters.
 
 The cost check covers the supplied offers and implemented rules. It doesn't handle mixed-currency bundles, exchange rates or discounts that depend on buying several assets together. Scanned PDFs need transcription; there is no OCR.
 
-Run ownership uses an anonymous browser cookie, not a full account system. Run and passport links are readable by anyone who has them. Keep confidential documents on a private instance.
+In the default offline mode, run ownership is an anonymous browser cookie and run and passport links are readable by anyone who has them. The optional private workspace (PostgreSQL and sign-in, see [operations](docs/OPERATIONS.md)) makes runs and passports private to an account until the owner creates an explicit share. Identity and rights review in the marketplace records a staff decision with evidence; it does not certify legal ownership. Only local development infrastructure has been exercised; nothing is deployed.
 
 Payments are limited to Sandbox or simulation. Deployment is deferred; use the local demo for now. AG Studio has a separate commercial licence and may show a trial watermark without a key.
 
@@ -122,6 +136,7 @@ Payments are limited to Sandbox or simulation. Deployment is deferred; use the l
 - [Verification evidence and remaining release work](docs/READINESS.md)
 - [Development plan](docs/PLAN.md)
 - [Deployment notes](docs/DEPLOY.md)
+- [Operating the private workspace](docs/OPERATIONS.md)
 
 AI assistance was used while writing and testing parts of this project.
 

@@ -41,3 +41,20 @@ The initial registry audit reported nine affected package entries, including dev
 Final command results are recorded in `docs/HANDOFF.md`: 436 unit/property/API tests and 12 browser journeys passed; typecheck and production build passed; the final dependency audit reported zero known vulnerabilities. Run `npm ci`, `npm test`, `npm run test:e2e`, then `npm run typecheck` sequentially. The build regenerates `.next/types`, so a concurrent standalone typecheck can race with it.
 
 This remains a single-process Sandbox prototype. Session locks do not coordinate multiple workers; use one server process. The filesystem is trusted and persistence remains best-effort, so durable transaction reconciliation needs a database before production use. Uploaded licences and public passports are readable by anyone with their links. Verified licensor onboarding, legal interpretation validation and disputes remain outside the implemented scope. Text-based PDF ingestion and captured-payment refunds have since been implemented; scanned-PDF OCR remains outside scope. Live Sandbox and live-model tests require owner credentials and remain unverified in this checkout.
+
+## Private marketplace review, 4 November 2026
+
+Defects found by running the private browser suite and the new integration tests for the first time, then fixed with a test each:
+
+- The database test script wrote its throwaway-key fixtures into the live application database. It now recreates an isolated database on every run.
+- One record sealed with an unavailable key made the whole catalogue and the staff queue return 503; one unreadable queued job could block every worker. Both now leave the bad record out or fail it visibly and report a count.
+- A presented bearer credential that did not resolve fell through to the public handlers. It now fails with 401.
+- Agent read scope matched any path under `/api/sessions/` and `/api/passports/`. It now matches only the run and passport read routes.
+- Claim errors returned 503; they now return 409. Provider and client errors during sign-in returned 503; they now return 401, while an unreachable provider stays 503.
+- A changed email or withdrawn licensor role left seller approval, sessions and agent credentials in place.
+- A capture refused with `ORDER_NOT_APPROVED` was recorded as an unknown capture needing staff reconciliation.
+- A webhook that arrived before its purchase was marked processed and lost.
+- Form fields took their accessible name from their pre-filled value, so a filled evidence box could not be found by label.
+- The private header said "Replayed demo" and "Payments off" on a signed-in workspace.
+
+Remaining limits: see "Not verified" in `docs/READINESS.md`. Dependency audit: 0 known vulnerabilities on 4 November 2026.

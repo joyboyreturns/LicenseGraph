@@ -2,6 +2,48 @@
 
 Latest local workbench verification: 2 November 2026. Earlier audit and provider evidence from 29 October 2026, based on revision `c26b30d`, is retained below. This report separates repeatable offline verification from provider checks and release work. Passing tests demonstrate the cases below; they do not establish that licence interpretations are legally correct or guarantee a competition result.
 
+## Private marketplace, 4 November 2026
+
+Scope: signed-in accounts, PostgreSQL storage, reviewed licensors and offers, held creator payouts, disputes, explicit sharing, operations tooling. Everything ran locally against throwaway PostgreSQL, Keycloak and Mailpit containers, the payment simulator and the offline replay. Nothing was deployed or published, and no model or PayPal request was sent.
+
+**Final gate on the working tree (run in sequence):**
+
+| Check | Result |
+| --- | --- |
+| `npm run typecheck` | passed |
+| `npx vitest run` | 832 passed, 70 skipped (77 files passed, 6 skipped) |
+| `npm run test:database` (isolated, recreated database) | 43 passed |
+| `npm run build` | passed |
+| `npm run test:marketplace-browser` | 12 passed |
+| `npm run test:e2e` (existing offline journeys) | 75 of 76 on the first run; **76 of 76 on the rerun** |
+| `npm audit` | 0 vulnerabilities |
+
+The one failure was `tests/e2e/scenarios.spec.ts:107` ("gap panel offers a paste box"), "Response has been disposed": its mocked route awaits a request after the test has ended. That spec was not changed by this work, passed in every other full run, and passed on rerun. It is a race in the test's route handler, not yet fixed. Do not treat it as proof the product is free of intermittent failures.
+
+The 70 skips are 27 live-provider tests that need credentials (not run) and the 43 PostgreSQL tests, which are skipped under plain `npx vitest run` and run by `npm run test:database` (counted separately above).
+
+**Tested, with evidence in the suites:**
+
+- Sign-in: authorization request carries state, nonce and an S256 PKCE challenge; `returnTo` cannot leave the application; forged, missing and replayed callbacks create no session; sign-out revokes the server session; cross-origin sign-out is refused.
+- Accounts: registration proves control of the email before a password is set; an unverified account never gets an application session; password recovery replaces and retires the old password; real one-time-code enrolment produces the second-factor claim that staff routes require.
+- Access: agent credentials can create catalogue runs and read, and are refused on approval, payment, claim, review, sharing and staff routes; expired, revoked and malformed credentials fail instead of falling back to public data; another account or an anonymous caller gets nothing from any run, passport, badge, QR, operation or listing route, and cannot write to someone else's run; claim works only for a different signed-in person with an unexpired, single-use link.
+- Sellers: a changed account email or lost licensor role withdraws approval and ends sessions and agent credentials; offers need a located quotation for every stated term over the real HTTP path; reviews need a reason, which is audited; versions can be created and withdrawn; seller and staff cannot review their own records.
+- Money: capture does not pay creators; payouts are held until acceptance or seven days; disputes block unsent payouts; `ORDER_NOT_APPROVED` is a retryable wait, not an unknown capture; a worker whose lease expired mid-call writes nothing and the job goes to reconciliation, and staff reconciliation reads the named existing record without sending again; an unmatched webhook is retained and applied once its purchase exists; a reversal blocks release and sharing and revokes share links.
+- Data: legacy import is idempotent and quarantines bad files without touching originals; a backup restores into an empty database with documents, authorizations and ledger chains verified, and detects a changed file, a non-empty target and a tampered authorization; key rotation re-seals mutable records and leaves immutable ones readable with the retained old key; a retired passport key keeps verifying older passports.
+- Interface: desktop and phone, light and dark, with automated accessibility scans on the workspace, creator and staff screens.
+
+**Simulated, not provider-verified:** order, capture, payout, refund and webhook behaviour used the payment simulator or fixtures. No genuine PayPal Sandbox delivery, order or payout was exercised in this work. A reconciliation against a real Sandbox record has not been run.
+
+**Not verified:**
+
+- The two new CI jobs (PostgreSQL, and the private browser flows against Keycloak and Mailpit) have not run on GitHub.
+- A restore onto a different machine.
+- Real email delivery, a managed identity provider, TLS, hosting. Keycloak ran in development mode.
+- Multi-instance behaviour under real load; the multi-worker and crash cases are covered by lease and fault-injection tests in one process.
+- Legal sufficiency of the identity and rights review. It records a staff decision with evidence and does not certify ownership.
+- The staff screen lists operations awaiting reconciliation but not unmatched webhooks; the health endpoint reports their count.
+- The new screens have had automated accessibility scans only. No screen-reader pass was done, and keyboard operation and error recovery of the new forms were not separately tested.
+
 ## Reliability follow-up, 2 November 2026
 
 Three additional regressions were reproduced against the earlier production build, then fixed:
@@ -123,4 +165,4 @@ User impact is still a hypothesis. Ask intended users whether the source review 
 
 ## Practical limits
 
-This is a single-process Sandbox prototype, with filesystem persistence and anonymous browser ownership. Multi-process transaction coordination, durable financial reconciliation, verified licensor onboarding, licence authenticity, legal interpretation validation, scanned-PDF OCR, currency conversion and disputes need further work before production use. A mandate is advisory, signatures require the signing secret, and a quote's presence does not validate its interpretation. Anyone with a run or passport link can read its published documents.
+The default offline mode is a single-process Sandbox prototype with filesystem persistence and anonymous browser ownership. The optional private workspace adds PostgreSQL transactions, leased jobs and accounts, as described above and in `docs/OPERATIONS.md`. Multi-process transaction coordination, durable financial reconciliation, verified licensor onboarding, licence authenticity, legal interpretation validation, scanned-PDF OCR, currency conversion and disputes need further work before production use. A mandate is advisory, signatures require the signing secret, and a quote's presence does not validate its interpretation. Anyone with a run or passport link can read its published documents.

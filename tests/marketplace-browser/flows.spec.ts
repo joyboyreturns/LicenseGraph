@@ -21,6 +21,7 @@ test("verified sign-in, private account session, phone layout and logout",async(
 });
 
 test("creator submission and staff review require an actual second factor",async({browser})=>{
+ const asset=`local-music-${Date.now().toString(36)}`;
  // Return the staff fixture to "not yet enrolled" so enrolment is exercised on every run, not only the first.
  const admin=await localIdentityAdmin();
  for(const credential of await admin(`/users/${identities.staff!.id}/credentials`) as {id:string;type:string}[]){if(credential.type==="otp")await admin(`/users/${identities.staff!.id}/credentials/${credential.id}`,"DELETE");}
@@ -40,11 +41,29 @@ test("creator submission and staff review require an actual second factor",async
  expect((await(await staff.request.get("/api/auth/me")).json()).user.mfa).toBe(true);
  await staff.getByRole("button",{name:"Staff review",exact:true}).click();const profile=staff.locator("article").filter({has:staff.getByRole("heading",{name:"Local review creator · pending"})});await profile.getByLabel("Reason",{exact:true}).fill("Local fixture identity and rights documents reviewed.");await profile.getByRole("button",{name:"Record decision"}).click();await expect(staff.getByText("Licensor reviewed completed.",{exact:true})).toBeVisible();
  await seller.reload();await seller.getByRole("button",{name:"Creator desk",exact:true}).click();await expect(seller.getByText(/Profile version \d+:/)).toContainText("approved");
- await seller.getByLabel("Asset ID",{exact:true}).fill("local-music");await seller.getByLabel("Price in USD",{exact:true}).fill("200.00");await seller.getByLabel("Months, or perpetual").fill("24");
+ await seller.getByLabel("Asset ID",{exact:true}).fill(asset);await seller.getByLabel("Price in USD",{exact:true}).fill("200.00");await seller.getByLabel("Months, or perpetual").fill("24");
  const source="Licence fee: USD 200.00. Commercial productions are permitted. Territory: Worldwide. Term: 24 months from purchase.";
  await seller.getByLabel("Complete licence source text").fill(source);await seller.getByRole("button",{name:"Add the four supporting quotations"}).click();
  for(const [field,quote] of Object.entries({price:"Licence fee: USD 200.00.",commercialUse:"Commercial productions are permitted.",territories:"Territory: Worldwide.",termMonths:"Term: 24 months from purchase."}))await seller.getByLabel(`Exact source quotation: ${field}`,{exact:true}).fill(quote);
  await seller.getByRole("button",{name:"Submit offer for review",exact:true}).click();await expect(seller.getByText("Offer submitted completed.",{exact:true})).toBeVisible();await scan(seller);
- await staff.reload();await staff.getByRole("button",{name:"Staff review",exact:true}).click();const offer=staff.locator("article").filter({has:staff.getByRole("heading",{name:"Offer: local-music · $200.00"})});await offer.getByLabel("Reason",{exact:true}).fill("Price and all source quotations reviewed against the submitted terms.");await offer.getByRole("button",{name:"Record decision"}).click();await expect(staff.getByText("Offer reviewed completed.",{exact:true})).toBeVisible();await scan(staff);
+ await staff.reload();await staff.getByRole("button",{name:"Staff review",exact:true}).click();const offer=staff.locator("article").filter({has:staff.getByRole("heading",{name:`Offer: ${asset} · $200.00`})});await offer.getByLabel("Reason",{exact:true}).fill("Price and all source quotations reviewed against the submitted terms.");await offer.getByRole("button",{name:"Record decision"}).click();await expect(staff.getByText("Offer reviewed completed.",{exact:true})).toBeVisible();await scan(staff);
+ // A new version may state optional terms, each with its own located quotation, and a version can be withdrawn.
+ await seller.reload();await seller.getByRole("button",{name:"Creator desk",exact:true}).click();
+ await seller.getByRole("button",{name:`Create a new version of ${asset}`}).click();await expect(seller.getByText("Creating a new version.")).toBeVisible();
+ await seller.getByLabel("Asset ID",{exact:true}).fill(asset);await seller.getByLabel("Price in USD",{exact:true}).fill("180.00");await seller.getByLabel("Months, or perpetual").fill("24");
+ const richer=source+" Credit to the creator is required.";
+ await seller.getByLabel("Complete licence source text").fill(richer.replace("USD 200.00","USD 180.00"));
+ await seller.getByLabel("Attribution required",{exact:true}).selectOption("yes");
+ await seller.getByRole("button",{name:"Add the four supporting quotations"}).click();
+ for(const [field,quote] of Object.entries({price:"Licence fee: USD 180.00.",commercialUse:"Commercial productions are permitted.",territories:"Territory: Worldwide.",termMonths:"Term: 24 months from purchase."}))await seller.getByLabel(`Exact source quotation: ${field}`,{exact:true}).fill(quote);
+ await seller.getByLabel("Exact source quotation: Attribution required",{exact:true}).fill("Credit to the creator is required.");
+ await scan(seller);
+ await seller.getByRole("button",{name:"Submit new version for review",exact:true}).click();await expect(seller.getByText("New offer version submitted completed.",{exact:true})).toBeVisible();
+ const mine=seller.locator("article",{hasText:asset});await expect(mine.getByText("Version 2: pending")).toBeVisible();
+ await seller.getByRole("button",{name:`Withdraw version 2 of ${asset}`}).click();await expect(seller.getByText("Offer withdrawn completed.",{exact:true})).toBeVisible();await expect(mine.getByText("Version 2: withdrawn")).toBeVisible();
+ // The header says what this server really is.
+ await expect(seller.locator(".chip").filter({hasText:"Private workspace"}).first()).toBeVisible();await expect(seller.locator(".chip").filter({hasText:"Replayed demo"})).toHaveCount(0);
+ // Health reports counts only.
+ const health=await(await seller.request.get("/api/marketplace/health")).json();expect(Object.keys(health).sort()).toEqual(["live_workers","oldest_ready_seconds","ready_jobs","reasons","reconcile_jobs","running_jobs","status","unmatched_webhooks"]);
  await sellerContext.close();await staffContext.close();
 });
