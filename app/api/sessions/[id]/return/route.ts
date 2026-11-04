@@ -1,3 +1,4 @@
+import { privateRequest } from "@/src/marketplace/http";
 import { completePayment } from "@/src/app-logic/session";
 import { sessionOr404 } from "@/src/server/http";
 import { getRuntime } from "@/src/server/runtime";
@@ -8,6 +9,8 @@ export const dynamic = "force-dynamic";
 
 /** PayPal sends the buyer here after approval. We capture the order we created, then show the result. */
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const privateResponse = await privateRequest(req);
+  if (privateResponse) return privateResponse;
   const id = (await params).id;
   const session = sessionOr404(id);
   const back = new URL(`/run/${encodeURIComponent(id)}`, getRuntime().appUrl);

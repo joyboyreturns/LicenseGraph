@@ -1,3 +1,4 @@
+import { privateRequest } from "@/src/marketplace/http";
 import { refreshPayouts, viewOf } from "@/src/app-logic/session";
 import { json } from "@/src/server/http";
 import { readOwner } from "@/src/server/owner";
@@ -7,6 +8,8 @@ export const dynamic = "force-dynamic";
 
 /** Every run's view for the portfolio dashboard, newest first. Licence text is left out: the dashboard does not need it. */
 export async function GET(req: Request) {
+  const privateResponse = await privateRequest(req);
+  if (privateResponse) return privateResponse;
   const { store, deps } = getRuntime();
   const me = readOwner(req);
   const mine = () => store.list().filter((s) => !s.ownerId || s.ownerId === me);

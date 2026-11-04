@@ -1,3 +1,4 @@
+import { privateRequest } from "@/src/marketplace/http";
 import { settleCreators, viewOf } from "@/src/app-logic/session";
 import { fail, forbidUnlessOwner, json, sessionOr404 } from "@/src/server/http";
 import { getRuntime } from "@/src/server/runtime";
@@ -6,6 +7,8 @@ export const dynamic = "force-dynamic";
 
 /** Retry creator payouts after a failure. Never touches the captured payment. */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const privateResponse = await privateRequest(req);
+  if (privateResponse) return privateResponse;
   try {
     const session = sessionOr404((await params).id);
     if (!session) return json({ error: "Session not found." }, 404);

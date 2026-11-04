@@ -46,7 +46,7 @@ export const SessionView = z
     failure: z.string().optional(),
     awaitingPerson: z.boolean().optional().describe("An agent started this run and no person has taken control yet, so it cannot be approved or paid."),
     project: Project,
-    meta: z.object({ scenarioId: z.string().optional(), brief: z.string().optional(), runKind: z.enum(["demo", "live"]).optional(), startedBy: z.literal("agent").optional(), revisedFrom: z.string().optional().describe("The run whose gap requests this one answers, with a licensor's revised licence added."), rebriefedFrom: z.string().optional().describe("The run whose brief this one changed: the same licences, checked against a different brief.") }).optional(),
+    meta: z.object({ scenarioId: z.string().optional(), brief: z.string().optional(), runKind: z.enum(["demo", "live", "catalog"]).optional(), startedBy: z.literal("agent").optional(), revisedFrom: z.string().optional().describe("The run whose gap requests this one answers, with a licensor's revised licence added."), rebriefedFrom: z.string().optional().describe("The run whose brief this one changed: the same licences, checked against a different brief.") }).optional(),
     documents: z.array(z.object({ id: z.string(), assetId: z.string(), text: z.string(), licensorName: z.string().optional() })),
     candidates: z.array(Offer).describe("Every offer read from the licences."),
     loopStatus: z.enum(["verified", "exhausted", "stalled"]).optional(),
@@ -78,7 +78,7 @@ export const RunSummary = z
     createdAt: z.string(),
     name: z.string(),
     phase,
-    runKind: z.enum(["demo", "live"]).optional(),
+    runKind: z.enum(["demo", "live", "catalog"]).optional(),
     scenarioId: z.string().optional(),
     revisedFrom: z.string().optional().describe("The run this one answers, when a licensor's revised licence was added."),
     rebriefedFrom: z.string().optional().describe("The run whose brief this one changed: the same licences, checked against a different brief."),
@@ -127,10 +127,10 @@ export const BriefReading = z
 
 export const Answer = z.object({ answer: z.string(), source: z.enum(["model", "local"]), citations: z.array(z.string()).describe("Offer ids the answer refers to; each exists in the run.") }).meta({ id: "Answer" });
 
-export const Health = z.object({ ok: z.literal(true), mode: z.enum(["demo", "live"]), paymentsMode: z.string(), runs: z.number().int() }).meta({ id: "Health" });
+export const Health = z.object({ ok: z.literal(true), mode: z.enum(["demo", "live", "catalog"]), paymentsMode: z.string(), runs: z.number().int() }).meta({ id: "Health" });
 
 export const Config = z
-  .object({ mode: z.enum(["demo", "live"]), model: z.string().optional(), paymentsEnabled: z.boolean(), paymentsMode: z.string(), assistant: z.boolean(), intakeModel: z.boolean(), passportSigned: z.boolean(), webhooks: z.boolean().describe("PayPal webhook deliveries are accepted at /api/webhooks/paypal."), appUrl: z.string() })
+  .object({ mode: z.enum(["demo", "live", "catalog"]), model: z.string().optional(), paymentsEnabled: z.boolean(), paymentsMode: z.string(), assistant: z.boolean(), intakeModel: z.boolean(), passportSigned: z.boolean(), webhooks: z.boolean().describe("PayPal webhook deliveries are accepted at /api/webhooks/paypal."), appUrl: z.string() })
   .meta({ id: "Config" });
 
 export const Scenario = z

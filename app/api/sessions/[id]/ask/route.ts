@@ -1,3 +1,4 @@
+import { privateRequest } from "@/src/marketplace/http";
 import { viewOf } from "@/src/app-logic/session";
 import { answerQuestion, answerLocally } from "@/src/intake/explain";
 import { json, sessionOr404 } from "@/src/server/http";
@@ -11,6 +12,8 @@ const modelBudget = createRateLimiter(4, 60_000);
 
 /** Ask a question about one run. Grounded in the run's recorded facts; always answers. */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const privateResponse = await privateRequest(req);
+  if (privateResponse) return privateResponse;
   const session = sessionOr404((await params).id);
   if (!session) return json({ error: "Session not found." }, 404);
   const body = (await req.json().catch(() => null)) as { question?: unknown } | null;

@@ -274,6 +274,7 @@ export function phaseInfo(phase: string): { label: string; tone: Tone } {
 }
 
 export function runKindLabel(runKind: string | undefined): { label: string; long: string } {
+  if (runKind === "catalog") return { label: "Reviewed catalogue", long: "A deterministic baseline proposes reviewed offers; the rules engine independently verifies them." };
   if (runKind === "live") return { label: "Live model run", long: "A live model read these licences and proposed each bundle." };
   return { label: "Replay of recorded model output", long: "Built-in scenario: the model's recorded answers are replayed, so the run is instant and repeatable. The rules engine still runs live." };
 }

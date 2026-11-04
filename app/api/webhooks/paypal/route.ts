@@ -1,3 +1,4 @@
+import { privateRequest } from "@/src/marketplace/http";
 import { fail, json } from "@/src/server/http";
 import { getRuntime } from "@/src/server/runtime";
 import { handleWebhookEvent, readWebhookHeaders, type WebhookEvent } from "@/src/payments/webhook";
@@ -11,6 +12,8 @@ const MAX_BODY = 256_000;
  * for this webhook id; anything else is refused before it can touch a run.
  */
 export async function POST(req: Request) {
+  const privateResponse = await privateRequest(req);
+  if (privateResponse) return privateResponse;
   const { webhookId, deps, store } = getRuntime();
   const verify = deps.payments?.verifyWebhookSignature;
   if (!webhookId || !verify) return json({ error: "Webhooks are not configured on this server." }, 503);

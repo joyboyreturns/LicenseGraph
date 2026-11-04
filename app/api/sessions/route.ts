@@ -1,3 +1,4 @@
+import { privateRequest } from "@/src/marketplace/http";
 import { createSession, reserveForPerson, runPipeline, SessionError, viewOf, type SessionInput } from "@/src/app-logic/session";
 import { scenarioById } from "@/src/demo/scenarios";
 import { fail, json } from "@/src/server/http";
@@ -28,6 +29,8 @@ function scenarioMandate(body: Body | null): Pick<NonNullable<SessionInput["meta
 }
 
 export async function POST(req: Request) {
+  const privateResponse = await privateRequest(req);
+  if (privateResponse) return privateResponse;
   try {
     const rt = getRuntime();
     const body = (await req.json().catch(() => null)) as Body | null;
@@ -69,7 +72,9 @@ export async function POST(req: Request) {
 }
 
 /** The caller's own runs, newest first: the portfolio. Runs from before owners existed are shown to everyone. */
-export function GET(req: Request) {
+export async function GET(req: Request) {
+  const privateResponse = await privateRequest(req);
+  if (privateResponse) return privateResponse;
   const me = readOwner(req);
   const runs = getRuntime().store.list().filter((s) => !s.ownerId || s.ownerId === me).map((s) => {
     const v = viewOf(s);

@@ -1,3 +1,4 @@
+import { privateRequest } from "@/src/marketplace/http";
 import { rebriefInput, recordRebrief } from "@/src/app-logic/revision";
 import { createSession, runPipeline, SessionError, viewOf } from "@/src/app-logic/session";
 import { describeChange } from "@/src/core/whatif";
@@ -16,6 +17,8 @@ const MAX_ACTIVE_RUNS = 3;
  * the rules for the changed brief can be approved and paid.
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const privateResponse = await privateRequest(req);
+  if (privateResponse) return privateResponse;
   try {
     const rt = getRuntime();
     const from = sessionOr404((await params).id);

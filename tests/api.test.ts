@@ -87,7 +87,7 @@ describe("scenarios and config", () => {
 
   it("reports the runtime configuration without secrets", async () => {
     install();
-    const cfg = await body(await getConfig());
+    const cfg = await body(await getConfig(new Request("http://app/api/config")));
     expect(cfg).toMatchObject({ mode: "demo", paymentsEnabled: true, passportSigned: true, assistant: false });
     expect(JSON.stringify(cfg)).not.toContain("test-secret");
   });

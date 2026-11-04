@@ -10,6 +10,9 @@ export type PayPalClient = ReturnType<typeof createPayPalClient>;
 /** A human's sign-off on one specific bundle. */
 export interface Approval {
   digestVersion?: 2;
+  purchaseDigest?: string;
+  accountId?: string;
+  authorizationVersion?: 3;
   approvedBy: string;
   approvedAt: string;
   /** Digest of the bundle that was shown to the approver. */

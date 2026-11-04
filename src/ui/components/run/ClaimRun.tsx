@@ -4,7 +4,7 @@ import { UserCheck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { SessionView } from "@/src/app-logic/session";
-import { api, errorMessage } from "@/src/ui/lib/api";
+import { api, ApiError, errorMessage } from "@/src/ui/lib/api";
 import { Spinner } from "../bits";
 
 /**
@@ -15,13 +15,14 @@ export function ClaimRun({ id, token }: { id: string; token: string }) {
   const router = useRouter();
   const [view, setView] = useState<SessionView | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [needsSignIn,setNeedsSignIn]=useState(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    api<SessionView>(`/api/sessions/${encodeURIComponent(id)}`)
+    api<SessionView>(`/api/sessions/${encodeURIComponent(id)}?claimToken=${encodeURIComponent(token)}`)
       .then(setView)
-      .catch((e) => setError(errorMessage(e)));
-  }, [id]);
+      .catch((e) => {setError(errorMessage(e));setNeedsSignIn(e instanceof ApiError&&e.status===401);});
+  }, [id,token]);
 
   async function take() {
     setBusy(true);
@@ -58,6 +59,7 @@ export function ClaimRun({ id, token }: { id: string; token: string }) {
           {error}
         </p>
       )}
+      {needsSignIn&&<a className="btn btn-primary" href={`/api/auth/login?returnTo=${encodeURIComponent(`/claim/${id}?token=${encodeURIComponent(token)}`)}`}>Sign in to review and claim this run</a>}
       <div className="row" style={{ marginTop: 20 }}>
         <button type="button" className="btn btn-lg btn-primary" onClick={take} disabled={busy || !token || !view?.awaitingPerson}>
           {busy ? <Spinner label="Taking control" /> : <UserCheck aria-hidden />} Take control of this run

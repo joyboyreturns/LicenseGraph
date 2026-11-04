@@ -1,4 +1,4 @@
-import { assertModelIsFree, type GatewayConfig } from "../extraction/model";
+import { assertModelIsFree, readGatewayJson, type GatewayConfig } from "../extraction/model";
 
 export interface ProxyLimits {
   maxMessages: number;
@@ -35,12 +35,11 @@ export class ProxyError extends Error {
 
 /**
  * Lets the dashboard's assistant call the model without ever holding the gateway key. The model is
- * fixed by the server, never taken from the request, and is checked free before every first use,
+ * fixed by the server, never taken from the request, and is checked free before every request,
  * so the browser cannot choose a paid model or spend credits.
  */
 export function createLlmProxy(config: GatewayConfig, limits: ProxyLimits = DEFAULT_LIMITS, now: () => number = Date.now, sleep: (ms: number) => Promise<void> = realSleep) {
   const doFetch = config.fetch ?? fetch;
-  let checked: Promise<void> | undefined;
   let recent: number[] = [];
   let nextSlot = 0;
   let waiting = 0;
@@ -57,16 +56,6 @@ export function createLlmProxy(config: GatewayConfig, limits: ProxyLimits = DEFA
     if (recent.length >= limits.maxPerWindow) throw new ProxyError("Too many assistant requests. Try again in a minute.", 429);
     recent.push(t);
 
-    checked ??= assertModelIsFree(config).catch((e) => {
-      checked = undefined; // a failed check is retried, never cached as a pass
-      throw e;
-    });
-    try {
-      await checked;
-    } catch (e) {
-      throw new ProxyError(e instanceof Error ? e.message : "Model check failed.", 403);
-    }
-
     // Take the next free slot: calls queue up rather than fail when the provider only allows a few a minute.
     if (waiting >= limits.maxQueued) throw new ProxyError("The assistant is busy. Try again in a moment.", 429);
     const slot = Math.max(now(), nextSlot);
@@ -82,11 +71,13 @@ export function createLlmProxy(config: GatewayConfig, limits: ProxyLimits = DEFA
     }
 
     const timeoutMs = config.timeoutMs ?? 100_000;
-    const signal = AbortSignal.timeout(timeoutMs);
     try {
-      const res = await doFetch(`${config.baseUrl ?? "https://ai-gateway.vercel.sh"}/v1/chat/completions`, {
+      await config.reserveSlot?.();
+      await assertModelIsFree(config).catch((e: unknown) => {
+        throw new ProxyError(e instanceof Error ? e.message : "Model check failed.", 403);
+      });
+      const { response: res, body: rawBody } = await readGatewayJson(doFetch, `${config.baseUrl ?? "https://ai-gateway.vercel.sh"}/v1/chat/completions`, {
         method: "POST",
-        signal,
         headers: { Authorization: `Bearer ${config.apiKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           model: config.model, // fixed by the server
@@ -96,15 +87,12 @@ export function createLlmProxy(config: GatewayConfig, limits: ProxyLimits = DEFA
           ...(b.tools ? { tools: b.tools } : {}),
           ...(b.tools && b.tool_choice ? { tool_choice: b.tool_choice } : {}),
         }),
-      });
-      const json = (await res.json().catch((e) => {
-        if (signal.aborted) throw e;
-        return {};
-      })) as { choices?: { message?: unknown }[]; usage?: unknown; model?: string; error?: { message?: string } };
+      }, timeoutMs, "The assistant model request");
+      const json = (rawBody && typeof rawBody === "object" ? rawBody : {}) as { choices?: { message?: unknown }[]; usage?: unknown; model?: string; error?: { message?: string } };
       if (!res.ok) throw new ProxyError(`The model request failed (${res.status}). ${json.error?.message ?? ""}`.trim(), 502);
       return { message: json.choices?.[0]?.message, usage: json.usage, model: json.model };
     } catch (e) {
-      if (signal.aborted) {
+      if (e instanceof Error && e.message.startsWith("The assistant model request timed out")) {
         const duration = timeoutMs >= 1000 ? `${Math.round(timeoutMs / 1000)}s` : `${timeoutMs}ms`;
         throw new ProxyError(`The assistant model request timed out after ${duration}. Try again when the service is available.`, 504);
       }

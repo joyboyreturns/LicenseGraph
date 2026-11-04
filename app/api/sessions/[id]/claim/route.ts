@@ -1,3 +1,4 @@
+import { privateRequest } from "@/src/marketplace/http";
 import { claimSession, SessionError, viewOf } from "@/src/app-logic/session";
 import { fail, json, sessionOr404 } from "@/src/server/http";
 import { ownerCookie, ownerFor } from "@/src/server/owner";
@@ -10,6 +11,8 @@ export const dynamic = "force-dynamic";
  * the link (or a chat app previewing it) changes nothing, so the click has to be deliberate.
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const privateResponse = await privateRequest(req);
+  if (privateResponse) return privateResponse;
   try {
     const session = sessionOr404((await params).id);
     if (!session) return json({ error: "Session not found." }, 404);

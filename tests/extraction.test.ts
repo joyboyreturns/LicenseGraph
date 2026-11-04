@@ -217,7 +217,7 @@ describe("createGatewayModel", () => {
     expect(await model.complete({ system: "s", user: "u" })).toBe("hi");
     const urls = fetchMock.mock.calls.map((c) => c[0]);
     expect(urls[0]).toBe("https://ai-gateway.vercel.sh/v1/models");
-    expect(urls.filter((u) => u.endsWith("/v1/models"))).toHaveLength(1); // price checked once
+    expect(urls.filter((u) => u.endsWith("/v1/models"))).toHaveLength(2); // a fresh price check before each request
     const [, init] = fetchMock.mock.calls[1]! as unknown as [string, { headers: Record<string, string>; body: string }];
     expect(init.headers.Authorization).toBe("Bearer k");
     expect(JSON.parse(init.body).model).toBe("m/x");
@@ -277,7 +277,7 @@ describe("createGatewayModel", () => {
 
     expect(await model.complete({ system: "s", user: "u" })).toBe("hi");
     expect(await model.complete({ system: "s", user: "u" })).toBe("hi");
-    expect(fetchMock.mock.calls.filter((c) => c[0].endsWith("/v1/models"))).toHaveLength(2); // the pass is cached, the failure was not
+    expect(fetchMock.mock.calls.filter((c) => c[0].endsWith("/v1/models"))).toHaveLength(3); // every request is independently checked
   });
 
   it("keeps refusing a paid model on every call", async () => {

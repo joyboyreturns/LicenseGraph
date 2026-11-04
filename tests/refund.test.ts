@@ -90,6 +90,37 @@ describe("refunding a payment whose creators were never paid", () => {
     expect(refundBlockedReason(fresh)).toMatch(/Only a captured payment/);
   });
 
+  it("blocks payouts after a refund response is lost", async () => {
+    const { s, deps } = await captured(() => rejects());
+    deps.payments!.refundCapture = vi.fn(async () => { throw new Error("response lost"); });
+    await expect(refundPurchase(s, deps)).rejects.toThrow(/response lost/);
+    const spy = vi.spyOn(deps.payments!, "createPayout").mockClear();
+    await expect(settleCreators(s, deps)).rejects.toThrow(/refund has been requested/);
+    expect(spy).not.toHaveBeenCalled();
+    expect(s.phase).toBe("captured");
+  });
+
+  it("serializes a payout retry against a competing refund", async () => {
+    const { s, deps, sim } = await captured(() => rejects());
+    let submitted!: () => void;
+    let finish!: () => void;
+    const started = new Promise<void>((resolve) => { submitted = resolve; });
+    const waiting = new Promise<void>((resolve) => { finish = resolve; });
+    deps.payments!.createPayout = async (input) => {
+      submitted();
+      await waiting;
+      return sim.createPayout(input);
+    };
+    const refund = vi.spyOn(deps.payments!, "refundCapture");
+    const payout = settleCreators(s, deps);
+    await started;
+    const refusal = expect(refundPurchase(s, deps)).rejects.toThrow(/may already have been sent/);
+    finish();
+    await payout;
+    await refusal;
+    expect(refund).not.toHaveBeenCalled();
+  });
+
   it("makes concurrent clicks one refund", async () => {
     const { s, deps } = await captured(() => rejects());
     const spy = vi.spyOn(deps.payments!, "refundCapture" as never);

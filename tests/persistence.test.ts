@@ -96,11 +96,12 @@ describe("FileSessionRepository and SessionStore", () => {
     expect(() => repo.save({ ...createSession(input()), id: "../../etc/passwd" })).toThrow(/unsafe id/);
   });
 
-  it("does not let a failing disk break a live run", async () => {
+  it("refuses to accept a run when its initial durable write fails", async () => {
     const repo = { save: vi.fn(() => { throw new Error("disk full"); }), loadAll: () => [] };
     const store = new SessionStore(10, repo);
-    const s = store.add(createSession(input()));
-    await expect(runPipeline(s, deps)).resolves.toBeUndefined();
+    const s = createSession(input());
+    expect(() => store.add(s)).toThrow(/durably save/);
+    expect(store.get(s.id)).toBeUndefined();
     expect(repo.save).toHaveBeenCalled();
   });
 });

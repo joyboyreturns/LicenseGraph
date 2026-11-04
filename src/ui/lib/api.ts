@@ -12,6 +12,7 @@ export class ApiError extends Error {
 }
 
 export interface AppConfig {
+  privateWorkspace?: boolean;
   mode: "demo" | "live";
   model?: string;
   paymentsEnabled: boolean;

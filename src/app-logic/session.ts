@@ -6,6 +6,7 @@ import { extractOffer, type SourceDocument } from "../extraction/extract";
 import type { ModelClient } from "../extraction/model";
 import { Ledger, type LedgerEvent } from "../ledger/ledger";
 import { approve, startCheckout, type Approval, type PayPalClient } from "../payments/checkout";
+import { StorageError } from "./storage-error";
 import type { SessionRepository } from "./persistence";
 import { applyPayoutStatus, isFinalPayout, planPayouts, toPayoutItems, type PayoutSummary } from "../payments/payouts";
 import type { CapturedOrder, CreatedOrder, RefundedCapture } from "../payments/paypal";
@@ -23,7 +24,7 @@ export interface SessionInput {
   requiredAssetIds: string[];
   documents: SourceDocument[];
   /** Where the run came from, for display. */
-  meta?: { scenarioId?: string; brief?: string; /** "demo" replays recorded model output; "live" calls the model. */ runKind?: "demo" | "live"; /** Started by an AI agent through the API; a person must take control before anything can be approved or paid. */ startedBy?: "agent"; /** The run whose gap requests this one answers, with a licensor's revised licence added. */ revisedFrom?: string; /** The spending cap an agent says its person gave it. */ mandate?: Mandate; /** The run whose brief this one changed: the same licences, checked against a different brief. */ rebriefedFrom?: string };
+  meta?: { scenarioId?: string; brief?: string; /** "demo" replays recorded model output; "live" calls the model. */ runKind?: "demo" | "live" | "catalog"; /** Started by an AI agent through the API; a person must take control before anything can be approved or paid. */ startedBy?: "agent"; /** The run whose gap requests this one answers, with a licensor's revised licence added. */ revisedFrom?: string; /** The spending cap an agent says its person gave it. */ mandate?: Mandate; /** The run whose brief this one changed: the same licences, checked against a different brief. */ rebriefedFrom?: string };
 }
 
 export interface Session {
@@ -58,13 +59,14 @@ export interface Session {
   payoutsCheckedAt?: number;
   /** Set by the store to persist the session after each change. Not persisted itself. */
   onChange?: () => void;
+  paymentIntents?: Partial<Record<"order" | "capture" | "refund", { requestId: string; startedAt: string }>>;
 }
 
 export interface Deps {
   model: ModelClient;
   proposer: Proposer;
   /** Absent when PayPal credentials are not configured. */
-  payments?: Pick<PayPalClient, "createOrder" | "captureOrder"> & Partial<Pick<PayPalClient, "createPayout" | "getPayout" | "refundCapture" | "verifyWebhookSignature">>;
+  payments?: Pick<PayPalClient, "createOrder" | "captureOrder"> & Partial<Pick<PayPalClient, "createPayout" | "getPayout" | "refundCapture" | "verifyWebhookSignature" | "inspectOrder" | "inspectRefund">>;
   /** Replace licensor emails in order, so a demo can pay real Sandbox accounts. */
   payeeOverrides?: string[];
   /** Which payment backend `payments` is. */
@@ -72,6 +74,9 @@ export interface Deps {
   today?: () => string;
   returnUrl?: (sessionId: string) => string;
   cancelUrl?: (sessionId: string) => string;
+  checkpoint?: (session: Session) => Promise<void>;
+  extractionAttempts?: number;
+  stopOnProposalError?: boolean;
 }
 
 export class SessionError extends Error {
@@ -103,6 +108,13 @@ export function createSession(input: SessionInput, ledger: Ledger = new Ledger()
 }
 
 const touch = (s: Session) => s.onChange?.();
+
+function persistPaymentIntent(session: Session, kind: "order" | "capture" | "refund", requestId: string): void {
+  session.paymentIntents ??= {};
+  session.paymentIntents[kind] ??= { requestId, startedAt: new Date().toISOString() };
+  if (session.paymentIntents[kind].requestId !== requestId) throw new SessionError("Payment intent changed; reconcile the original operation first.");
+  touch(session);
+}
 
 const CLAIM_TTL_MS = 24 * 60 * 60 * 1000;
 const hashToken = (token: string) => createHash("sha256").update(token).digest("hex");
@@ -149,6 +161,19 @@ const ordersInFlight = new WeakMap<Session, Promise<CreatedOrder>>();
 const capturesInFlight = new WeakMap<Session, Promise<CapturedOrder>>();
 const payoutsInFlight = new WeakMap<Session, Promise<PayoutSummary | undefined>>();
 const refundsInFlight = new WeakMap<Session, Promise<RefundedCapture>>();
+const moneyTransitions = new WeakMap<Session, Promise<unknown>>();
+
+/** Refund and payout submission must never pass their safety checks concurrently. */
+function withMoneyTransition<T>(session: Session, work: () => Promise<T>): Promise<T> {
+  const previous = moneyTransitions.get(session) ?? Promise.resolve();
+  const result = previous.catch(() => undefined).then(work);
+  moneyTransitions.set(session, result);
+  void result.finally(() => {
+    if (moneyTransitions.get(session) === result) moneyTransitions.delete(session);
+  }).catch(() => undefined);
+  return result;
+}
+
 
 const EXTRACTION_CONCURRENCY = 3;
 
@@ -179,6 +204,7 @@ export async function runPipeline(session: Session, deps: Deps, carried?: { from
   session.phase = "extracting";
   session.runDate = today(deps);
   touch(session);
+  await deps.checkpoint?.(session);
 
   // A revised run does not read again what the run it answers already read: the same licence text gives the same terms.
   const carriedByDocument = new Map((carried?.offers ?? []).map((o) => [o.evidence[0]?.documentId, o]));
@@ -189,12 +215,13 @@ export async function runPipeline(session: Session, deps: Deps, carried?: { from
   // Licences are read a few at a time (the model client paces its own requests), but recorded in document order,
   // so the ledger reads the same whether the model is fast or slow.
   const gate = createGate(EXTRACTION_CONCURRENCY);
-  const reading = session.input.documents.map((doc) => (isCarried(doc) ? undefined : settle(gate(() => extractOffer(deps.model, doc)))));
+  const reading = session.input.documents.map((doc) => (isCarried(doc) ? undefined : settle(gate(() => extractOffer(deps.model, doc, { attempts: deps.extractionAttempts })))));
   for (const [i, doc] of session.input.documents.entries()) {
     const earlier = carriedByDocument.get(doc.id);
     if (earlier && isCarried(doc)) {
       session.candidates.push(structuredClone(earlier));
       session.ledger.append("extracted", { documentId: doc.id, assetId: doc.assetId, offerId: earlier.id, priceCents: earlier.priceCents, terms: earlier.terms, evidence: earlier.evidence, carriedFromRun: carried!.fromRunId });
+      await deps.checkpoint?.(session);
       continue;
     }
     const outcome = await reading[i]!;
@@ -206,6 +233,7 @@ export async function runPipeline(session: Session, deps: Deps, carried?: { from
     } else {
       session.ledger.append("extraction_failed", { documentId: doc.id, assetId: doc.assetId, problems: result.problems });
     }
+    await deps.checkpoint?.(session);
   }
 
   // No point asking the proposer when an asset has no readable licence at all.
@@ -214,6 +242,7 @@ export async function runPipeline(session: Session, deps: Deps, carried?: { from
     session.phase = "failed";
     session.failure = `Could not read the licence terms for: ${unreadable.join(", ")}. See the ledger for details.`;
     touch(session);
+  await deps.checkpoint?.(session);
     return;
   }
 
@@ -225,11 +254,13 @@ export async function runPipeline(session: Session, deps: Deps, carried?: { from
     session.phase = "failed";
     session.failure = `No licence on offer meets every requirement for: ${uncoveredAssets.join(", ")}. The agent was not asked to propose a bundle, because the independent cost check proves none can pass. See what to ask each licensor.`;
     touch(session);
+  await deps.checkpoint?.(session);
     return;
   }
 
   session.phase = "proposing";
   touch(session);
+  await deps.checkpoint?.(session);
   session.loop = await runProposeVerifyLoop({
     project: session.input.project,
     requiredAssetIds: session.input.requiredAssetIds,
@@ -237,6 +268,8 @@ export async function runPipeline(session: Session, deps: Deps, carried?: { from
     proposer: deps.proposer,
     ledger: session.ledger,
     verifyOptions: { today: session.runDate },
+    stopOnError: deps.stopOnProposalError,
+    checkpoint: deps.checkpoint ? () => deps.checkpoint!(session) : undefined,
   });
 
   if (session.loop.status === "verified") {
@@ -254,6 +287,7 @@ export async function runPipeline(session: Session, deps: Deps, carried?: { from
         : "The agent ran out of attempts before finding a compliant bundle.";
   }
   touch(session);
+  await deps.checkpoint?.(session);
 }
 
 /** How many clauses outside the rules engine's checks the approval screen put in front of the person, counted from the bought licences' own text. */
@@ -304,13 +338,18 @@ export function payoutBlockers(session: Session, deps: Deps): string[] {
 }
 
 /** A human signs off on exactly the verified bundle. */
-export function approveSession(session: Session, approvedBy: string): Approval {
+export function approveSession(session: Session, approvedBy: string, authorization?: { purchaseDigest: string; accountId: string }): Approval {
   if (session.phase !== "verified" || !session.loop?.bundle) throw new SessionError("Only a verified bundle can be approved.");
   if (!approvedBy.trim()) throw new SessionError("Approver name is required.");
-  session.approval = approve(session.loop.bundle, approvedBy.trim());
+  session.approval = { ...approve(session.loop.bundle, approvedBy.trim()), ...(authorization ? { ...authorization, authorizationVersion: 3 as const } : {}) };
   session.phase = "approved";
-  touch(session);
-  session.ledger.append("approved", { approvedBy: session.approval.approvedBy, bundleDigest: session.approval.bundleDigest, finePrintShown: finePrintShown(session) });
+  try {
+    session.ledger.append("approved", { approvedBy: session.approval.approvedBy, bundleDigest: session.approval.bundleDigest, finePrintShown: finePrintShown(session), ...(authorization ? { ...authorization, authorizationVersion: 3 } : {}) });
+  } catch (error) {
+    session.approval = undefined;
+    session.phase = "verified";
+    throw error;
+  }
   return session.approval;
 }
 
@@ -324,7 +363,11 @@ async function startPaymentOnce(session: Session, deps: Deps): Promise<CreatedOr
   if (session.phase !== "approved" || !session.loop?.bundle) throw new SessionError("Approve the verified bundle before paying.");
   const blocked = payoutBlockers(session, deps);
   if (blocked.length) throw new SessionError(`These creators cannot be paid because they have no payout email: ${blocked.join(", ")}. Nothing was charged. Start a new run and give each licensor a payout email.`);
-  const order = await startCheckout(deps.payments, {
+  const orderClient = { createOrder: async (input: Parameters<PayPalClient["createOrder"]>[0]) => {
+    persistPaymentIntent(session, "order", input.requestId);
+    return deps.payments!.createOrder(input);
+  } };
+  const order = await startCheckout(orderClient, {
     project: session.input.project,
     requiredAssetIds: session.input.requiredAssetIds,
     bundle: session.loop.bundle,
@@ -353,6 +396,7 @@ export function completePayment(session: Session, deps: Deps): Promise<CapturedO
 async function completePaymentOnce(session: Session, deps: Deps): Promise<CapturedOrder> {
   if (!deps.payments) throw new SessionError("PayPal is not configured.");
   if (session.phase !== "order_created" || !session.order) throw new SessionError("No PayPal order is waiting to be captured.");
+  persistPaymentIntent(session, "capture", paymentRequestId("capture", session.id));
   const captured = await deps.payments.captureOrder(session.order.id, paymentRequestId("capture", session.id));
   const bundle = session.loop?.bundle;
   const total = bundle?.offers.reduce((n, o) => n + o.priceCents, 0);
@@ -371,12 +415,13 @@ async function completePaymentOnce(session: Session, deps: Deps): Promise<Captur
 
 /** Pay each licensor the price of their licence in one PayPal Payouts batch. Safe to call again after a failure. */
 export function settleCreators(session: Session, deps: Deps): Promise<PayoutSummary | undefined> {
-  return singleFlight(payoutsInFlight, session, () => settleCreatorsOnce(session, deps));
+  return singleFlight(payoutsInFlight, session, () => withMoneyTransition(session, () => settleCreatorsOnce(session, deps)));
 }
 
 async function settleCreatorsOnce(session: Session, deps: Deps): Promise<PayoutSummary | undefined> {
   const bundle = session.loop?.bundle;
   if (session.phase === "refunded") return session.payouts; // the buyer was refunded; paying creators now would pay twice
+  if (session.paymentIntents?.refund) throw new SessionError("A refund has been requested. Reconcile it before sending creator payouts.");
   if (!deps.payments?.createPayout || !bundle || !session.capture) return undefined;
   if (session.payouts && session.payouts.status !== "FAILED") return session.payouts;
   const previous = session.payouts;
@@ -403,6 +448,7 @@ async function settleCreatorsOnce(session: Session, deps: Deps): Promise<PayoutS
     touch(session);
     session.ledger.append("payout_created", { batchId: created.batchId, status: created.status, totalCents, currency, lines: plan.lines.map((l) => ({ assetId: l.assetId, licensor: l.licensorName, amountCents: l.amountCents })) });
   } catch (e) {
+    if (e instanceof StorageError) throw e;
     const error = e instanceof Error ? e.message : "Payout failed";
     // Certain only when the batch was never sent: refused before the request, or rejected with a client error
     // (4xx), and no earlier attempt could have been accepted. A timeout or a duplicate-batch answer is not certain.
@@ -436,13 +482,14 @@ export async function refundSettled(session: Session): Promise<void> {
 
 /** Return the buyer's money for a run whose creators could not be paid. Idempotent at PayPal; recorded in the ledger. */
 export function refundPurchase(session: Session, deps: Deps): Promise<RefundedCapture> {
-  return singleFlight(refundsInFlight, session, () => refundPurchaseOnce(session, deps));
+  return singleFlight(refundsInFlight, session, () => withMoneyTransition(session, () => refundPurchaseOnce(session, deps)));
 }
 
 async function refundPurchaseOnce(session: Session, deps: Deps): Promise<RefundedCapture> {
   if (!deps.payments?.refundCapture) throw new SessionError("Refunds are not available on this payment rail.");
   const blocked = refundBlockedReason(session);
   if (blocked) throw new SessionError(blocked);
+  persistPaymentIntent(session, "refund", paymentRequestId("refund", session.id));
   const refund = await deps.payments.refundCapture(session.capture!.captureId, paymentRequestId("refund", session.id));
   // PayPal's answer to a full refund normally has no amount; it is the captured amount.
   session.refund = { id: refund.id, status: refund.status, amount: refund.amount ?? session.capture!.amount, at: new Date().toISOString() };
@@ -474,6 +521,10 @@ const maskEmail = (email: string) => {
 };
 
 export interface SessionView {
+  privateMarketplace?: boolean;
+  pendingOperation?: { id: string; kind: string; status: string; error_code?: string; available_at?: string } | null;
+  purchase?: { payout_state: string; release_at?: string; accepted_at?: string } | null;
+  disputes?: { id: string; status: string; created_at: string }[];
   id: string;
   phase: Phase;
   createdAt: string;
@@ -559,8 +610,8 @@ export class SessionStore {
     s.onChange = () => {
       try {
         this.repo?.save(s);
-      } catch {
-        // Persistence is best effort; a full disk must not break a live run.
+      } catch (cause) {
+        throw new StorageError({ cause });
       }
     };
   }
@@ -574,7 +625,12 @@ export class SessionStore {
       if (EVICTABLE.includes(old.phase)) this.sessions.delete(id);
     }
     this.attach(s);
-    s.onChange?.();
+    try {
+      s.onChange?.();
+    } catch (error) {
+      this.sessions.delete(s.id);
+      throw error;
+    }
     return s;
   }
 

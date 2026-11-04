@@ -1,3 +1,4 @@
+import { privateRequest } from "@/src/marketplace/http";
 import { issuePassport } from "@/src/passport/issue";
 import { PassportError, verifyPassport } from "@/src/passport/passport";
 import { checkSignature, signPassport } from "@/src/server/passport-signing";
@@ -11,6 +12,8 @@ export const dynamic = "force-dynamic";
  * The browser repeats the content checks itself; only the server can check the signature.
  */
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
+  const privateResponse = await privateRequest(_);
+  if (privateResponse) return privateResponse;
   const session = sessionOr404((await params).id);
   if (!session) return json({ error: "Passport not found." }, 404);
   try {

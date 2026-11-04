@@ -26,6 +26,7 @@ import { LedgerPanel } from "./LedgerPanel";
 import { ReplayController } from "./ReplayController";
 import { RightsGraph } from "./RightsGraph";
 import { RunHeader, StepRail } from "./RunHeader";
+import { MarketplaceControls } from "./MarketplaceControls";
 import { SettlementPanel } from "./SettlementPanel";
 import { useReplay } from "./useReplay";
 import { useSession } from "./useSession";
@@ -306,6 +307,7 @@ function Theatre({ view, accept, refresh }: { view: SessionView; accept: (v: Ses
         <div className="desk-heading"><div><p className="eyebrow">02 / Evidence desk</p><h2 id="source-title">Read the terms behind the decision</h2></div><p>Select a quotation to inspect its source, located evidence and rule results.</p></div>
         {state.chosen.length > 0 ? <div className="desk-evidence">{view.candidates.filter((o) => state.chosen.includes(o.id)).map((o) => <button type="button" key={o.id} onClick={() => setSelected(o.id)}><span className="eyebrow">{catalog.offer(o.id)?.licensor} · {formatMoney(o.priceCents, o.currency)}</span><q>{(o.evidence.find((e) => e.field === "mediums") ?? o.evidence.find((e) => e.field === "territories") ?? o.evidence[0])?.quote}</q><span>Read all {o.evidence.length} source quotations →</span></button>)}</div> : <p className="callout">Source quotations for the chosen bundle appear when the replay reaches verification. Select any licence in the rights graph to inspect its evidence now.</p>}
       </section>
+      {view.privateMarketplace && <MarketplaceControls view={view} refresh={refresh}/>}
       <div id="decide" className={styles.mid}>
         <section className={`card ${styles.actionCard}`} aria-label="Decision">
           {view.phase === "verified" && <ApprovalPanel view={view} catalog={catalog} busy={busy === "approve"} onSelectOffer={setSelected} onApprove={(name) => run("approve", "approve", { approvedBy: name }, () => "Bundle approved")} />}
@@ -315,10 +317,10 @@ function Theatre({ view, accept, refresh }: { view: SessionView; accept: (v: Ses
               config={config}
               busy={busy}
               actions={{
-                pay: () => run("pay", "pay", {}, () => "Order created"),
-                capture: () => run("capture", "capture", {}, () => "Payment captured"),
+                pay: () => run("pay", "pay", {}, (v) => v.pendingOperation ? "Order request queued" : "Order created"),
+                capture: () => run("capture", "capture", {}, (v) => v.pendingOperation ? "Capture request queued" : "Payment captured"),
                 retryPayouts: () => run("payouts", "payouts", {}, (v) => (v.payouts?.status === "FAILED" ? null : "Payouts sent")),
-                refund: () => run("refund", "refund", {}, () => "Buyer refunded"),
+                refund: () => run("refund", "refund", {}, (v) => v.pendingOperation ? "Refund request queued" : "Buyer refunded"),
               }}
             />
           )}

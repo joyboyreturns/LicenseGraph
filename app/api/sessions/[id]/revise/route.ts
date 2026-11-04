@@ -1,3 +1,4 @@
+import { privateRequest } from "@/src/marketplace/http";
 import { recordRevision, reviseInput } from "@/src/app-logic/revision";
 import { createSession, runPipeline, SessionError, viewOf } from "@/src/app-logic/session";
 import { fail, forbidUnlessOwner, json, sessionOr404 } from "@/src/server/http";
@@ -14,6 +15,8 @@ const MAX_ACTIVE_RUNS = 3;
  * and check everything again as a new run. The earlier run is not changed. Nothing is bought here.
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const privateResponse = await privateRequest(req);
+  if (privateResponse) return privateResponse;
   try {
     const rt = getRuntime();
     const from = sessionOr404((await params).id);

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { MARKETPLACE_ROUTES } from "../marketplace/routes";
 import { sessionInputSchema } from "../server/session-input";
 import * as S from "./schemas";
 
@@ -87,6 +88,19 @@ export function buildOpenApi(serverUrl = "http://localhost:3000"): Json {
       { name: "Service", description: "Health, configuration and demo data." },
     ],
     paths: {
+      "/api/auth/{action}": Object.fromEntries(["get","post"].map((method) => [method, {
+        operationId: `${method}AccountAction`, summary: "Sign in, complete sign-in, read identity or sign out",
+        description: "GET actions: login, callback, me. POST action: logout (same-origin only). Sign-in uses OIDC with PKCE. Private workspace must be configured.",
+        parameters: [{ name: "action", in: "path", required: true, schema: { type: "string", enum: ["login","callback","me","logout"] } }],
+        responses: { ...ok("Current identity or account result.", { type: "object" }), "303": { description: "Account redirect; HttpOnly cookies are set or cleared." }, ...err(["401","Sign-in failed or email is unverified."],["403","Cross-origin action refused."],["503","Identity or database unavailable."]) }
+      }])),
+      ...Object.fromEntries(MARKETPLACE_ROUTES.map((route) => [route.path, Object.fromEntries(route.methods.map((method) => [method, {
+        operationId: `${method}${route.path.replace(/[^a-zA-Z0-9]/g, "_")}`, summary: route.summary,
+        description: "Private workspace endpoint. Browser writes require a same-origin Origin header. Staff endpoints require MFA and the staff role. Uncertain submitted operations cannot be blindly retried. Receipt grants redact source text and personal details; full passports need a separate grant.",
+        parameters: [...route.path.matchAll(/\{(\w+)\}/g)].map((match) => ({ name: match[1], in: "path", required: true, schema: { type: "string" } })),
+        security: "public" in route ? [] : [{ accountCookie: [] }, { agentBearer: [] }],
+        responses: { ...ok("Action result.", { type: "object" }), ...ok("Operation durably queued. Poll its operation ID and the run; do not issue a new transfer identity.", { type: "object" }, "202"), ...ok("Record or grant created.", { type: "object" }, "201"), ...err(["400","Invalid bounded input."],["401","Sign-in required."],["403","Role, ownership, agent scope or origin refused."],["404","Record not visible."],["409","State conflict or reconciliation required."],["503","Required service unavailable."]) }
+      }]))])),
       "/api/sessions": {
         post: {
           operationId: "startRun",
@@ -201,7 +215,9 @@ export function buildOpenApi(serverUrl = "http://localhost:3000"): Json {
       },
     },
     components: {
-      securitySchemes: { ownerCookie: { type: "apiKey", in: "cookie", name: "lg_owner", description: "An unguessable id set when a browser starts or claims a run. Only that browser may approve, pay, refund or list the run." } },
+      securitySchemes: {
+        accountCookie: { type: "apiKey", in: "cookie", name: "lg_account", description: "Revocable private-workspace browser session." },
+        agentBearer: { type: "http", scheme: "bearer", description: "Limited run creation/read credential; cannot approve, claim, pay or release payouts." }, ownerCookie: { type: "apiKey", in: "cookie", name: "lg_owner", description: "An unguessable id set when a browser starts or claims a run. Only that browser may approve, pay, refund or list the run." } },
       schemas: components(),
     },
   };

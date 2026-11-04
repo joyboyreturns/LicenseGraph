@@ -10,6 +10,7 @@ export type SessionLoad = { status: "loading" } | { status: "not-found" } | { st
 
 /** How soon to ask again, or null to stop: fast while the agent works, slower while payouts settle. */
 export function pollDelay(view: SessionView, now: number = Date.now()): number | null {
+  if (view.pendingOperation && ["queued","running"].includes(view.pendingOperation.status) && (!view.pendingOperation.available_at || Date.parse(view.pendingOperation.available_at) <= now)) return 1500;
   if (isActivePhase(view.phase)) return 1000;
   if (view.phase === "captured" && !view.payouts) {
     // Payouts are created right after capture; give them a short window, then stop asking.

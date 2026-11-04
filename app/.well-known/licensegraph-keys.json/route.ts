@@ -11,6 +11,6 @@ export const dynamic = "force-dynamic";
 export function GET() {
   const secret = getRuntime().passportSecret;
   if (!secret) return json({ error: "This server does not sign passports." }, 404);
-  const { publicKey, keyId } = passportKey(secret);
-  return json({ keys: [{ keyId, algorithm: "Ed25519", publicKey, use: "licence-passport-signature" }] });
+  const secrets = [secret, ...(process.env.LICENSEGRAPH_STORAGE === "postgres" && process.env.LICENSEGRAPH_PASSPORT_SECRET ? [process.env.LICENSEGRAPH_PASSPORT_SECRET] : [])];
+  return json({ keys: secrets.map((value) => { const { publicKey, keyId } = passportKey(value); return { keyId, algorithm: "Ed25519", publicKey, use: "licence-passport-signature" }; }) });
 }

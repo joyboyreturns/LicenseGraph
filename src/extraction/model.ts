@@ -16,6 +16,7 @@ export interface GatewayConfig {
   /** Injectable for tests. */
   now?: () => number;
   sleep?: (ms: number) => Promise<void>;
+  reserveSlot?: () => Promise<void>;
 }
 
 /** Free models are typically limited to about 5 requests a minute (LICENSEGRAPH_MODEL_RPM overrides). */
@@ -31,13 +32,29 @@ export function gatewayConfigFromEnv(env: Record<string, string | undefined> = p
   return { apiKey, model, minIntervalMs: minIntervalFromEnv(env), ...(timeoutMs > 0 ? { timeoutMs } : {}) };
 }
 
-/** fetch with a deadline; the error says what timed out, so a retry hint and the run's history are readable. */
-async function fetchWithin(doFetch: typeof fetch, url: string, init: RequestInit, ms: number, what: string): Promise<Response> {
+/** Keep the deadline active through the complete response body, including custom transports. */
+export async function readGatewayJson(
+  doFetch: typeof fetch, url: string, init: RequestInit, ms: number, what: string,
+): Promise<{ response: Response; body: unknown }> {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => {
+      controller.abort();
+      reject(new Error(`${what} timed out after ${ms >= 1000 ? `${Math.round(ms / 1000)}s` : `${ms}ms`}`));
+    }, ms);
+  });
   try {
-    return await doFetch(url, { ...init, signal: AbortSignal.timeout(ms) });
-  } catch (e) {
-    if (e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError")) throw new Error(`${what} timed out after ${ms >= 1000 ? `${Math.round(ms / 1000)}s` : `${ms}ms`}`);
-    throw e;
+    return await Promise.race([deadline, (async () => {
+      const response = await doFetch(url, { ...init, signal: controller.signal });
+      const body: unknown = await response.json().catch((error: unknown) => {
+        if (controller.signal.aborted) throw error;
+        return {};
+      });
+      return { response, body };
+    })()]);
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -47,13 +64,13 @@ async function fetchWithin(doFetch: typeof fetch, url: string, init: RequestInit
  */
 export async function assertModelIsFree(config: GatewayConfig): Promise<void> {
   const doFetch = config.fetch ?? fetch;
-  const res = await fetchWithin(doFetch, `${config.baseUrl ?? "https://ai-gateway.vercel.sh"}/v1/models`, { headers: { Authorization: `Bearer ${config.apiKey}` } }, 15_000, "The model price check");
+  const { response: res, body } = await readGatewayJson(doFetch, `${config.baseUrl ?? "https://ai-gateway.vercel.sh"}/v1/models`, { headers: { Authorization: `Bearer ${config.apiKey}` } }, 15_000, "The model price check");
   if (!res.ok) throw new Error(`Could not check model pricing (${res.status}); not sending any request`);
-  const { data } = (await res.json()) as { data?: { id: string; pricing?: { input?: string | number; output?: string | number } }[] };
-  const entry = data?.find((m) => m.id === config.model);
+  const data = body && typeof body === "object" && "data" in body ? body.data : undefined;
+  const entry = Array.isArray(data) ? data.find((m: unknown) => m !== null && typeof m === "object" && "id" in m && m.id === config.model) : undefined;
   if (!entry) throw new Error(`Model ${config.model} is not in the gateway list; refusing to send a request`);
-  const price = (v: string | number | undefined) => (v === undefined || v === null || v === "" ? NaN : Number(v));
-  if (price(entry.pricing?.input) !== 0 || price(entry.pricing?.output) !== 0) {
+  const zero = (value: unknown) => value === 0 || (typeof value === "string" && /^(?:0+(?:\.0*)?|\.0+)(?:e[+-]?\d+)?$/i.test(value));
+  if (!zero(entry.pricing?.input) || !zero(entry.pricing?.output)) {
     throw new Error(`Model ${config.model} is not free; refusing to spend credits`);
   }
 }
@@ -63,22 +80,16 @@ export function createGatewayModel(config: GatewayConfig): ModelClient {
   const doFetch = config.fetch ?? fetch;
   const now = config.now ?? Date.now;
   const sleep = config.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
-  let checked: Promise<void> | undefined;
   let nextSlot = 0;
   return {
     async complete({ system, user }) {
-      // A failed check is retried on the next call, never cached: one blip on the price list must not
-      // disable the model until a restart. The check still has to pass before any completion is sent.
-      checked ??= assertModelIsFree(config).catch((e) => {
-        checked = undefined;
-        throw e;
-      });
-      await checked;
       // Take the next free slot so several calls in a row never outrun the provider's rate limit.
       const slot = Math.max(now(), nextSlot);
       nextSlot = slot + (config.minIntervalMs ?? 0);
       if (slot > now()) await sleep(slot - now());
-      const res = await fetchWithin(doFetch, `${config.baseUrl ?? "https://ai-gateway.vercel.sh"}/v1/chat/completions`, {
+      await config.reserveSlot?.();
+      await assertModelIsFree(config);
+      const { response: res, body: rawBody } = await readGatewayJson(doFetch, `${config.baseUrl ?? "https://ai-gateway.vercel.sh"}/v1/chat/completions`, {
         method: "POST",
         headers: { Authorization: `Bearer ${config.apiKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -92,7 +103,7 @@ export function createGatewayModel(config: GatewayConfig): ModelClient {
           ],
         }),
       }, config.timeoutMs ?? 100_000, "The model request");
-      const body = (await res.json().catch(() => ({}))) as {
+      const body = (rawBody && typeof rawBody === "object" ? rawBody : {}) as {
         choices?: { message?: { content?: string; reasoning?: string; reasoning_content?: string }; finish_reason?: string }[];
         error?: { message?: string };
       };

@@ -125,7 +125,7 @@ export function PassportPage({ id }: { id: string }) {
   const sig = signature && signature !== "error" ? SIGNATURE_TEXT[signature] : null;
   return (
     <div className={`container-wide ${styles.page}`}>
-      <header className="desk-heading"><div><p className="eyebrow">Clearance archive / Purchase record</p><h2>Your release, with receipts.</h2></div><p>Share the record or download the file. Anyone can re-run the content checks in their browser; issuer authentication is checked separately.</p></header>
+      <header className="desk-heading"><div><p className="eyebrow">Clearance archive / Purchase record</p><h2>Your release, with receipts.</h2></div><p>{p.purchaseAuthorization ? "This passport is private. Create an explicit sharing grant from the run; downloading gives you a complete copy." : "Share the record or download the file. Anyone can re-run the content checks in their browser; issuer authentication is checked separately."}</p></header>
       <section className="desk-summary" aria-label="Passport purchase summary"><div><span className="eyebrow">The purchase</span><strong>{formatMoney(p.bundle.totalCents, p.bundle.currency)}</strong><p>{p.bundle.offers.length} licences · {p.project.name}</p></div><div><span className="eyebrow">Payment environment</span><strong>{p.paypal.environment === "simulator" ? "Simulated payment" : "PayPal Sandbox"}</strong><p>No real money moved. Creator outcomes are listed in the certificate.</p></div><div><span className="eyebrow">Independent verification</span><strong>{result ? result.ok ? "9 content checks passed" : "Needs review" : "Checking in your browser…"}</strong><p>Rules, evidence, approval, ledger and payment are checked together.</p></div></section>
       <div className={`${styles.toolbar} no-print`}>
         <Link prefetch={false} href={`/run/${p.id}`} className="btn btn-ghost">
@@ -135,8 +135,8 @@ export function PassportPage({ id }: { id: string }) {
         <a href={`/api/passports/${encodeURIComponent(p.id)}?download=1`} className="btn" download>
           <Download aria-hidden /> Download JSON
         </a>
-        <CopyButton text={`[![Licence Passport](${window.location.origin}/api/passports/${encodeURIComponent(p.id)}/badge)](${window.location.origin}/passport/${encodeURIComponent(p.id)})`} label="Copy badge for a README" announce="Badge copied" className="btn">
-          <BadgeCheck aria-hidden /> Copy badge for a README
+        <CopyButton text={`[![Licence Passport](${window.location.origin}/api/passports/${encodeURIComponent(p.id)}/badge)](${window.location.origin}/passport/${encodeURIComponent(p.id)})`} label={p.purchaseAuthorization ? "Copy private badge link" : "Copy badge for a README"} announce="Badge copied" className="btn">
+          <BadgeCheck aria-hidden /> {p.purchaseAuthorization ? "Copy private badge link" : "Copy badge for a README"}
         </CopyButton>
         {hasDates && (
           <button type="button" className="btn" onClick={downloadCalendar}>
@@ -155,7 +155,7 @@ export function PassportPage({ id }: { id: string }) {
           onClick={async () => {
             try {
               await navigator.clipboard.writeText(url);
-              toast.push({ tone: "ok", title: "Link copied", body: "Anyone with the link can open and re-verify this passport." });
+              toast.push({ tone: "ok", title: "Link copied", body: p.purchaseAuthorization ? "This link still requires your signed-in account. Create a sharing grant from the run for other readers." : "Anyone with the link can open and re-verify this passport." });
             } catch {
               toast.push({ tone: "bad", title: "Could not copy", body: url });
             }

@@ -43,6 +43,8 @@ export interface LoopInput {
   verifyOptions?: VerifyOptions;
   /** Hard cap on proposals. Default 4. */
   maxRounds?: number;
+  stopOnError?: boolean;
+  checkpoint?: () => Promise<void>;
 }
 
 const key = (ids: string[]) => [...ids].sort().join("|");
@@ -69,6 +71,8 @@ export async function runProposeVerifyLoop(input: LoopInput): Promise<LoopResult
       const error = e instanceof Error ? e.message : String(e);
       ledger.append("proposal_error", { round, error });
       history.push({ offerIds: [], violations: [], error });
+      await input.checkpoint?.();
+      if (input.stopOnError) return { status: "exhausted", rounds: round, verdict: last };
       continue;
     }
 
@@ -77,10 +81,12 @@ export async function runProposeVerifyLoop(input: LoopInput): Promise<LoopResult
       const error = `Unknown offer ids: ${unknown.join(", ")}`;
       ledger.append("proposal_error", { round, offerIds, error });
       history.push({ offerIds, violations: [], error });
+      await input.checkpoint?.();
       continue;
     }
 
     ledger.append(round === 1 ? "proposed" : "revised", { round, offerIds, rationale });
+    await input.checkpoint?.();
 
     if (tried.has(key(offerIds))) {
       return { status: "stalled", rounds: round, verdict: last };
@@ -92,9 +98,11 @@ export async function runProposeVerifyLoop(input: LoopInput): Promise<LoopResult
 
     if (last.ok) {
       ledger.append("verified", { round, offerIds, totalCents: last.totalCents });
+      await input.checkpoint?.();
       return { status: "verified", rounds: round, bundle, verdict: last };
     }
     ledger.append("rejected", { round, offerIds, violations: last.violations });
+    await input.checkpoint?.();
     history.push({ offerIds, violations: last.violations });
   }
 

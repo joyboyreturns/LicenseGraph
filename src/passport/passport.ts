@@ -1,3 +1,4 @@
+import type { AuthorizationV3 } from "../marketplace/types";
 import { bundleCanonical, canonicalJson, sha256Hex } from "../core/digest";
 import { verifyBundle } from "../core/rules";
 import type { LicenseOffer, Project } from "../core/types";
@@ -7,6 +8,7 @@ import type { Session } from "../app-logic/session";
 
 export interface Passport {
   version: 1;
+  purchaseAuthorization?: AuthorizationV3 & { digest: string };
   id: string;
   /** When the payment was captured, taken from the ledger so the passport is reproducible. */
   issuedAt: string;
@@ -82,6 +84,15 @@ export async function verifyPassport(p: Passport): Promise<{ ok: boolean; checks
   const checks: PassportCheck[] = [];
   const add = (id: string, label: string, ok: boolean, detail: string) => checks.push({ id, label, ok, detail });
   const events = p.ledger.events;
+  if (p.purchaseAuthorization) {
+    const { digest: authorizationDigest, ...authorization } = p.purchaseAuthorization;
+    const digestMatches = await sha256Hex(canonicalJson(authorization)) === authorizationDigest;
+    const approval = events.find((event) => event.kind === "approved" && event.payload.purchaseDigest === authorizationDigest && event.payload.accountId === authorization.approvedBy && event.payload.authorizationVersion === 3);
+    const documentsMatch = p.documents.every((document) => authorization.documents.some((source) => source.id === document.id && source.assetId === document.assetId && source.text === document.text));
+    const recipientsMatch = authorization.recipients.length === p.bundle.offers.length && authorization.recipients.every((recipient) => p.bundle.offers.some((offer) => offer.id === `${recipient.offerId}:${recipient.offerVersion}` && offer.assetId === recipient.assetId && offer.currency === recipient.currency && offer.priceCents === recipient.amountCents));
+    add("purchase-authorization", "Human marketplace authorization", Boolean(digestMatches && approval && authorization.version === 3 && authorization.runId === p.id && canonicalJson(authorization.project) === canonicalJson(p.project) && canonicalJson(authorization.requiredAssetIds) === canonicalJson(p.requiredAssetIds) && bundleCanonical(authorization.offers) === bundleCanonical(p.bundle.offers) && documentsMatch && recipientsMatch && authorization.releasePolicy.days === 7 && authorization.releasePolicy.buyerAcceptance && authorization.releasePolicy.disputesHold), "The signed authorization binds the account, brief, source terms, recipients and payout hold.");
+  }
+
 
   const chain = await verifyChainAsync(events, sha256Hex);
   add("ledger-chain", "Ledger hash chain", chain && events.at(-1)?.hash === p.ledger.head, chain ? `${events.length} events, each linked to the one before` : "A ledger event was changed, removed or reordered");

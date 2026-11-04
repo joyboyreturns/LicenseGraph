@@ -1,3 +1,4 @@
+import { privateRequest } from "@/src/marketplace/http";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { createLicenseGraphServer } from "@/src/mcp/server";
 
@@ -9,6 +10,8 @@ export const dynamic = "force-dynamic";
  * The agent can check, price and start a purchase; only a person with the claim link can approve and pay.
  */
 export async function POST(req: Request) {
+  const privateResponse = await privateRequest(req);
+  if (privateResponse) return privateResponse;
   const server = createLicenseGraphServer({ baseUrl: new URL(req.url).origin });
   // Stateless: nothing is kept between requests, so any instance can answer any call.
   const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });

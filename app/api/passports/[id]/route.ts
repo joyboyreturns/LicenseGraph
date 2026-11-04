@@ -1,3 +1,4 @@
+import { privateRequest } from "@/src/marketplace/http";
 import { issuePassport } from "@/src/passport/issue";
 import { PassportError } from "@/src/passport/passport";
 import { signPassport } from "@/src/server/passport-signing";
@@ -8,6 +9,8 @@ export const dynamic = "force-dynamic";
 
 /** The Licence Passport for a paid run. Add ?download=1 to save it as a file. */
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const privateResponse = await privateRequest(req);
+  if (privateResponse) return privateResponse;
   const session = sessionOr404((await params).id);
   if (!session) return json({ error: "Passport not found." }, 404);
   try {

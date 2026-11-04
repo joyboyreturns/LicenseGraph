@@ -1,0 +1,49 @@
+name: licensegraph-local
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: licensegraph
+      POSTGRES_USER: licensegraph
+      POSTGRES_PASSWORD: ${LOCAL_DATABASE_PASSWORD:?Set LOCAL_DATABASE_PASSWORD in .env.local-infra}
+    ports: ["127.0.0.1:55432:5432"]
+    volumes: ["database:/var/lib/postgresql"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U licensegraph -d licensegraph"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+  identity-db:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: ${LOCAL_IDENTITY_DATABASE_PASSWORD:?Set LOCAL_IDENTITY_DATABASE_PASSWORD}
+    volumes: ["identity-database:/var/lib/postgresql"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak -d keycloak"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8.1
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: administrator
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${LOCAL_IDENTITY_ADMIN_PASSWORD:?Set LOCAL_IDENTITY_ADMIN_PASSWORD}
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://identity-db:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${LOCAL_IDENTITY_DATABASE_PASSWORD}
+      KC_HOSTNAME: http://localhost:8081
+      KC_HTTP_PORT: 8080
+    ports: ["127.0.0.1:8081:8080"]
+    volumes: ["./infra/keycloak:/opt/keycloak/data/import:ro"]
+    depends_on:
+      identity-db: {condition: service_healthy}
+  mail:
+    image: axllent/mailpit:v1.29
+    ports: ["127.0.0.1:8025:8025", "127.0.0.1:1025:1025"]
+volumes:
+  database:
+  identity-database:

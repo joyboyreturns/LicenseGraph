@@ -10,6 +10,7 @@ import { ThemeToggle } from "./ThemeToggle";
 import styles from "./SiteHeader.module.css";
 
 const NAV = [
+  { href: "/workspace", label: "Workspace", icon: Wallet },
   { href: "/dashboard", label: "Portfolio", icon: LayoutGrid },
   { href: "/agents", label: "Agents", icon: Bot },
   { href: "/verify", label: "Verify a passport", icon: ShieldCheck },

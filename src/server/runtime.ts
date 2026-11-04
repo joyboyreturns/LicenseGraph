@@ -37,18 +37,19 @@ export interface Runtime {
 const appUrl = () => (process.env.APP_URL || process.env.RENDER_EXTERNAL_URL || "http://localhost:3000").replace(/\/$/, "");
 
 function build(): Runtime {
-  const hasGateway = Boolean(process.env.AI_GATEWAY_API_KEY && process.env.LICENSEGRAPH_MODEL);
-  const mode: Mode = process.env.LICENSEGRAPH_MODE === "demo" ? "demo" : process.env.LICENSEGRAPH_MODE === "live" || hasGateway ? "live" : "demo";
+  const publicScenariosOnly = process.env.LICENSEGRAPH_STORAGE === "postgres";
+  const hasGateway = !publicScenariosOnly && Boolean(process.env.AI_GATEWAY_API_KEY && process.env.LICENSEGRAPH_MODEL);
+  const mode: Mode = publicScenariosOnly ? "demo" : process.env.LICENSEGRAPH_MODE === "demo" ? "demo" : process.env.LICENSEGRAPH_MODE === "live" || hasGateway ? "live" : "demo";
 
-  const hasPayPal = Boolean(process.env.PAYPAL_CLIENT_ID && process.env.PAYPAL_CLIENT_SECRET);
+  const hasPayPal = !publicScenariosOnly && Boolean(process.env.PAYPAL_CLIENT_ID && process.env.PAYPAL_CLIENT_SECRET);
   // The simulator runs only when asked for (or when forced with LICENSEGRAPH_PAYMENTS=simulator), never in place of real credentials by accident.
   const forced = process.env.LICENSEGRAPH_PAYMENTS;
-  const useSimulator = forced === "simulator" || (!hasPayPal && forced !== "none" && process.env.LICENSEGRAPH_SIMULATOR === "1");
+  const useSimulator = publicScenariosOnly || forced === "simulator" || (!hasPayPal && forced !== "none" && process.env.LICENSEGRAPH_SIMULATOR === "1");
   const simulator = useSimulator ? createPayPalSimulator({ appUrl, failFirstPayout: process.env.LICENSEGRAPH_SIMULATOR_FAIL_FIRST_PAYOUT === "1" }) : undefined;
   const payments = simulator ?? (hasPayPal && forced !== "none" ? createPayPalClient(configFromEnv()) : undefined);
   const paymentsMode: Runtime["paymentsMode"] = simulator ? "simulator" : payments ? "paypal-sandbox" : "none";
   const paymentsEnabled = paymentsMode !== "none";
-  const payeeOverrides = (process.env.LICENSEGRAPH_CREATOR_EMAILS ?? "").split(",").map((e) => e.trim()).filter(Boolean);
+  const payeeOverrides = (publicScenariosOnly ? "" : process.env.LICENSEGRAPH_CREATOR_EMAILS ?? "").split(",").map((e) => e.trim()).filter(Boolean);
 
   let model: ModelClient = demoModel;
   let proposer = greedyProposer;
@@ -74,7 +75,7 @@ function build(): Runtime {
     returnUrl: (id: string) => `${appUrl()}/api/sessions/${id}/return`,
     cancelUrl: (id: string) => `${appUrl()}/run/${id}`,
   };
-  const dataDir = resolve(process.env.LICENSEGRAPH_DATA_DIR ?? join(process.cwd(), ".data"));
+  const dataDir = publicScenariosOnly ? join(process.cwd(), ".data-public-scenarios") : resolve(process.env.LICENSEGRAPH_DATA_DIR ?? join(process.cwd(), ".data"));
 
   return {
     mode,
@@ -84,7 +85,7 @@ function build(): Runtime {
     simulator,
     llmProxy,
     intakeModel,
-    passportSecret: process.env.LICENSEGRAPH_PASSPORT_SECRET || undefined,
+    passportSecret: publicScenariosOnly ? "licensegraph-public-scenario-only" : process.env.LICENSEGRAPH_PASSPORT_SECRET || undefined,
     webhookId: process.env.PAYPAL_WEBHOOK_ID || undefined,
     appUrl: appUrl(),
     store: new SessionStore(500, new FileSessionRepository(join(dataDir, "sessions"))),

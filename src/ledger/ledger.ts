@@ -48,7 +48,12 @@ export class Ledger {
     };
     const event: LedgerEvent = { ...body, hash: hashOf(body) };
     this.log.push(event);
-    this.onAppend?.(structuredClone(event));
+    try {
+      this.onAppend?.(structuredClone(event));
+    } catch (error) {
+      this.log.pop();
+      throw error;
+    }
     return structuredClone(event);
   }
 

@@ -27,11 +27,11 @@ describe("createLlmProxy", () => {
     expect(JSON.stringify(reply)).not.toContain("secret-key");
   });
 
-  it("checks the model is free once, then reuses the result", async () => {
+  it("checks the model is free before every completion", async () => {
     const { proxy, fetchMock } = make();
     await proxy(body);
     await proxy(body);
-    expect(fetchMock.mock.calls.filter((c) => c[0].endsWith("/v1/models"))).toHaveLength(1);
+    expect(fetchMock.mock.calls.filter((c) => c[0].endsWith("/v1/models"))).toHaveLength(2);
   });
 
   it("refuses a paid model with 403 and never sends a completion", async () => {

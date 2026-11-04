@@ -1,3 +1,4 @@
+import { privateRequest } from "@/src/marketplace/http";
 import { badgeSvg } from "@/src/passport/badge";
 import { issuePassport } from "@/src/passport/issue";
 import { PassportError, verifyPassport } from "@/src/passport/passport";
@@ -7,6 +8,8 @@ export const dynamic = "force-dynamic";
 
 /** A status badge (SVG) for a paid run's Licence Passport, from the passport's own re-verification. */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const privateResponse = await privateRequest(_req);
+  if (privateResponse) return privateResponse;
   const session = sessionOr404((await params).id);
   if (!session) return json({ error: "Passport not found." }, 404);
   try {

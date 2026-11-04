@@ -280,7 +280,7 @@ export async function startPurchase(app: AppClient, input: z.infer<typeof startP
   const { mandate, ...run } = input;
   const stated = mandate && { maxTotalCents: Math.round(mandate.maxSpend * 100), currency: (mandate.currency ?? (run.project as { currency?: string }).currency ?? "USD").toUpperCase(), ...(mandate.note ? { note: mandate.note } : {}), ...(mandate.maxPerLicence ? { maxPerLicenceCents: Math.round(mandate.maxPerLicence * 100) } : {}), ...(mandate.avoidLicensors?.length ? { avoidLicensors: mandate.avoidLicensors } : {}) };
   const { status, body } = await call(app, "/api/sessions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...run, ...(stated ? { mandate: stated } : {}), handoff: true }) });
-  if (status !== 201) return { ok: false as const, error: body?.error ?? `The app answered ${status}.` };
+  if (status !== 201 && status !== 202) return { ok: false as const, error: body?.error ?? `The app answered ${status}.` };
   return {
     ok: true as const,
     runId: body.id as string,

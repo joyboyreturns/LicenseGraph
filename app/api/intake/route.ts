@@ -1,3 +1,4 @@
+import { privateRequest } from "@/src/marketplace/http";
 import { parseBrief } from "@/src/intake/brief";
 import { fail, json } from "@/src/server/http";
 import { createRateLimiter } from "@/src/server/rate-limit";
@@ -10,6 +11,8 @@ export const dynamic = "force-dynamic";
 
 /** Turn a plain-English brief into a project. Uses the free model when configured, and always falls back to the local reader. */
 export async function POST(req: Request) {
+  const privateResponse = await privateRequest(req);
+  if (privateResponse) return privateResponse;
   try {
     const body = (await req.json().catch(() => null)) as { text?: unknown } | null;
     const text = typeof body?.text === "string" ? body.text.trim() : "";

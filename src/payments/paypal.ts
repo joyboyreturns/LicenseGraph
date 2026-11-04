@@ -6,6 +6,7 @@ export interface PayPalConfig {
   clientSecret: string;
   baseUrl: string;
   fetch?: typeof fetch;
+  timeoutMs?: number;
 }
 
 export interface CreatedOrder {
@@ -40,7 +41,8 @@ export interface PayoutStatus {
   batchId: string;
   /** PENDING, PROCESSING, SUCCESS, DENIED, CANCELED. */
   status: string;
-  items: { itemId: string; status: string; receiver: string; error?: string }[];
+  senderBatchId?: string;
+  items: { itemId: string; status: string; receiver: string; error?: string; amount?: { currency: string; value: string } }[];
 }
 
 /** The transmission headers PayPal signs each webhook delivery with. */
@@ -199,7 +201,8 @@ export function createPayPalClient(config: PayPalConfig) {
       return {
         batchId: json.batch_header.payout_batch_id,
         status: json.batch_header.batch_status,
-        items: (json.items ?? []).map((i: any) => ({ itemId: i.payout_item?.sender_item_id, status: i.transaction_status, receiver: i.payout_item?.receiver, error: i.errors?.name })),
+        ...(json.batch_header.sender_batch_header?.sender_batch_id ? { senderBatchId: json.batch_header.sender_batch_header.sender_batch_id } : {}),
+        items: (json.items ?? []).map((i: any) => ({ itemId: i.payout_item?.sender_item_id, status: i.transaction_status, receiver: i.payout_item?.receiver, error: i.errors?.name, ...(i.payout_item?.amount ? { amount: { currency: i.payout_item.amount.currency, value: i.payout_item.amount.value } } : {}) })),
       };
     },
 
@@ -226,6 +229,30 @@ export function createPayPalClient(config: PayPalConfig) {
         webhook_event: input.event,
       });
       return json.verification_status === "SUCCESS";
+    },
+
+    /** Read existing provider records for reconciliation; these methods never create a transaction. */
+    async inspectOrder(orderId: string): Promise<{ id: string; status: string; customId?: string; amount: { currency: string; value: string }; capture?: CapturedOrder }> {
+      const json = await request("GET", `/v2/checkout/orders/${encodeURIComponent(orderId)}`);
+      const unit = json.purchase_units?.[0];
+      if (json.id !== orderId || json.purchase_units?.length !== 1 || !unit?.amount?.currency_code || !unit?.amount?.value) throw new Error("Invalid Sandbox order record.");
+      const captures = unit.payments?.captures ?? [];
+      if (captures.length > 1) throw new Error("Multiple captures require manual reconciliation.");
+      const capture = captures[0];
+      return { id: json.id, status: json.status, customId: unit.custom_id, amount: { currency: unit.amount.currency_code, value: unit.amount.value },
+        ...(capture ? { capture: { id: json.id, captureId: capture.id, status: capture.status, amount: { currency: capture.amount.currency_code, value: capture.amount.value } } } : {}) };
+    },
+
+    async inspectRefund(refundId: string): Promise<RefundedCapture & { captureId: string }> {
+      const json = await request("GET", `/v2/payments/refunds/${encodeURIComponent(refundId)}`);
+      const up = (json.links ?? []).find((link: any) => link.rel === "up");
+      let captureId: string | undefined;
+      try {
+        const link = new URL(up?.href);
+        if (link.origin === base.origin) captureId = /^\/v2\/payments\/captures\/([A-Za-z0-9-]+)$/.exec(link.pathname)?.[1];
+      } catch { /* Missing or unrelated links cannot establish refund ownership. */ }
+      if (json.id !== refundId || !captureId || !json.amount?.currency_code || !json.amount?.value) throw new Error("Invalid Sandbox refund record.");
+      return { id: json.id, status: json.status, captureId, amount: { currency: json.amount.currency_code, value: json.amount.value } };
     },
 
     async captureOrder(orderId: string, requestId: string): Promise<CapturedOrder> {

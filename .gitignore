@@ -15,3 +15,10 @@ test-results/
 playwright-report/
 graphify-out/
 .data-live/
+
+.env.local-infra
+.backups/
+
+.data-public-scenarios/
+
+.data-private-tests/

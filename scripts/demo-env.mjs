@@ -3,6 +3,10 @@ export function demoEnvironment(env, { dataDir, port, failFirstPayout }) {
   return {
     ...env,
     LICENSEGRAPH_MODE: "demo",
+    LICENSEGRAPH_STORAGE: "",
+    DATABASE_URL: "",
+    OIDC_CLIENT_SECRET: "",
+    LICENSEGRAPH_STORAGE_KEYS: "",
     LICENSEGRAPH_PAYMENTS: "simulator",
     AI_GATEWAY_API_KEY: "",
     LICENSEGRAPH_MODEL: "",

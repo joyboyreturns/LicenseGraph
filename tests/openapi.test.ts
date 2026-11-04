@@ -146,7 +146,7 @@ describe("real responses match the published schemas", () => {
   it("service endpoints, and an error body", async () => {
     await install();
     S.Health.parse(await body(await getHealth()));
-    S.Config.parse(await body(await getConfig()));
+    S.Config.parse(await body(await getConfig(new Request("http://app/api/config"))));
     for (const sc of (await body(await getScenarios())).scenarios) S.Scenario.parse(sc);
     const missing = await getPassport(new Request("http://app"), ctx("00000000-0000-0000-0000-000000000000"));
     expect(missing.status).toBe(404);

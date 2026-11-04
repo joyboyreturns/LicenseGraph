@@ -26,6 +26,7 @@ export interface StoredSession {
   claim?: Session["claim"];
   payoutBlockedAssets?: Session["payoutBlockedAssets"];
   payoutPreview?: Session["payoutPreview"];
+  paymentIntents?: Session["paymentIntents"];
   events: LedgerEvent[];
 }
 
@@ -50,16 +51,18 @@ export function serializeSession(s: Session): StoredSession {
     claim: s.claim,
     payoutBlockedAssets: s.payoutBlockedAssets,
     payoutPreview: s.payoutPreview,
+    paymentIntents: s.paymentIntents,
     events: s.ledger.events(),
   };
 }
 
 /** Rebuild a session. A run that was still working when the server stopped cannot resume, so it is marked failed. */
-export function deserializeSession(stored: StoredSession): Session {
+export function deserializeSession(stored: StoredSession, options: { resume?: boolean } = {}): Session {
   if (stored.v !== 1) throw new Error(`Unknown session format ${String(stored.v)}`);
   const ledger = Ledger.fromEvents(stored.events);
   const session: Session = {
     id: stored.id,
+    paymentIntents: stored.paymentIntents,
     ownerId: stored.ownerId,
     createdAt: stored.createdAt,
     runDate: stored.runDate,
@@ -79,7 +82,7 @@ export function deserializeSession(stored: StoredSession): Session {
     payoutBlockedAssets: stored.payoutBlockedAssets,
     payoutPreview: stored.payoutPreview,
   };
-  if (ACTIVE.includes(session.phase)) {
+  if (!options.resume && ACTIVE.includes(session.phase)) {
     session.phase = "failed";
     session.failure = "This run was interrupted by a server restart. Start it again.";
   }
