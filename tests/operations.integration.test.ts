@@ -147,7 +147,7 @@ describe.skipIf(!enabled)("legacy import, backup and restore", () => {
 
       // A tampered authorization inside a restored database is detected by verification.
       await restored.db.pool.query("ALTER TABLE licensegraph.purchase_authorizations DISABLE TRIGGER immutable_authorizations");
-      await restored.db.pool.query("UPDATE licensegraph.purchase_authorizations SET digest='0'||substr(digest,2)");
+      await restored.db.pool.query("UPDATE licensegraph.purchase_authorizations SET digest=(CASE WHEN left(digest,1)='0' THEN '1' ELSE '0' END)||substr(digest,2)");
       expect((await verifyDatabase(restored.db, cipher)).problems.join(" ")).toMatch(/authorization .* does not match its digest/);
     });
   });
