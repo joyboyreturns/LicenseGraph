@@ -48,7 +48,7 @@ services:
       KC_CACHE: local
       KC_HEALTH_ENABLED: "false"
       KC_METRICS_ENABLED: "false"
-    mem_limit: 480m
+    mem_limit: 512m
     ports: ["127.0.0.1:8081:8080"]
     volumes: ["./infra/keycloak:/opt/keycloak/data/import:ro"]
     depends_on:

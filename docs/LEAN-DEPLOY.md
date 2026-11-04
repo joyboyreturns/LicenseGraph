@@ -66,7 +66,7 @@ systemd-cgtop -m                                           # memory per service
 
 ## Keeping several projects on one machine
 
-- **Hard ceilings.** Every service here has a limit: web `MemoryMax=256M`, worker `MemoryMax=128M`, containers `mem_limit` (PostgreSQL 192 MB, Keycloak 480 MB). One misbehaving project is killed and restarted by systemd or Docker instead of pushing the machine into swap. Give each new project the same treatment before it starts.
+- **Hard ceilings.** Every service here has a limit: web `MemoryMax=256M`, worker `MemoryMax=128M`, containers `mem_limit` (PostgreSQL 192 MB, Keycloak 512 MB). One misbehaving project is killed and restarted by systemd or Docker instead of pushing the machine into swap. Give each new project the same treatment before it starts.
 - **Budget.** Write down a budget per project and keep the sum below about 70 percent of RAM so the page cache and bursts have room. This stack's ceiling is about 1.1 GB if every limit were reached at once; it normally sits near 600 MB.
 - **Ports.** Bind every service to `127.0.0.1` and publish only through the reverse proxy or Tailscale Funnel. This project uses 3000 (app), 5432 and 8081 (Keycloak). Pick a new range per project and keep a list.
 - **One database server.** Reuse one PostgreSQL server with one database and one role per project (as above). Never share a role between projects.

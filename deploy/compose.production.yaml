@@ -31,7 +31,7 @@ services:
     restart: unless-stopped
     # Production mode: no development caches or theme reloading. TLS ends at the reverse proxy in front.
     command: ["start", "--import-realm", "--http-enabled=true", "--proxy-headers=xforwarded"]
-    mem_limit: 480m
+    mem_limit: 512m
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: administrator
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${IDENTITY_ADMIN_PASSWORD:?Set IDENTITY_ADMIN_PASSWORD}
