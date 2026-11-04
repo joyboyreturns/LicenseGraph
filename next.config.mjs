@@ -11,6 +11,10 @@ const securityHeaders = [
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // A self-contained server folder (only the files the app uses) for the deployed copy: `node .next/standalone/server.js`.
+  output: "standalone",
+  // Never let the build trace local secrets, data or test output into the standalone folder.
+  outputFileTracingExcludes: { "*": [".env*", ".data*/**", ".sandbox-run/**", ".data-private-tests/**", "test-results/**", "release/**", "release.tar.gz", "graphify-out/**"] },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

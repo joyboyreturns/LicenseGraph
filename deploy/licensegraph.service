@@ -1,9 +1,9 @@
-# systemd unit for LicenseGraph on an Ubuntu server.
-# Install: sudo cp deploy/licensegraph.service /etc/systemd/system/ && sudo systemctl daemon-reload
-#          sudo systemctl enable --now licensegraph
-# Adjust User, WorkingDirectory and the Node path to match your machine (see docs/DEPLOY.md).
+# systemd unit for the LicenseGraph web server on Ubuntu. Runs the self-contained release (see docs/LEAN-DEPLOY.md).
+# Install: sudo cp deploy/licensegraph.service deploy/licensegraph-worker.service /etc/systemd/system/
+#          sudo systemctl daemon-reload && sudo systemctl enable --now licensegraph licensegraph-worker
+# Adjust User, WorkingDirectory and the Node path to match your machine.
 [Unit]
-Description=LicenseGraph (Next.js)
+Description=LicenseGraph web server
 After=network-online.target
 Wants=network-online.target
 
@@ -11,13 +11,23 @@ Wants=network-online.target
 Type=simple
 User=licensegraph
 Group=licensegraph
-WorkingDirectory=/opt/licensegraph
+WorkingDirectory=/opt/licensegraph/app
 EnvironmentFile=/opt/licensegraph/.env
 Environment=NODE_ENV=production
-# Listen on localhost only: Tailscale Funnel connects to it from the same machine.
-ExecStart=/usr/bin/node node_modules/next/dist/bin/next start -H 127.0.0.1 -p 3000
+# Listen on localhost only: the reverse proxy or Tailscale Funnel connects to it from the same machine.
+Environment=HOSTNAME=127.0.0.1
+Environment=PORT=3000
+# The JavaScript heap stops growing at 160 MB (the process as a whole stays near 100 to 150 MB).
+Environment=NODE_OPTIONS=--max-old-space-size=160
+ExecStart=/usr/bin/node server.js
 Restart=on-failure
 RestartSec=5
+
+# A hard ceiling so a fault here can never starve the other projects on the machine.
+MemoryHigh=200M
+MemoryMax=256M
+TasksMax=128
+CPUWeight=100
 
 # Hardening: the app only needs to read its own folder and write its data directory.
 NoNewPrivileges=true

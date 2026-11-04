@@ -23,6 +23,8 @@ jobs:
       - run: npx vitest run
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
+      # The deployable release must build and must not contain local secrets or data.
+      - run: npm run package
       - if: failure()
         uses: actions/upload-artifact@v4
         with:

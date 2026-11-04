@@ -1,5 +1,7 @@
 # Deploying on your own Ubuntu server with Tailscale Funnel
 
+For the signed-in (PostgreSQL) mode, memory budgets and sharing the machine with other projects, see `docs/LEAN-DEPLOY.md`.
+
 This puts LicenseGraph on the public internet from a machine at home, with HTTPS and no port forwarding. It uses PayPal **Sandbox** only: no real money moves.
 
 > The Tailscale commands below follow Tailscale's documented usage but were not run on this project's build machine. Check `tailscale funnel --help` on yours if a flag differs.
@@ -13,14 +15,18 @@ This puts LicenseGraph on the public internet from a machine at home, with HTTPS
 
 ## 2. Install the app
 
+Build the small self-contained release on your own machine (or CI), then copy it over. The server needs Node 22 only, not npm or the source:
+
 ```bash
-# a service user whose home is the data folder (also where npm keeps its cache)
+# on your Mac, in the repository
+npm ci && npm run package            # writes release.tar.gz (about 22 MB) and refuses to include .env or .data files
+scp release.tar.gz you@server:/tmp/
+
+# on the server: a service user whose home is the data folder
 sudo useradd --system --home-dir /var/lib/licensegraph --create-home --shell /usr/sbin/nologin licensegraph
-sudo mkdir -p /opt/licensegraph && sudo chown licensegraph:licensegraph /opt/licensegraph
-sudo -u licensegraph git clone https://github.com/joyboyreturns/licensegraph /opt/licensegraph
+sudo mkdir -p /opt/licensegraph && sudo tar -xzf /tmp/release.tar.gz --strip-components=1 -C /opt/licensegraph
+sudo chown -R licensegraph:licensegraph /opt/licensegraph
 cd /opt/licensegraph
-sudo -u licensegraph npm ci
-sudo -u licensegraph npm run build
 ```
 
 Create the settings file from the example and lock it down:
@@ -37,7 +43,7 @@ openssl rand -hex 32                   # paste into LICENSEGRAPH_PASSPORT_SECRET
 ## 3. Run it as a service
 
 ```bash
-sudo cp deploy/licensegraph.service /etc/systemd/system/
+sudo cp deploy/licensegraph.service /etc/systemd/system/      # add deploy/licensegraph-worker.service only for the signed-in mode
 # the unit assumes /opt/licensegraph; edit WorkingDirectory and EnvironmentFile if you used another folder
 sudo systemctl daemon-reload
 sudo systemctl enable --now licensegraph
@@ -67,7 +73,7 @@ Try it in a private window from a phone on mobile data (not your home Wi-Fi) to 
 ## 6. Operating it
 
 - **Logs:** `journalctl -u licensegraph -f`
-- **Update:** `git pull && npm ci && npm run build && sudo systemctl restart licensegraph`
+- **Update:** build a new `release.tar.gz` (`npm run package`), extract it over `/opt/licensegraph` as in step 2 (the `.env` and data folder are not part of it), then `sudo systemctl restart licensegraph`
 - **Backups:** copy `/var/lib/licensegraph` (one JSON file per run).
 - **Judging runs for weeks** (results after submission close). Keep the machine on, enable automatic restarts (the unit does), and consider an uptime check against `/api/health`. The repository also runs locally from the README, so a judge is never blocked if your server is off.
 

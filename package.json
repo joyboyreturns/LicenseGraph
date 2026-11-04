@@ -29,7 +29,9 @@
     "db:import-legacy": "node --env-file-if-exists=.env.local-infra --import tsx scripts/import-legacy.ts",
     "db:rekey": "node --env-file-if-exists=.env.local-infra --import tsx scripts/database-rekey.ts",
     "db:backup": "node --env-file-if-exists=.env.local-infra --import tsx scripts/database-backup.ts",
-    "db:restore": "node --env-file-if-exists=.env.local-infra --import tsx scripts/database-restore.ts"
+    "db:restore": "node --env-file-if-exists=.env.local-infra --import tsx scripts/database-restore.ts",
+    "build:ops": "node scripts/build-ops.mjs",
+    "package": "npm run build && npm run build:ops && node scripts/package-release.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",
@@ -39,6 +41,7 @@
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "esbuild": "^0.28.2",
     "fast-check": "^3.23.2",
     "tsx": "^4.23.15",
     "typescript": "^5.6.0",

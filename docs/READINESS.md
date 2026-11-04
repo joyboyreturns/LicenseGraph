@@ -32,13 +32,15 @@ The 70 skips are 27 live-provider tests that need credentials (not run) and the 
 - Data: legacy import is idempotent and quarantines bad files without touching originals; a backup restores into an empty database with documents, authorizations and ledger chains verified, and detects a changed file, a non-empty target and a tampered authorization; key rotation re-seals mutable records and leaves immutable ones readable with the retained old key; a retired passport key keeps verifying older passports.
 - Interface: desktop and phone, light and dark, with automated accessibility scans on the workspace, creator and staff screens.
 
-**Simulated, not provider-verified:** order, capture, payout, refund and webhook behaviour used the payment simulator or fixtures. No genuine PayPal Sandbox delivery, order or payout was exercised in this work. A reconciliation against a real Sandbox record has not been run.
+**Verified against the real PayPal Sandbox (4 November 2026, local stack, owner's Sandbox buyer account):** two $20.00 purchases through the signed-in marketplace. The Sandbox order was created, approved by the owner at PayPal and captured; the creator payout stayed held after capture. Purchase 1: the buyer opened a dispute and staff chose a refund; the Sandbox refund completed and the payout was never sent. Purchase 2: the buyer accepted and the PayPal Payouts batch was sent; its single line came back `UNCLAIMED` because the licensor's payout address was a fixture address, not a Sandbox account (a payout to a real Sandbox account was therefore not observed to completion). A first attempt failed with `PRECONDITION_FAILED` because the worker had been started without the PayPal credentials; the retry succeeded.
+
+**Still simulated, not provider-verified:** webhook delivery (a local machine cannot receive PayPal callbacks), a reconciliation against a real Sandbox record, and the other failure paths (provider timeouts, partial payouts), which used the simulator or fixtures.
 
 **Not verified:**
 
 - CI: the PostgreSQL, private-browser and offline jobs passed on GitHub for revision `c4fa778` (run 41828974773). That is the only revision with all three green.
 - A restore onto a different machine.
-- Real email delivery, a managed identity provider, TLS, hosting. Keycloak ran in development mode.
+- Real email delivery, a managed identity provider, TLS, hosting. The local stack runs Keycloak in development mode with a capped JVM. `deploy/compose.production.yaml` (production-mode Keycloak, one PostgreSQL server) and the systemd units in `deploy/` are written and the compose file validates, but neither was started on the home PC; see `docs/LEAN-DEPLOY.md` for the measured memory figures and what remains untested.
 - Multi-instance behaviour under real load; the multi-worker and crash cases are covered by lease and fault-injection tests in one process.
 - Legal sufficiency of the identity and rights review. It records a staff decision with evidence and does not certify ownership.
 - The staff screen lists operations awaiting reconciliation but not unmatched webhooks; the health endpoint reports their count.

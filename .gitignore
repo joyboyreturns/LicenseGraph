@@ -22,3 +22,6 @@ graphify-out/
 .data-public-scenarios/
 
 .data-private-tests/
+release/
+release.tar.gz
+.sandbox-run/

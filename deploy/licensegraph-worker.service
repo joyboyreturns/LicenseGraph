@@ -1,0 +1,31 @@
+# systemd unit for the LicenseGraph background worker (payments, payouts, webhook retries). Run one or more.
+[Unit]
+Description=LicenseGraph worker
+After=network-online.target licensegraph.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=licensegraph
+Group=licensegraph
+WorkingDirectory=/opt/licensegraph
+EnvironmentFile=/opt/licensegraph/.env
+Environment=NODE_ENV=production
+Environment=NODE_OPTIONS=--max-old-space-size=96
+ExecStart=/usr/bin/node ops/worker.mjs
+Restart=on-failure
+RestartSec=5
+
+MemoryHigh=100M
+MemoryMax=128M
+TasksMax=64
+CPUWeight=50
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/var/lib/licensegraph
+
+[Install]
+WantedBy=multi-user.target
