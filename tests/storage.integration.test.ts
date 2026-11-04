@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createSession } from "../src/app-logic/session";
 import { sampleDocuments, sampleProject, sampleRequiredAssets } from "../src/demo/sample";
 import { RecordCipher } from "../src/storage/crypto";
@@ -72,5 +72,22 @@ describe.skipIf(!enabled)("PostgreSQL durable storage", () => {
   });
   it("rejects negative, fractional and unsafe cents in the database", async () => {
     for (const value of ["-1", "1.5", "9007199254740992"]) await expect(db.pool.query("SELECT $1::licensegraph.cents", [value])).rejects.toThrow();
+  });
+
+  it("fails an unreadable job visibly instead of letting it block every worker", async () => {
+    const poisoned = await make();
+    const healthy = await make();
+    const foreign = new RecordCipher("other", { other: "ab".repeat(32) });
+    const badId = randomUUID();
+    await db.pool.query("INSERT INTO licensegraph.operations(id,run_id,kind,dedupe_key,sealed,available_at) VALUES ($1,$2,'pipeline','initial',$3,now()-interval '1 hour')", [badId, poisoned.id, foreign.seal(null, `operation:${badId}`)]);
+    const good = await db.transaction((tx) => queue.enqueue(tx, healthy.id, "pipeline", "initial"));
+    const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      let claimed = await queue.claim();
+      while (claimed && claimed.id !== good.id) { await db.transaction((tx) => queue.finish(tx, claimed!, "failed")); claimed = await queue.claim(); }
+      expect(claimed?.id).toBe(good.id);
+    } finally { errors.mockRestore(); }
+    const bad = await db.pool.query("SELECT status,error_code FROM licensegraph.operations WHERE id=$1", [badId]);
+    expect(bad.rows[0]).toMatchObject({ status: "failed", error_code: "UNREADABLE_RECORD" });
   });
 });

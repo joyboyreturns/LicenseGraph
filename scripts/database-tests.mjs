@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process";
 import pg from "pg";
 
 // The suites write approved offers, users and ledger rows sealed with throwaway keys. They must never share a
-// database with the running app, so they always run in "<name>_test", created on demand.
+// database with the running app, so they always run in "<name>_test", recreated empty on every run.
 const source = process.env.DATABASE_URL;
 if (!source) throw new Error("Set DATABASE_URL to the local PostgreSQL server.");
 const url = new URL(source);
@@ -11,11 +11,14 @@ if (!base) throw new Error("DATABASE_URL must name a database.");
 const testName = base.endsWith("_test") ? base : `${base}_test`;
 if (!/^[a-z0-9_]{1,50}$/.test(testName)) throw new Error("Unsupported database name for the isolated test database.");
 
-const admin = new pg.Client({ connectionString: source });
+const maintenance = new URL(source);
+maintenance.pathname = "/postgres";
+const admin = new pg.Client({ connectionString: maintenance.toString() });
 await admin.connect();
 try {
-  const exists = await admin.query("SELECT 1 FROM pg_database WHERE datname = $1", [testName]);
-  if (!exists.rowCount) await admin.query(`CREATE DATABASE ${testName}`);
+  // Disposable by design: queued jobs and rows from an earlier run must never leak into this one.
+  await admin.query(`DROP DATABASE IF EXISTS ${testName} WITH (FORCE)`);
+  await admin.query(`CREATE DATABASE ${testName}`);
 } finally {
   await admin.end();
 }

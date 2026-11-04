@@ -28,14 +28,24 @@ export class JobQueue {
     return this.db.transaction(async (tx) => {
       // An expired lease may have reached an external provider. It requires reconciliation, never blind replay.
       await tx.query("UPDATE licensegraph.operations SET status='reconcile',error_code='LEASE_EXPIRED',updated_at=now() WHERE status='running' AND lease_until < now()");
-      const selected = await tx.query(`SELECT o.* FROM licensegraph.operations o JOIN licensegraph.runs r ON r.id=o.run_id
-        WHERE o.status='queued' AND o.available_at<=now() AND r.quarantine_reason IS NULL
-        AND NOT EXISTS (SELECT 1 FROM licensegraph.operations busy WHERE busy.run_id=o.run_id AND busy.status IN ('running','reconcile'))
-        ORDER BY o.available_at,o.created_at LIMIT 1 FOR UPDATE OF o,r SKIP LOCKED`);
-      if (!selected.rowCount) return undefined;
-      const row = selected.rows[0];
-      const updated = await tx.query("UPDATE licensegraph.operations SET status='running',lease_token=$1,lease_until=now()+interval '60 seconds',updated_at=now() WHERE id=$2 RETURNING *", [randomUUID(), row.id]);
-      return this.decode(updated.rows[0]);
+      for (let attempt = 0; attempt < 25; attempt++) {
+        const selected = await tx.query(`SELECT o.* FROM licensegraph.operations o JOIN licensegraph.runs r ON r.id=o.run_id
+          WHERE o.status='queued' AND o.available_at<=now() AND r.quarantine_reason IS NULL
+          AND NOT EXISTS (SELECT 1 FROM licensegraph.operations busy WHERE busy.run_id=o.run_id AND busy.status IN ('running','reconcile'))
+          ORDER BY o.available_at,o.created_at LIMIT 1 FOR UPDATE OF o,r SKIP LOCKED`);
+        if (!selected.rowCount) return undefined;
+        const row = selected.rows[0];
+        // An unreadable job can never run. Failing it visibly keeps it from blocking every worker behind it.
+        try { this.decode(row); }
+        catch {
+          await tx.query("UPDATE licensegraph.operations SET status='failed',error_code='UNREADABLE_RECORD',lease_until=NULL,updated_at=now() WHERE id=$1", [row.id]);
+          console.error(JSON.stringify({ event: "operation_unreadable", operation: row.id }));
+          continue;
+        }
+        const updated = await tx.query("UPDATE licensegraph.operations SET status='running',lease_token=$1,lease_until=now()+interval '60 seconds',updated_at=now() WHERE id=$2 RETURNING *", [randomUUID(), row.id]);
+        return this.decode(updated.rows[0]);
+      }
+      return undefined;
     });
   }
   async assertLease(tx: Transaction, job: Operation): Promise<void> {

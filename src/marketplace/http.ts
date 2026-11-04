@@ -1,7 +1,7 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { z, ZodError } from "zod";
 import { AccessError, requireSameOrigin, staffOnly, type Principal } from "../auth/identity";
-import { createSession, reserveForPerson, claimSession, viewOf, type Session } from "../app-logic/session";
+import { createSession, reserveForPerson, claimSession, viewOf, SessionError, type Session } from "../app-logic/session";
 import { sessionInputSchema, rebriefInputSchema, reviseInputSchema } from "../server/session-input";
 import { getRuntime } from "../server/runtime";
 import { issuePassport } from "../passport/issue";
@@ -148,11 +148,13 @@ export async function privateRequest(request: Request): Promise<Response | undef
     }
     if (path === "/api/webhooks/paypal") return await receiveWebhook(rt, request);
     const principal = await rt.identity.principal(request);
+    // A presented credential that does not resolve (expired, revoked, malformed) must fail visibly, not fall back to public data.
+    if (!principal && path !== "/api/mcp" && request.headers.get("authorization")) throw new AccessError("This credential is invalid, expired or revoked.", 401);
     if (!principal && path === "/api/mcp") return undefined;
     if (!principal && ["/api/sessions", "/api/portfolio", "/api/config"].includes(path) && request.method === "GET") return undefined;
     if (!principal) throw new AccessError("Sign in to access your private workspace.", 401);
     if (principal.agent) {
-      const allowed = request.method === "GET" && (/^\/api\/(?:sessions|passports)\//.test(path) || path === "/api/sessions" || path.startsWith("/api/marketplace/operations/") || path === "/api/marketplace/catalog") || request.method === "POST" && ["/api/sessions", "/api/mcp"].includes(path);
+      const allowed = request.method === "GET" && (/^\/api\/(?:sessions\/[^/]+|passports\/[^/]+(?:\/(?:badge|qr|verify))?)$/.test(path) || path === "/api/sessions" || path.startsWith("/api/marketplace/operations/") || path === "/api/marketplace/catalog") || request.method === "POST" && ["/api/sessions", "/api/mcp"].includes(path);
       if (!allowed) throw new AccessError("Agent credentials can create and read permitted runs; human approval and money actions require browser sign-in.");
     } else requireSameOrigin(request, rt.appUrl);
     if (path === "/api/config") return json({ mode: rt.model ? "live" : "demo", paymentsEnabled: Boolean(rt.deps.payments), paymentsMode: rt.deps.payments ? "paypal-sandbox" : "none", assistant: Boolean(rt.proxy), intakeModel: Boolean(rt.model), passportSigned: Boolean(rt.passportSecret), appUrl: rt.appUrl, privateWorkspace: true });
@@ -258,7 +260,7 @@ export async function privateRequest(request: Request): Promise<Response | undef
     throw new AccessError("This endpoint is unavailable in the private workspace.", 404);
   } catch (error) {
     if (error instanceof AccessError) return json({ error: error.message }, error.status);
-    if (error instanceof ConflictError) return json({ error: error.message }, 409);
+    if (error instanceof ConflictError || error instanceof SessionError) return json({ error: error.message }, 409);
     if (error instanceof ZodError) return json({ error: "Invalid request.", issues: error.issues.map((issue) => ({ path: issue.path, message: issue.message })) }, 400);
     // Class and database code only: messages can carry record contents.
     const detail = error instanceof Error ? { error: error.name, code: (error as { code?: unknown }).code } : { error: "unknown" };
