@@ -3,7 +3,10 @@ import { readFileSync } from "node:fs";
 import { test, expect, type BrowserContext, type Page } from "@playwright/test";
 import { localIdentityAdmin } from "../../scripts/marketplace/keycloak-admin";
 
-const identities = JSON.parse(readFileSync(".data-private-tests/identities.json", "utf8")) as Record<string, { email: string; password: string }>;
+const identities = JSON.parse(readFileSync(".data-private-tests/identities.json", "utf8")) as Record<
+  string,
+  { email: string; password: string }
+>;
 const APP = "http://localhost:3000";
 const MAIL = "http://localhost:8025";
 
@@ -12,12 +15,15 @@ async function keycloakLogin(page: Page, email: string, password: string) {
   await page.locator("#password").fill(password);
   await page.locator("#kc-login").click();
 }
-const me = async (page: Page | BrowserContext) => (await (await page.request.get("/api/auth/me")).json()) as { user?: { email: string; mfa: boolean } };
+const me = async (page: Page | BrowserContext) =>
+  (await (await page.request.get("/api/auth/me")).json()) as { user?: { email: string; mfa: boolean } };
 
 /** Newest message addressed to `email`, as plain text. */
 async function mailTo(email: string, after = 0) {
   for (let attempt = 0; attempt < 40; attempt++) {
-    const list = (await (await fetch(`${MAIL}/api/v1/search?query=${encodeURIComponent(`to:${email}`)}`)).json()) as { messages?: { ID: string; Created: string }[] };
+    const list = (await (await fetch(`${MAIL}/api/v1/search?query=${encodeURIComponent(`to:${email}`)}`)).json()) as {
+      messages?: { ID: string; Created: string }[];
+    };
     const fresh = (list.messages ?? []).filter((m) => Date.parse(m.Created) >= after);
     if (fresh.length) {
       const message = (await (await fetch(`${MAIL}/api/v1/message/${fresh[0]!.ID}`)).json()) as { Text: string };
@@ -34,12 +40,30 @@ async function temporaryUser(options: { verified: boolean }) {
   const admin = await localIdentityAdmin();
   const email = `tmp-${randomUUID().slice(0, 8)}@example.invalid`;
   const password = `Pw-${randomUUID()}`;
-  await admin("/users", "POST", { username: email, email, emailVerified: options.verified, enabled: true, firstName: "Temporary", lastName: "Person", credentials: [{ type: "password", value: password, temporary: false }] });
+  await admin("/users", "POST", {
+    username: email,
+    email,
+    emailVerified: options.verified,
+    enabled: true,
+    firstName: "Temporary",
+    lastName: "Person",
+    credentials: [{ type: "password", value: password, temporary: false }],
+  });
   const found = (await admin(`/users?email=${encodeURIComponent(email)}&exact=true`)) as { id: string }[];
-  return { email, password, remove: async () => { for (const user of (await admin(`/users?email=${encodeURIComponent(email)}&exact=true`)) as { id: string }[]) await admin(`/users/${user.id}`, "DELETE"); }, id: found[0]?.id };
+  return {
+    email,
+    password,
+    remove: async () => {
+      for (const user of (await admin(`/users?email=${encodeURIComponent(email)}&exact=true`)) as { id: string }[])
+        await admin(`/users/${user.id}`, "DELETE");
+    },
+    id: found[0]?.id,
+  };
 }
 
-test("the authorization request carries state, nonce and an S256 PKCE challenge, in an HttpOnly cookie-bound attempt", async ({ playwright }) => {
+test("the authorization request carries state, nonce and an S256 PKCE challenge, in an HttpOnly cookie-bound attempt", async ({
+  playwright,
+}) => {
   const api = await playwright.request.newContext({ baseURL: APP });
   const response = await api.get("/api/auth/login?returnTo=/dashboard", { maxRedirects: 0 });
   expect(response.status()).toBe(303);
@@ -61,7 +85,12 @@ test("the authorization request carries state, nonce and an S256 PKCE challenge,
   await api.dispose();
 });
 
-for (const [label, returnTo, landing] of [["a protocol-relative URL", "//evil.example/x", "/workspace"], ["an absolute URL", "https://evil.example/", "/workspace"], ["a backslash trick", "/\\evil.example", "/workspace"], ["a local path", "/dashboard", "/dashboard"]] as const) {
+for (const [label, returnTo, landing] of [
+  ["a protocol-relative URL", "//evil.example/x", "/workspace"],
+  ["an absolute URL", "https://evil.example/", "/workspace"],
+  ["a backslash trick", "/\\evil.example", "/workspace"],
+  ["a local path", "/dashboard", "/dashboard"],
+] as const) {
   test(`returnTo as ${label} never leaves the application`, async ({ page }) => {
     await page.goto(`/api/auth/login?returnTo=${encodeURIComponent(returnTo)}`);
     await keycloakLogin(page, identities.buyer!.email, identities.buyer!.password);
@@ -89,7 +118,9 @@ test("a forged, missing or replayed callback creates no session", async ({ brows
   const real = await browser.newContext({ baseURL: APP });
   const realPage = await real.newPage();
   let callback = "";
-  realPage.on("request", (request) => { if (request.url().includes("/api/auth/callback")) callback = request.url(); });
+  realPage.on("request", (request) => {
+    if (request.url().includes("/api/auth/callback")) callback = request.url();
+  });
   await realPage.goto("/api/auth/login");
   await keycloakLogin(realPage, identities.buyer!.email, identities.buyer!.password);
   await realPage.waitForURL(/localhost:3000\/workspace/);
@@ -125,7 +156,9 @@ test("sign-out revokes the server-side session and cross-origin sign-out is refu
   await Promise.all([context.close(), thief.close()]);
 });
 
-test("registration proves control of the email first, then sets a password, and only then yields an application session", async ({ page }) => {
+test("registration proves control of the email first, then sets a password, and only then yields an application session", async ({
+  page,
+}) => {
   const email = `reg-${randomUUID().slice(0, 8)}@example.invalid`;
   const password = `Pw-${randomUUID()}`;
   const started = Date.now() - 2000;
@@ -150,11 +183,14 @@ test("registration proves control of the email first, then sets a password, and 
     expect((await me(page)).user?.email).toBe(email);
   } finally {
     const admin = await localIdentityAdmin();
-    for (const user of (await admin(`/users?email=${encodeURIComponent(email)}&exact=true`)) as { id: string }[]) await admin(`/users/${user.id}`, "DELETE");
+    for (const user of (await admin(`/users?email=${encodeURIComponent(email)}&exact=true`)) as { id: string }[])
+      await admin(`/users/${user.id}`, "DELETE");
   }
 });
 
-test("an account whose email is unverified is held at the identity provider and never receives an application session", async ({ page }) => {
+test("an account whose email is unverified is held at the identity provider and never receives an application session", async ({
+  page,
+}) => {
   const user = await temporaryUser({ verified: false });
   try {
     await page.goto("/api/auth/login");
@@ -162,7 +198,9 @@ test("an account whose email is unverified is held at the identity provider and 
     await expect(page.getByText(/verify your email/i).first()).toBeVisible();
     expect(new URL(page.url()).origin).toBe("http://localhost:8081");
     expect((await me(page)).user).toBeUndefined();
-  } finally { await user.remove(); }
+  } finally {
+    await user.remove();
+  }
 });
 
 test("password recovery sends a link through the mail sink, replaces the password and retires the old one", async ({ page, browser }) => {
@@ -193,5 +231,7 @@ test("password recovery sends a link through the mail sink, replaces the passwor
     await freshPage.waitForURL(/localhost:3000/);
     expect((await me(fresh)).user?.email).toBe(user.email);
     await Promise.all([old.close(), fresh.close()]);
-  } finally { await user.remove(); }
+  } finally {
+    await user.remove();
+  }
 });

@@ -5,25 +5,203 @@ import type { SessionView } from "@/src/app-logic/session";
 import { api, errorMessage } from "@/src/ui/lib/api";
 import styles from "../Workspace.module.css";
 
-export function MarketplaceControls({view,refresh}:{view:SessionView;refresh:()=>Promise<void>}) {
- const [busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
- const [shares,setShares]=useState<{id:string;kind:string;expires_at:string;revoked_at?:string}[]>([]);
- const [shareUrl,setShareUrl]=useState("");
- async function action(work:()=>Promise<unknown>,message:string){setBusy(true);setError("");try{await work();setNotice(message);await refresh();}catch(e){setError(errorMessage(e));}finally{setBusy(false);}}
- return <section className={`card ${styles.panel}`} aria-label="Private purchase controls" style={{marginBlock:24}}><p className="eyebrow">Private marketplace · Sandbox only</p><h2>Purchase controls</h2><p>Approval binds your account, project brief, exact offers and recipients. Captured funds stay held until you accept the purchase or seven days pass without a dispute.</p>
-  <p><Link href="/workspace">Back to your private workspace</Link></p>
-  {view.pendingOperation&&(view.pendingOperation.status==="failed"&&view.pendingOperation.error_code==="ORDER_NOT_APPROVED"
-   ?<p className="callout" role="status">Waiting for you to approve the order at PayPal. Nothing was captured. Approve it there, then complete the payment again.</p>
-   :<p className="callout" role="status">{view.pendingOperation.kind}: {view.pendingOperation.status.replaceAll("_"," ")}{view.pendingOperation.status==="reconcile"?". The outcome is uncertain. Staff must reconcile existing provider records before another money action.":""}</p>)}
-  {view.purchase&&<p>Payout status: <strong>{view.purchase.payout_state}</strong>{view.purchase.release_at&&` · release eligible ${new Date(view.purchase.release_at).toLocaleString()}`}</p>}
-  {error&&<p className="callout tone-bad" role="alert">{error}</p>}{notice&&<p role="status" className="callout">{notice}</p>}
-  <fieldset disabled={busy} className={styles.all}><legend className="visually-hidden">Purchase and sharing actions</legend>
-  {view.capture&&!view.refund&&<>
-   {view.purchase?.payout_state==="held"&&<button className="btn btn-primary" onClick={()=>void action(()=>api(`/api/marketplace/runs/${view.id}/accept`,{method:"POST",json:{}}),"Acceptance recorded. Payout release was queued and will be checked again before submission.")}>Accept purchase and release creator payouts</button>}
-   <details style={{marginBlock:20}}><summary>Report a problem with this purchase</summary><form className={styles.form} onSubmit={(event)=>{event.preventDefault();const form=new FormData(event.currentTarget);void action(()=>api(`/api/marketplace/runs/${view.id}/disputes`,{method:"POST",json:{reason:String(form.get("reason")),evidence:String(form.get("evidence"))}}),"Dispute recorded. Unsent payouts are held; submitted or uncertain transfers require staff review.");}}><label className={styles.field}><span>What went wrong?</span><textarea name="reason" required minLength={10} maxLength={10000} rows={3}/></label><label className={styles.field}><span>Private supporting evidence</span><textarea name="evidence" required maxLength={100000} rows={4}/></label><button className="btn">Open dispute</button></form></details>
-   <details style={{marginBlock:20}}><summary>Share a receipt or complete passport</summary><p>Receipt links omit source text and personal details. A complete passport includes licence sources, evidence and recipient details. Anyone with its link can download a copy; revocation cannot recall a downloaded file.</p><form className={styles.form} onSubmit={(event)=>{event.preventDefault();const form=new FormData(event.currentTarget);void action(async()=>{const grant=await api<{url:string}>(`/api/marketplace/runs/${view.id}/shares`,{method:"POST",json:{kind:String(form.get("kind")),days:Number(form.get("days"))}});setShareUrl(grant.url);const result=await api<{shares:typeof shares}>(`/api/marketplace/runs/${view.id}/shares`);setShares(result.shares);},"Share grant created.");}}><label className={styles.field}><span>What to share</span><select name="kind"><option value="receipt">Redacted receipt</option><option value="passport">Complete passport, including source and recipients</option></select></label><label className={styles.field}><span>Expires in days</span><input name="days" type="number" min={1} max={30} defaultValue={7} required/></label><label><input type="checkbox" required/>I understand what this link discloses.</label><button className="btn">Create explicit share grant</button></form>{shareUrl&&<p className={styles.source}><a href={shareUrl}>{shareUrl}</a></p>}<button className="btn" onClick={()=>void action(async()=>{const result=await api<{shares:typeof shares}>(`/api/marketplace/runs/${view.id}/shares`);setShares(result.shares);},"Sharing grants refreshed.")}>Review existing grants</button><ul className={styles.list}>{shares.map((share)=><li key={share.id}><span>{share.kind} · expires {new Date(share.expires_at).toLocaleDateString()}{share.revoked_at?" · revoked":""}</span>{!share.revoked_at&&<button className="btn btn-sm" onClick={()=>void action(async()=>{await api(`/api/marketplace/shares/${share.id}`,{method:"DELETE"});const result=await api<{shares:typeof shares}>(`/api/marketplace/runs/${view.id}/shares`);setShares(result.shares);},"Sharing grant revoked.")}>Revoke {share.kind} grant</button>}</li>)}</ul></details>
-  </>}
-  </fieldset>
-  {view.disputes?.length? <ul className={styles.list}>{view.disputes.map((d)=><li key={d.id}><span>Dispute {d.id.slice(0,8)}: {d.status}</span></li>)}</ul>:null}
- </section>;
+export function MarketplaceControls({ view, refresh }: { view: SessionView; refresh: () => Promise<void> }) {
+  const [busy, setBusy] = useState(false),
+    [error, setError] = useState(""),
+    [notice, setNotice] = useState("");
+  const [shares, setShares] = useState<{ id: string; kind: string; expires_at: string; revoked_at?: string }[]>([]);
+  const [shareUrl, setShareUrl] = useState("");
+  async function action(work: () => Promise<unknown>, message: string) {
+    setBusy(true);
+    setError("");
+    try {
+      await work();
+      setNotice(message);
+      await refresh();
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <section className={`card ${styles.panel}`} aria-label="Private purchase controls" style={{ marginBlock: 24 }}>
+      <p className="eyebrow">Private marketplace · Sandbox only</p>
+      <h2>Purchase controls</h2>
+      <p>
+        Approval binds your account, project brief, exact offers and recipients. Captured funds stay held until you accept the purchase or
+        seven days pass without a dispute.
+      </p>
+      <p>
+        <Link href="/workspace">Back to your private workspace</Link>
+      </p>
+      {view.pendingOperation &&
+        (view.pendingOperation.status === "failed" && view.pendingOperation.error_code === "ORDER_NOT_APPROVED" ? (
+          <p className="callout" role="status">
+            Waiting for you to approve the order at PayPal. Nothing was captured. Approve it there, then complete the payment again.
+          </p>
+        ) : (
+          <p className="callout" role="status">
+            {view.pendingOperation.kind}: {view.pendingOperation.status.replaceAll("_", " ")}
+            {view.pendingOperation.status === "reconcile"
+              ? ". The outcome is uncertain. Staff must reconcile existing provider records before another money action."
+              : ""}
+          </p>
+        ))}
+      {view.purchase && (
+        <p>
+          Payout status: <strong>{view.purchase.payout_state}</strong>
+          {view.purchase.release_at && ` · release eligible ${new Date(view.purchase.release_at).toLocaleString()}`}
+        </p>
+      )}
+      {error && (
+        <p className="callout tone-bad" role="alert">
+          {error}
+        </p>
+      )}
+      {notice && (
+        <p role="status" className="callout">
+          {notice}
+        </p>
+      )}
+      <fieldset disabled={busy} className={styles.all}>
+        <legend className="visually-hidden">Purchase and sharing actions</legend>
+        {view.capture && !view.refund && (
+          <>
+            {view.purchase?.payout_state === "held" && (
+              <button
+                className="btn btn-primary"
+                onClick={() =>
+                  void action(
+                    () => api(`/api/marketplace/runs/${view.id}/accept`, { method: "POST", json: {} }),
+                    "Acceptance recorded. Payout release was queued and will be checked again before submission.",
+                  )
+                }
+              >
+                Accept purchase and release creator payouts
+              </button>
+            )}
+            <details style={{ marginBlock: 20 }}>
+              <summary>Report a problem with this purchase</summary>
+              <form
+                className={styles.form}
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  const form = new FormData(event.currentTarget);
+                  void action(
+                    () =>
+                      api(`/api/marketplace/runs/${view.id}/disputes`, {
+                        method: "POST",
+                        json: { reason: String(form.get("reason")), evidence: String(form.get("evidence")) },
+                      }),
+                    "Dispute recorded. Unsent payouts are held; submitted or uncertain transfers require staff review.",
+                  );
+                }}
+              >
+                <label className={styles.field}>
+                  <span>What went wrong?</span>
+                  <textarea name="reason" required minLength={10} maxLength={10000} rows={3} />
+                </label>
+                <label className={styles.field}>
+                  <span>Private supporting evidence</span>
+                  <textarea name="evidence" required maxLength={100000} rows={4} />
+                </label>
+                <button className="btn">Open dispute</button>
+              </form>
+            </details>
+            <details style={{ marginBlock: 20 }}>
+              <summary>Share a receipt or complete passport</summary>
+              <p>
+                Receipt links omit source text and personal details. A complete passport includes licence sources, evidence and recipient
+                details. Anyone with its link can download a copy; revocation cannot recall a downloaded file.
+              </p>
+              <form
+                className={styles.form}
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  const form = new FormData(event.currentTarget);
+                  void action(async () => {
+                    const grant = await api<{ url: string }>(`/api/marketplace/runs/${view.id}/shares`, {
+                      method: "POST",
+                      json: { kind: String(form.get("kind")), days: Number(form.get("days")) },
+                    });
+                    setShareUrl(grant.url);
+                    const result = await api<{ shares: typeof shares }>(`/api/marketplace/runs/${view.id}/shares`);
+                    setShares(result.shares);
+                  }, "Share grant created.");
+                }}
+              >
+                <label className={styles.field}>
+                  <span>What to share</span>
+                  <select name="kind">
+                    <option value="receipt">Redacted receipt</option>
+                    <option value="passport">Complete passport, including source and recipients</option>
+                  </select>
+                </label>
+                <label className={styles.field}>
+                  <span>Expires in days</span>
+                  <input name="days" type="number" min={1} max={30} defaultValue={7} required />
+                </label>
+                <label>
+                  <input type="checkbox" required />I understand what this link discloses.
+                </label>
+                <button className="btn">Create explicit share grant</button>
+              </form>
+              {shareUrl && (
+                <p className={styles.source}>
+                  <a href={shareUrl}>{shareUrl}</a>
+                </p>
+              )}
+              <button
+                className="btn"
+                onClick={() =>
+                  void action(async () => {
+                    const result = await api<{ shares: typeof shares }>(`/api/marketplace/runs/${view.id}/shares`);
+                    setShares(result.shares);
+                  }, "Sharing grants refreshed.")
+                }
+              >
+                Review existing grants
+              </button>
+              <ul className={styles.list}>
+                {shares.map((share) => (
+                  <li key={share.id}>
+                    <span>
+                      {share.kind} · expires {new Date(share.expires_at).toLocaleDateString()}
+                      {share.revoked_at ? " · revoked" : ""}
+                    </span>
+                    {!share.revoked_at && (
+                      <button
+                        className="btn btn-sm"
+                        onClick={() =>
+                          void action(async () => {
+                            await api(`/api/marketplace/shares/${share.id}`, { method: "DELETE" });
+                            const result = await api<{ shares: typeof shares }>(`/api/marketplace/runs/${view.id}/shares`);
+                            setShares(result.shares);
+                          }, "Sharing grant revoked.")
+                        }
+                      >
+                        Revoke {share.kind} grant
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          </>
+        )}
+      </fieldset>
+      {view.disputes?.length ? (
+        <ul className={styles.list}>
+          {view.disputes.map((d) => (
+            <li key={d.id}>
+              <span>
+                Dispute {d.id.slice(0, 8)}: {d.status}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </section>
+  );
 }

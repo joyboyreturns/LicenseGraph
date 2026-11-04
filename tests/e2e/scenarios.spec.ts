@@ -112,9 +112,13 @@ test("with a live model the gap panel offers a paste box for each licensor's rep
   // This server runs the offline demo, so pretend it has a model and catch what the page would send.
   await page.route("**/api/config", async (route) => route.fulfill({ json: { ...(await (await route.fetch()).json()), mode: "live" } }));
   let sent: { assetId?: string; text?: string; licensor?: { name?: string } } | undefined;
+  // The handler must finish before the test ends: a handler still awaiting a request when the context closes fails
+  // with "Response has been disposed", which is a race in the test, not in the page.
+  let fulfilled: Promise<void> = Promise.resolve();
   await page.route(`**/api/sessions/${id}/revise`, async (route) => {
     sent = route.request().postDataJSON();
-    await route.fulfill({ status: 201, json: await (await page.request.get(`/api/sessions/${id}`)).json() });
+    fulfilled = (async () => route.fulfill({ status: 201, json: await (await page.request.get(`/api/sessions/${id}`)).json() }))();
+    await fulfilled;
   });
 
   await page.goto(`/run/${id}`);
@@ -126,4 +130,5 @@ test("with a live model the gap panel offers a paste box for each licensor's rep
   await song.getByRole("textbox").fill("Price: USD 520.00. Exclusive to the Licensee.");
   await check.click();
   await expect.poll(() => sent).toMatchObject({ assetId: "song", text: "Price: USD 520.00. Exclusive to the Licensee.", licensor: { name: "Tapeloop" } });
+  await fulfilled;
 });

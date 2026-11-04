@@ -22,7 +22,14 @@ import type { PurchaseDetails } from "./types";
 
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
 const uuid = z.uuid();
-const publicOperation = (job: Operation) => ({ id: job.id, runId: job.runId, kind: job.kind, status: job.status, stage: job.stage, ...(job.errorCode ? { code: job.errorCode } : {}) });
+const publicOperation = (job: Operation) => ({
+  id: job.id,
+  runId: job.runId,
+  kind: job.kind,
+  status: job.status,
+  stage: job.stage,
+  ...(job.errorCode ? { code: job.errorCode } : {}),
+});
 
 async function readJson(request: Request): Promise<unknown> {
   const maximum = 500_000;
@@ -31,30 +38,76 @@ async function readJson(request: Request): Promise<unknown> {
   if (!reader) return {};
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    const body = await Promise.race([new Promise<never>((_resolve, reject) => { timer = setTimeout(() => { void reader.cancel(); reject(new AccessError("Request body timed out.", 408)); }, 10_000); }), (async () => {
-      const chunks: Uint8Array[] = []; let length = 0;
-      while (true) {
-        const chunk = await reader.read(); if (chunk.done) break;
-        length += chunk.value.length;
-        if (length > maximum) { await reader.cancel(); throw new AccessError("Request is too large.", 413); }
-        chunks.push(chunk.value);
-      }
-      return JSON.parse(Buffer.concat(chunks).toString("utf8")) as unknown;
-    })()]);
+    const body = await Promise.race([
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(() => {
+          void reader.cancel();
+          reject(new AccessError("Request body timed out.", 408));
+        }, 10_000);
+      }),
+      (async () => {
+        const chunks: Uint8Array[] = [];
+        let length = 0;
+        while (true) {
+          const chunk = await reader.read();
+          if (chunk.done) break;
+          length += chunk.value.length;
+          if (length > maximum) {
+            await reader.cancel();
+            throw new AccessError("Request is too large.", 413);
+          }
+          chunks.push(chunk.value);
+        }
+        return JSON.parse(Buffer.concat(chunks).toString("utf8")) as unknown;
+      })(),
+    ]);
     return body;
-  } catch (error) { if (error instanceof SyntaxError) throw new AccessError("Send valid JSON.", 400); throw error; }
-  finally { clearTimeout(timer); reader.releaseLock(); }
+  } catch (error) {
+    if (error instanceof SyntaxError) throw new AccessError("Send valid JSON.", 400);
+    throw error;
+  } finally {
+    clearTimeout(timer);
+    reader.releaseLock();
+  }
 }
 async function privateView(rt: PrivateRuntime, session: Session) {
-  const pending = await rt.db.pool.query("SELECT id,kind,status,error_code,available_at FROM licensegraph.operations WHERE run_id=$1 ORDER BY created_at DESC LIMIT 1", [session.id]);
-  const purchase = (await rt.db.pool.query("SELECT payout_state,release_at,accepted_at FROM licensegraph.purchases WHERE run_id=$1", [session.id])).rows[0];
-  const disputes = await rt.db.pool.query("SELECT id,status,created_at FROM licensegraph.disputes WHERE run_id=$1 ORDER BY created_at DESC", [session.id]);
-  return { ...viewOf(session), privateMarketplace: true, pendingOperation: pending.rows[0] && ["queued","running","reconcile","failed"].includes(pending.rows[0].status) ? pending.rows[0] : null, purchase: purchase ?? null, disputes: disputes.rows };
+  const pending = await rt.db.pool.query(
+    "SELECT id,kind,status,error_code,available_at FROM licensegraph.operations WHERE run_id=$1 ORDER BY created_at DESC LIMIT 1",
+    [session.id],
+  );
+  const purchase = (
+    await rt.db.pool.query("SELECT payout_state,release_at,accepted_at FROM licensegraph.purchases WHERE run_id=$1", [session.id])
+  ).rows[0];
+  const disputes = await rt.db.pool.query(
+    "SELECT id,status,created_at FROM licensegraph.disputes WHERE run_id=$1 ORDER BY created_at DESC",
+    [session.id],
+  );
+  return {
+    ...viewOf(session),
+    privateMarketplace: true,
+    pendingOperation:
+      pending.rows[0] && ["queued", "running", "reconcile", "failed"].includes(pending.rows[0].status) ? pending.rows[0] : null,
+    purchase: purchase ?? null,
+    disputes: disputes.rows,
+  };
 }
 function summary(s: Session) {
   const view = viewOf(s);
-  return { id: s.id, createdAt: s.createdAt, name: s.input.project.name, phase: s.phase, runKind: s.input.meta?.runKind, revisedFrom: s.input.meta?.revisedFrom, rebriefedFrom: s.input.meta?.rebriefedFrom,
-    rounds: view.rounds, totalCents: view.bundle?.totalCents, currency: view.bundle?.currency, naiveTotalCents: view.analysis?.naiveTotalCents, blocked: view.analysis?.blockedPurchases.length ?? 0, paid: Boolean(s.capture) };
+  return {
+    id: s.id,
+    createdAt: s.createdAt,
+    name: s.input.project.name,
+    phase: s.phase,
+    runKind: s.input.meta?.runKind,
+    revisedFrom: s.input.meta?.revisedFrom,
+    rebriefedFrom: s.input.meta?.rebriefedFrom,
+    rounds: view.rounds,
+    totalCents: view.bundle?.totalCents,
+    currency: view.bundle?.currency,
+    naiveTotalCents: view.analysis?.naiveTotalCents,
+    blocked: view.analysis?.blockedPurchases.length ?? 0,
+    paid: Boolean(s.capture),
+  };
 }
 async function createRun(rt: PrivateRuntime, principal: Principal, body: unknown) {
   const selection = Req.CatalogRun;
@@ -65,31 +118,71 @@ async function createRun(rt: PrivateRuntime, principal: Principal, body: unknown
     if (selected.success) {
       const candidates = [];
       for (const ref of selected.data.offerRefs) {
-        const row = (await tx.query(`SELECT o.sealed FROM licensegraph.offers o JOIN licensegraph.licensors l ON l.id=o.licensor_id WHERE o.id=$1 AND o.version=$2 AND o.status='approved' AND l.status='approved' AND l.version=o.licensor_version`, [ref.id, ref.version])).rows[0];
+        const row = (
+          await tx.query(
+            `SELECT o.sealed FROM licensegraph.offers o JOIN licensegraph.licensors l ON l.id=o.licensor_id WHERE o.id=$1 AND o.version=$2 AND o.status='approved' AND l.status='approved' AND l.version=o.licensor_version`,
+            [ref.id, ref.version],
+          )
+        ).rows[0];
         if (!row) throw new ConflictError("A selected offer is unavailable or awaiting review.");
-        candidates.push(rt.cipher.open<{ offer: z.infer<typeof offerSchema>; document: Session["input"]["documents"][number] }>(row.sealed, `offer:${ref.id}:${ref.version}`));
+        candidates.push(
+          rt.cipher.open<{ offer: z.infer<typeof offerSchema>; document: Session["input"]["documents"][number] }>(
+            row.sealed,
+            `offer:${ref.id}:${ref.version}`,
+          ),
+        );
       }
-      session = createSession({ project: selected.data.project, requiredAssetIds: selected.data.requiredAssetIds, documents: candidates.map((c) => c.document) });
+      session = createSession({
+        project: selected.data.project,
+        requiredAssetIds: selected.data.requiredAssetIds,
+        documents: candidates.map((c) => c.document),
+      });
       payload = { offers: candidates.map((c) => c.offer) };
     } else {
-      if (!rt.model) throw new ConflictError("Custom licence analysis requires a configured free model. You can select reviewed marketplace offers without one.");
+      if (!rt.model)
+        throw new ConflictError(
+          "Custom licence analysis requires a configured free model. You can select reviewed marketplace offers without one.",
+        );
       const parsed = sessionInputSchema.parse(body);
-      session = createSession({ project: parsed.project, requiredAssetIds: parsed.requiredAssetIds, documents: parsed.documents, meta: { brief: parsed.brief, runKind: "live", mandate: parsed.mandate } });
+      session = createSession({
+        project: parsed.project,
+        requiredAssetIds: parsed.requiredAssetIds,
+        documents: parsed.documents,
+        meta: { brief: parsed.brief, runKind: "live", mandate: parsed.mandate },
+      });
     }
     session.ownerId = principal.id;
     session.input.meta = { ...session.input.meta, runKind: rt.model ? "live" : "catalog" };
-    const handoff = principal.agent || Boolean(body && typeof body === "object" && "handoff" in body && body.handoff === true) ? reserveForPerson(session) : undefined;
+    const handoff =
+      principal.agent || Boolean(body && typeof body === "object" && "handoff" in body && body.handoff === true)
+        ? reserveForPerson(session)
+        : undefined;
     await rt.runs.create(session, principal.id, tx);
     const job = await rt.queue.enqueue(tx, session.id, "pipeline", "initial", payload);
     await rt.runs.audit(tx, principal.id, "run_created", session.id, {});
-    return json({ ...viewOf(session), privateMarketplace: true, operation: publicOperation(job), ...(handoff ? { handoff: { claimUrl: `${rt.appUrl}/claim/${session.id}?token=${handoff.token}`, expiresAt: handoff.expiresAt } } : {}) }, 202);
+    return json(
+      {
+        ...viewOf(session),
+        privateMarketplace: true,
+        operation: publicOperation(job),
+        ...(handoff
+          ? { handoff: { claimUrl: `${rt.appUrl}/claim/${session.id}?token=${handoff.token}`, expiresAt: handoff.expiresAt } }
+          : {}),
+      },
+      202,
+    );
   });
 }
 async function queuePurchase(rt: PrivateRuntime, principal: Principal, runId: string, kind: OperationKind) {
   return rt.db.transaction(async (tx) => {
     const loaded = await rt.market.owned(runId, principal, tx);
     const s = loaded.session;
-    const requiredPhase: Partial<Record<OperationKind, string>> = { order: "approved", capture: "order_created", payout: "captured", refund: "captured" };
+    const requiredPhase: Partial<Record<OperationKind, string>> = {
+      order: "approved",
+      capture: "order_created",
+      payout: "captured",
+      refund: "captured",
+    };
     if (s.phase !== requiredPhase[kind]) throw new ConflictError(`Cannot start ${kind} from ${s.phase}.`);
     if (kind === "refund") {
       const purchase = (await tx.query("SELECT payout_state FROM licensegraph.purchases WHERE run_id=$1 FOR UPDATE", [runId])).rows[0];
@@ -99,7 +192,10 @@ async function queuePurchase(rt: PrivateRuntime, principal: Principal, runId: st
     const job = await rt.queue.enqueue(tx, runId, kind, kind === "payout" ? "release" : "initial");
     // A failed precondition may be retried by an explicit human request. Submitted or uncertain jobs never restart here.
     if (job.status === "failed" && job.stage !== "submitted" && job.stage !== "recorded") {
-      await tx.query("UPDATE licensegraph.operations SET status='queued',error_code=NULL,available_at=now() WHERE id=$1 AND status='failed' AND stage<>'submitted'", [job.id]);
+      await tx.query(
+        "UPDATE licensegraph.operations SET status='queued',error_code=NULL,available_at=now() WHERE id=$1 AND status='failed' AND stage<>'submitted'",
+        [job.id],
+      );
       job.status = "queued";
     }
     return json({ ...viewOf(s), privateMarketplace: true, pendingOperation: publicOperation(job), operation: publicOperation(job) }, 202);
@@ -109,7 +205,10 @@ async function passport(rt: PrivateRuntime, session: Session) {
   const p = issuePassport(session);
   const purchase = (await rt.db.pool.query("SELECT sealed FROM licensegraph.purchases WHERE run_id=$1", [session.id])).rows[0];
   const details = purchase ? rt.cipher.open<PurchaseDetails>(purchase.sealed, `purchase:${session.id}`) : undefined;
-  return signPassport({ ...p, ...(details ? { purchaseAuthorization: { ...details.authorization, digest: details.authorizationDigest } } : {}) }, rt.passportSecret);
+  return signPassport(
+    { ...p, ...(details ? { purchaseAuthorization: { ...details.authorization, digest: details.authorizationDigest } } : {}) },
+    rt.passportSecret,
+  );
 }
 
 export async function privateRequest(request: Request): Promise<Response | undefined> {
@@ -127,7 +226,7 @@ export async function privateRequest(request: Request): Promise<Response | undef
     const rt = getPrivateRuntime();
     if (path.startsWith("/api/auth/")) {
       const action = path.split("/").at(-1);
-      if (action === "login" && request.method === "GET") return await rt.identity.start(url.searchParams.get("returnTo")??"/workspace");
+      if (action === "login" && request.method === "GET") return await rt.identity.start(url.searchParams.get("returnTo") ?? "/workspace");
       if (action === "callback" && request.method === "GET") return await rt.identity.callback(request);
       if (action === "logout" && request.method === "POST") return await rt.identity.logout(request);
       if (action === "me" && request.method === "GET") return json({ enabled: true, user: await rt.identity.principal(request) });
@@ -140,43 +239,96 @@ export async function privateRequest(request: Request): Promise<Response | undef
     }
     if (path === "/api/marketplace/health") {
       // Counts only: no identifiers, no record contents.
-      const health = (await rt.db.pool.query(`SELECT
+      const health = (
+        await rt.db.pool.query(`SELECT
         (SELECT count(*) FROM licensegraph.operations WHERE status='queued' AND available_at<=now())::int AS ready_jobs,
         (SELECT COALESCE(EXTRACT(EPOCH FROM now()-min(available_at)),0) FROM licensegraph.operations WHERE status='queued' AND available_at<=now())::int AS oldest_ready_seconds,
         (SELECT count(*) FROM licensegraph.operations WHERE status='running')::int AS running_jobs,
         (SELECT count(*) FROM licensegraph.operations WHERE status='reconcile')::int AS reconcile_jobs,
         (SELECT count(*) FROM licensegraph.webhook_deliveries WHERE status IN ('queued','reconcile'))::int AS unmatched_webhooks,
-        (SELECT count(*) FROM licensegraph.worker_heartbeats WHERE beat_at > now() - interval '60 seconds')::int AS live_workers`)).rows[0];
+        (SELECT count(*) FROM licensegraph.worker_heartbeats WHERE beat_at > now() - interval '60 seconds')::int AS live_workers`)
+      ).rows[0];
       const stalled = health.ready_jobs > 0 && (health.live_workers === 0 || health.oldest_ready_seconds > 120);
-      return json({ status: stalled ? "degraded" : "ok", ...health, reasons: stalled ? [health.live_workers === 0 ? "No worker has reported in the last 60 seconds." : "Queued work is older than two minutes."] : [] }, stalled ? 503 : 200);
+      return json(
+        {
+          status: stalled ? "degraded" : "ok",
+          ...health,
+          reasons: stalled
+            ? [health.live_workers === 0 ? "No worker has reported in the last 60 seconds." : "Queued work is older than two minutes."]
+            : [],
+        },
+        stalled ? 503 : 200,
+      );
     }
     if (path.startsWith("/api/marketplace/shared/")) {
       const token = path.split("/").at(-1)!;
       if (!/^[A-Za-z0-9_-]{43}$/.test(token)) throw new AccessError("Share not found.", 404);
-      const grant = (await rt.db.pool.query("SELECT run_id,kind FROM licensegraph.share_grants WHERE token_hash=$1 AND revoked_at IS NULL AND expires_at>now()", [hashSecret(token)])).rows[0];
-      const loaded = grant && await rt.runs.read(grant.run_id);
-      if (!loaded || !loaded.session.capture || loaded.session.refund || paymentReversed(loaded.session)) throw new AccessError("Share not found.", 404);
+      const grant = (
+        await rt.db.pool.query(
+          "SELECT run_id,kind FROM licensegraph.share_grants WHERE token_hash=$1 AND revoked_at IS NULL AND expires_at>now()",
+          [hashSecret(token)],
+        )
+      ).rows[0];
+      const loaded = grant && (await rt.runs.read(grant.run_id));
+      if (!loaded || !loaded.session.capture || loaded.session.refund || paymentReversed(loaded.session))
+        throw new AccessError("Share not found.", 404);
       if (grant.kind === "passport") return json(await passport(rt, loaded.session));
       const s = loaded.session;
-      return json({ kind: "receipt", status: s.phase, currency: s.capture!.amount.currency, totalCents: s.loop!.verdict!.totalCents, environment: "sandbox", bundleCommitment: s.approval!.bundleDigest, ledgerCommitment: s.ledger.events().at(-1)?.hash, verification: "Receipt only; full source and passport checks require an explicit full-passport grant." });
+      return json({
+        kind: "receipt",
+        status: s.phase,
+        currency: s.capture!.amount.currency,
+        totalCents: s.loop!.verdict!.totalCents,
+        environment: "sandbox",
+        bundleCommitment: s.approval!.bundleDigest,
+        ledgerCommitment: s.ledger.events().at(-1)?.hash,
+        verification: "Receipt only; full source and passport checks require an explicit full-passport grant.",
+      });
     }
     if (path === "/api/webhooks/paypal") return await receiveWebhook(rt, request);
     const principal = await rt.identity.principal(request);
     // A presented credential that does not resolve (expired, revoked, malformed) must fail visibly, not fall back to public data.
-    if (!principal && path !== "/api/mcp" && request.headers.get("authorization")) throw new AccessError("This credential is invalid, expired or revoked.", 401);
+    if (!principal && path !== "/api/mcp" && request.headers.get("authorization"))
+      throw new AccessError("This credential is invalid, expired or revoked.", 401);
     if (!principal && path === "/api/mcp") return undefined;
     if (!principal && ["/api/sessions", "/api/portfolio", "/api/config"].includes(path) && request.method === "GET") return undefined;
     if (!principal) throw new AccessError("Sign in to access your private workspace.", 401);
     if (principal.agent) {
-      const allowed = request.method === "GET" && (/^\/api\/(?:sessions\/[^/]+|passports\/[^/]+(?:\/(?:badge|qr|verify))?)$/.test(path) || path === "/api/sessions" || path.startsWith("/api/marketplace/operations/") || path === "/api/marketplace/catalog") || request.method === "POST" && ["/api/sessions", "/api/mcp"].includes(path);
-      if (!allowed) throw new AccessError("Agent credentials can create and read permitted runs; human approval and money actions require browser sign-in.");
+      const allowed =
+        (request.method === "GET" &&
+          (/^\/api\/(?:sessions\/[^/]+|passports\/[^/]+(?:\/(?:badge|qr|verify))?)$/.test(path) ||
+            path === "/api/sessions" ||
+            path.startsWith("/api/marketplace/operations/") ||
+            path === "/api/marketplace/catalog")) ||
+        (request.method === "POST" && ["/api/sessions", "/api/mcp"].includes(path));
+      if (!allowed)
+        throw new AccessError(
+          "Agent credentials can create and read permitted runs; human approval and money actions require browser sign-in.",
+        );
     } else requireSameOrigin(request, rt.appUrl);
-    if (path === "/api/config") return json({ mode: rt.model ? "live" : "demo", paymentsEnabled: Boolean(rt.deps.payments), paymentsMode: rt.deps.payments ? "paypal-sandbox" : "none", assistant: Boolean(rt.proxy), intakeModel: Boolean(rt.model), passportSigned: Boolean(rt.passportSecret), appUrl: rt.appUrl, privateWorkspace: true });
+    if (path === "/api/config")
+      return json({
+        mode: rt.model ? "live" : "demo",
+        paymentsEnabled: Boolean(rt.deps.payments),
+        paymentsMode: rt.deps.payments ? "paypal-sandbox" : "none",
+        assistant: Boolean(rt.proxy),
+        intakeModel: Boolean(rt.model),
+        passportSigned: Boolean(rt.passportSecret),
+        appUrl: rt.appUrl,
+        privateWorkspace: true,
+      });
     if (path === "/api/sessions" && request.method === "POST") return await createRun(rt, principal, await readJson(request));
     if ((path === "/api/sessions" || path === "/api/portfolio") && request.method === "GET") {
-      const rows = await rt.db.pool.query("SELECT id FROM licensegraph.runs WHERE owner_id=$1 AND quarantine_reason IS NULL ORDER BY created_at DESC LIMIT 200", [principal.id]);
-      const sessions = (await Promise.all(rows.rows.map((row) => rt.runs.read(row.id)))).flatMap((loaded) => loaded ? [loaded.session] : []);
-      return path === "/api/portfolio" ? json({ views: sessions.map((s) => ({ ...viewOf(s), documents: viewOf(s).documents.map((d) => ({ ...d, text: "" })) })) }) : json({ runs: sessions.map(summary) });
+      const rows = await rt.db.pool.query(
+        "SELECT id FROM licensegraph.runs WHERE owner_id=$1 AND quarantine_reason IS NULL ORDER BY created_at DESC LIMIT 200",
+        [principal.id],
+      );
+      const sessions = (await Promise.all(rows.rows.map((row) => rt.runs.read(row.id)))).flatMap((loaded) =>
+        loaded ? [loaded.session] : [],
+      );
+      return path === "/api/portfolio"
+        ? json({ views: sessions.map((s) => ({ ...viewOf(s), documents: viewOf(s).documents.map((d) => ({ ...d, text: "" })) })) })
+        : json({ runs: sessions.map(summary) });
     }
     const runMatch = /^\/api\/sessions\/([^/]+)(?:\/([^/]+))?$/.exec(path);
     if (runMatch) {
@@ -184,7 +336,10 @@ export async function privateRequest(request: Request): Promise<Response | undef
       const action = runMatch[2];
       if (action === "claim" && request.method === "POST") {
         if (principal.agent) throw new AccessError("A person must claim this run.");
-        const body = z.object({ token: z.string().min(1).max(200) }).strict().parse(await readJson(request));
+        const body = z
+          .object({ token: z.string().min(1).max(200) })
+          .strict()
+          .parse(await readJson(request));
         const result = await rt.db.transaction(async (tx) => {
           const loaded = await rt.runs.lock(runId, tx);
           claimSession(loaded.session, body.token, principal.id);
@@ -198,8 +353,9 @@ export async function privateRequest(request: Request): Promise<Response | undef
       if (!action && request.method === "GET" && claimToken && !principal.agent) {
         const preview = await rt.runs.read(runId);
         const claim = preview?.session.claim;
-        if (!claim || Date.parse(claim.expiresAt) <= Date.now() || hashSecret(claimToken) !== claim.tokenHash) throw new AccessError("This claim link is expired or unavailable.",404);
-        return json({ ...viewOf(preview!.session), privateMarketplace:true });
+        if (!claim || Date.parse(claim.expiresAt) <= Date.now() || hashSecret(claimToken) !== claim.tokenHash)
+          throw new AccessError("This claim link is expired or unavailable.", 404);
+        return json({ ...viewOf(preview!.session), privateMarketplace: true });
       }
       const loaded = await rt.market.owned(runId, principal);
       if (!action && request.method === "GET") return json(await privateView(rt, loaded.session));
@@ -209,33 +365,47 @@ export async function privateRequest(request: Request): Promise<Response | undef
       }
       if (request.method !== "POST") throw new AccessError("Method not allowed.", 405);
       if (action === "approve") return json(await rt.market.approve(principal, runId));
-      const kind = ({ pay: "order", capture: "capture", payouts: "payout", refund: "refund" } as const)[action as "pay" | "capture" | "payouts" | "refund"];
+      const kind = ({ pay: "order", capture: "capture", payouts: "payout", refund: "refund" } as const)[
+        action as "pay" | "capture" | "payouts" | "refund"
+      ];
       if (kind) return await queuePurchase(rt, principal, runId, kind);
       if (action === "ask") {
         const { answerQuestion } = await import("../intake/explain");
         const body = z.object({ question: z.string().trim().min(1).max(1000) }).parse(await readJson(request));
         return json(await answerQuestion(viewOf(loaded.session), body.question, rt.model));
       }
-      if (action === "rebrief" || action === "revise") return await linkedRun(rt, principal, loaded.session, action, await readJson(request));
+      if (action === "rebrief" || action === "revise")
+        return await linkedRun(rt, principal, loaded.session, action, await readJson(request));
       throw new AccessError("This action is not available for private runs.", 404);
     }
     const passportMatch = /^\/api\/passports\/([^/]+)(?:\/([^/]+))?$/.exec(path);
     if (passportMatch) {
       const loaded = await rt.market.owned(uuid.parse(passportMatch[1]), principal);
       const p = await passport(rt, loaded.session);
-      if (passportMatch[2] === "verify") return json({ ...await verifyPassport(p), signature: checkSignature(p, rt.passportSecret) });
+      if (passportMatch[2] === "verify") return json({ ...(await verifyPassport(p)), signature: checkSignature(p, rt.passportSecret) });
       if (passportMatch[2] === "qr") {
-        const {default: QRCode}=await import("qrcode");
-        return new Response(await QRCode.toString(`${rt.appUrl}/passport/${loaded.session.id}`,{type:"svg",margin:1,errorCorrectionLevel:"M"}),{headers:{"Content-Type":"image/svg+xml","Cache-Control":"no-store"}});
+        const { default: QRCode } = await import("qrcode");
+        return new Response(
+          await QRCode.toString(`${rt.appUrl}/passport/${loaded.session.id}`, { type: "svg", margin: 1, errorCorrectionLevel: "M" }),
+          { headers: { "Content-Type": "image/svg+xml", "Cache-Control": "no-store" } },
+        );
       }
       if (passportMatch[2] === "badge") {
-        const {badgeSvg}=await import("../passport/badge");
-        const result=await verifyPassport(p);
-        return new Response(badgeSvg({verified:result.ok,licences:p.bundle.offers.length,reversed:result.checks.some((c)=>c.id==="payment-standing"&&!c.ok)}),{headers:{"Content-Type":"image/svg+xml","Cache-Control":"no-store"}});
+        const { badgeSvg } = await import("../passport/badge");
+        const result = await verifyPassport(p);
+        return new Response(
+          badgeSvg({
+            verified: result.ok,
+            licences: p.bundle.offers.length,
+            reversed: result.checks.some((c) => c.id === "payment-standing" && !c.ok),
+          }),
+          { headers: { "Content-Type": "image/svg+xml", "Cache-Control": "no-store" } },
+        );
       }
-      if (passportMatch[2]) throw new AccessError("Passport endpoint not found.",404);
+      if (passportMatch[2]) throw new AccessError("Passport endpoint not found.", 404);
       const response = json(p);
-      if (url.searchParams.has("download")) response.headers.set("Content-Disposition", `attachment; filename="licence-passport-${loaded.session.id}.json"`);
+      if (url.searchParams.has("download"))
+        response.headers.set("Content-Disposition", `attachment; filename="licence-passport-${loaded.session.id}.json"`);
       return response;
     }
     if (path === "/api/intake") {
@@ -244,26 +414,38 @@ export async function privateRequest(request: Request): Promise<Response | undef
       return json(await parseBrief(body.text, rt.model));
     }
     if (path === "/api/mcp") {
-      const {createLicenseGraphServer}=await import("../mcp/server");
-      const {WebStandardStreamableHTTPServerTransport}=await import("@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js");
-      const server=createLicenseGraphServer({baseUrl:rt.appUrl,fetch:async(input,init)=>{
-        const target=new URL(String(input));
-        if(target.origin!==new URL(rt.appUrl).origin) throw new AccessError("Agent tool target must be this application.");
-        const headers=new Headers(init?.headers);
-        for(const name of ["cookie","authorization"]) {const value=request.headers.get(name);if(value)headers.set(name,value);}
-        headers.set("Origin",new URL(rt.appUrl).origin);
-        const forwarded=new Request(target,{...init,headers});
-        const response=await privateRequest(forwarded);
-        if(response)return response;
-        // Public replay handlers do not touch private storage or credentials.
-        if(target.pathname==="/api/sessions"&&init?.method==="POST") return (await import("../../app/api/sessions/route")).POST(forwarded);
-        const publicRun=/^\/api\/sessions\/([^/]+)$/.exec(target.pathname);
-        if(publicRun)return (await import("../../app/api/sessions/[id]/route")).GET(forwarded,{params:Promise.resolve({id:publicRun[1]!})});
-        return json({error:"Public tool target unavailable."},404);
-      }});
-      const transport=new WebStandardStreamableHTTPServerTransport({sessionIdGenerator:undefined,enableJsonResponse:true});
+      const { createLicenseGraphServer } = await import("../mcp/server");
+      const { WebStandardStreamableHTTPServerTransport } = await import("@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js");
+      const server = createLicenseGraphServer({
+        baseUrl: rt.appUrl,
+        fetch: async (input, init) => {
+          const target = new URL(String(input));
+          if (target.origin !== new URL(rt.appUrl).origin) throw new AccessError("Agent tool target must be this application.");
+          const headers = new Headers(init?.headers);
+          for (const name of ["cookie", "authorization"]) {
+            const value = request.headers.get(name);
+            if (value) headers.set(name, value);
+          }
+          headers.set("Origin", new URL(rt.appUrl).origin);
+          const forwarded = new Request(target, { ...init, headers });
+          const response = await privateRequest(forwarded);
+          if (response) return response;
+          // Public replay handlers do not touch private storage or credentials.
+          if (target.pathname === "/api/sessions" && init?.method === "POST")
+            return (await import("../../app/api/sessions/route")).POST(forwarded);
+          const publicRun = /^\/api\/sessions\/([^/]+)$/.exec(target.pathname);
+          if (publicRun)
+            return (await import("../../app/api/sessions/[id]/route")).GET(forwarded, { params: Promise.resolve({ id: publicRun[1]! }) });
+          return json({ error: "Public tool target unavailable." }, 404);
+        },
+      });
+      const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
       await server.connect(transport);
-      try{return await transport.handleRequest(request);}finally{void transport.close().catch(()=>undefined);}
+      try {
+        return await transport.handleRequest(request);
+      } finally {
+        void transport.close().catch(() => undefined);
+      }
     }
     if (path === "/api/llm") {
       if (!rt.proxy) throw new AccessError("The optional assistant is not configured.", 503);
@@ -275,7 +457,8 @@ export async function privateRequest(request: Request): Promise<Response | undef
   } catch (error) {
     if (error instanceof AccessError) return json({ error: error.message }, error.status);
     if (error instanceof ConflictError || error instanceof SessionError) return json({ error: error.message }, 409);
-    if (error instanceof ZodError) return json({ error: "Invalid request.", issues: error.issues.map((issue) => ({ path: issue.path, message: issue.message })) }, 400);
+    if (error instanceof ZodError)
+      return json({ error: "Invalid request.", issues: error.issues.map((issue) => ({ path: issue.path, message: issue.message })) }, 400);
     // Class and database code only: messages can carry record contents.
     const detail = error instanceof Error ? { error: error.name, code: (error as { code?: unknown }).code } : { error: "unknown" };
     console.error(JSON.stringify({ event: "private_request_failed", path: new URL(request.url).pathname, ...detail }));
@@ -288,14 +471,19 @@ function readable<Row, Out>(list: string, rows: Row[], decode: (row: Row) => Out
   const out: Out[] = [];
   let unreadable = 0;
   for (const row of rows) {
-    try { out.push(decode(row)); } catch { unreadable += 1; }
+    try {
+      out.push(decode(row));
+    } catch {
+      unreadable += 1;
+    }
   }
   if (unreadable) console.error(JSON.stringify({ event: "unreadable_records", list, count: unreadable }));
   return out;
 }
 
 async function linkedRun(rt: PrivateRuntime, principal: Principal, from: Session, action: string, body: unknown): Promise<Response> {
-  if (!["failed", "verified"].includes(from.phase) || from.order || from.capture) throw new ConflictError("Wait for an unpaid run to finish before revising it.");
+  if (!["failed", "verified"].includes(from.phase) || from.order || from.capture)
+    throw new ConflictError("Wait for an unpaid run to finish before revising it.");
   const { rebriefInput, reviseInput, recordRebrief, recordRevision } = await import("../app-logic/revision");
   const { describeChange } = await import("../core/whatif");
   let next: Session;
@@ -323,28 +511,53 @@ async function marketplaceRequest(rt: PrivateRuntime, principal: Principal, requ
   const parts = path.slice("/api/marketplace/".length).split("/");
   const [area, id, action] = parts;
   if (area === "agent-tokens") {
-    if (request.method === "GET") return json({ tokens: (await rt.db.pool.query("SELECT id,name,expires_at,revoked_at FROM licensegraph.agent_tokens WHERE user_id=$1 ORDER BY created_at DESC", [principal.id])).rows });
+    if (request.method === "GET")
+      return json({
+        tokens: (
+          await rt.db.pool.query(
+            "SELECT id,name,expires_at,revoked_at FROM licensegraph.agent_tokens WHERE user_id=$1 ORDER BY created_at DESC",
+            [principal.id],
+          )
+        ).rows,
+      });
     if (request.method === "POST" && !id) {
       const body = Req.AgentTokenRequest.parse(await readJson(request));
       const token = randomBytes(32).toString("base64url");
       const tokenId = randomUUID();
-      await rt.db.pool.query("INSERT INTO licensegraph.agent_tokens(id,user_id,token_hash,name,expires_at) VALUES ($1,$2,$3,$4,now()+interval '7 days')", [tokenId,principal.id,hashSecret(token),body.name]);
-      return json({ id:tokenId, token, scope:["runs:create","runs:read"], expiresInDays:7 },201);
+      await rt.db.pool.query(
+        "INSERT INTO licensegraph.agent_tokens(id,user_id,token_hash,name,expires_at) VALUES ($1,$2,$3,$4,now()+interval '7 days')",
+        [tokenId, principal.id, hashSecret(token), body.name],
+      );
+      return json({ id: tokenId, token, scope: ["runs:create", "runs:read"], expiresInDays: 7 }, 201);
     }
     if (request.method === "DELETE" && id) {
-      await rt.db.pool.query("UPDATE licensegraph.agent_tokens SET revoked_at=now() WHERE id=$1 AND user_id=$2", [uuid.parse(id),principal.id]);
-      return json({revoked:true});
+      await rt.db.pool.query("UPDATE licensegraph.agent_tokens SET revoked_at=now() WHERE id=$1 AND user_id=$2", [
+        uuid.parse(id),
+        principal.id,
+      ]);
+      return json({ revoked: true });
     }
   }
   if (area === "licensor" && id === "purchases" && request.method === "GET") {
-    const rows=await rt.db.pool.query("SELECT DISTINCT r.run_id,p.payout_state,p.captured_at FROM licensegraph.purchase_recipients r JOIN licensegraph.licensors l ON l.id=r.licensor_id JOIN licensegraph.purchases p ON p.run_id=r.run_id WHERE l.user_id=$1 ORDER BY p.captured_at DESC NULLS LAST LIMIT 200",[principal.id]);
-    return json({ purchases:rows.rows });
+    const rows = await rt.db.pool.query(
+      "SELECT DISTINCT r.run_id,p.payout_state,p.captured_at FROM licensegraph.purchase_recipients r JOIN licensegraph.licensors l ON l.id=r.licensor_id JOIN licensegraph.purchases p ON p.run_id=r.run_id WHERE l.user_id=$1 ORDER BY p.captured_at DESC NULLS LAST LIMIT 200",
+      [principal.id],
+    );
+    return json({ purchases: rows.rows });
   }
   if (area === "catalog" && request.method === "GET") {
-    const rows = await rt.db.pool.query(`SELECT o.* FROM licensegraph.offers o JOIN licensegraph.licensors l ON l.id=o.licensor_id WHERE o.status='approved' AND l.status='approved' AND l.version=o.licensor_version ORDER BY o.id,o.version DESC LIMIT 200`);
+    const rows = await rt.db.pool.query(
+      `SELECT o.* FROM licensegraph.offers o JOIN licensegraph.licensors l ON l.id=o.licensor_id WHERE o.status='approved' AND l.status='approved' AND l.version=o.licensor_version ORDER BY o.id,o.version DESC LIMIT 200`,
+    );
     // One unreadable record (for example sealed with a key that is no longer configured) must not hide the
     // other reviewed offers. It is left out and reported, never shown half-decoded.
-    return json({ offers: readable("catalog", rows.rows, (row) => ({ id: row.id, version: row.version, ...rt.cipher.open<object>(row.sealed, `offer:${row.id}:${row.version}`) })) });
+    return json({
+      offers: readable("catalog", rows.rows, (row) => ({
+        id: row.id,
+        version: row.version,
+        ...rt.cipher.open<object>(row.sealed, `offer:${row.id}:${row.version}`),
+      })),
+    });
   }
   if (area === "operations" && request.method === "GET") {
     const job = await rt.queue.get(uuid.parse(id));
@@ -356,7 +569,18 @@ async function marketplaceRequest(rt: PrivateRuntime, principal: Principal, requ
     if (request.method === "POST") return json(await rt.market.submitLicensor(principal, await readJson(request)), 201);
     if (request.method === "GET") {
       const row = (await rt.db.pool.query("SELECT * FROM licensegraph.licensors WHERE user_id=$1", [principal.id])).rows[0];
-      return json({ licensor: row ? { id: row.id, version: row.version, status: row.status, recipientConfirmed: Boolean(row.recipient_confirmed_at), reason: row.review_reason, details: rt.cipher.open(row.sealed, `licensor:${row.id}:${row.version}`) } : null });
+      return json({
+        licensor: row
+          ? {
+              id: row.id,
+              version: row.version,
+              status: row.status,
+              recipientConfirmed: Boolean(row.recipient_confirmed_at),
+              reason: row.review_reason,
+              details: rt.cipher.open(row.sealed, `licensor:${row.id}:${row.version}`),
+            }
+          : null,
+      });
     }
   }
   if (area === "licensor" && id === "confirm" && request.method === "POST") return json(await rt.market.confirmRecipient(principal));
@@ -369,13 +593,24 @@ async function marketplaceRequest(rt: PrivateRuntime, principal: Principal, requ
     return json(await rt.market.withdrawOffer(principal, uuid.parse(id), version));
   }
   if (area === "offers" && request.method === "GET") {
-    const rows = await rt.db.pool.query("SELECT o.* FROM licensegraph.offers o JOIN licensegraph.licensors l ON l.id=o.licensor_id WHERE l.user_id=$1 ORDER BY o.id,o.version DESC", [principal.id]);
-    return json({ offers: rows.rows.map((row) => ({ id: row.id, version: row.version, status: row.status, ...rt.cipher.open<object>(row.sealed, `offer:${row.id}:${row.version}`) })) });
+    const rows = await rt.db.pool.query(
+      "SELECT o.* FROM licensegraph.offers o JOIN licensegraph.licensors l ON l.id=o.licensor_id WHERE l.user_id=$1 ORDER BY o.id,o.version DESC",
+      [principal.id],
+    );
+    return json({
+      offers: rows.rows.map((row) => ({
+        id: row.id,
+        version: row.version,
+        status: row.status,
+        ...rt.cipher.open<object>(row.sealed, `offer:${row.id}:${row.version}`),
+      })),
+    });
   }
   if (area === "runs" && id) {
     const runId = uuid.parse(id);
     if (action === "accept" && request.method === "POST") return json(publicOperation(await rt.market.accept(principal, runId)), 202);
-    if (action === "disputes" && request.method === "POST") return json(await rt.market.dispute(principal, runId, await readJson(request)), 201);
+    if (action === "disputes" && request.method === "POST")
+      return json(await rt.market.dispute(principal, runId, await readJson(request)), 201);
     if (action === "shares" && request.method === "POST") {
       const body = Req.ShareRequest.parse(await readJson(request));
       const grant = await rt.market.share(principal, runId, body.kind, body.days);
@@ -383,7 +618,10 @@ async function marketplaceRequest(rt: PrivateRuntime, principal: Principal, requ
     }
     if (action === "shares" && request.method === "GET") {
       await rt.market.owned(runId, principal);
-      const result = await rt.db.pool.query("SELECT id,kind,expires_at,revoked_at FROM licensegraph.share_grants WHERE run_id=$1 ORDER BY created_at DESC", [runId]);
+      const result = await rt.db.pool.query(
+        "SELECT id,kind,expires_at,revoked_at FROM licensegraph.share_grants WHERE run_id=$1 ORDER BY created_at DESC",
+        [runId],
+      );
       return json({ shares: result.rows });
     }
   }
@@ -403,7 +641,8 @@ async function marketplaceRequest(rt: PrivateRuntime, principal: Principal, requ
     if (!owner) throw new AccessError("The browser that originally owned this run is required.");
     await rt.db.transaction(async (tx) => {
       const row = (await tx.query("SELECT owner_id,legacy_owner_hash FROM licensegraph.runs WHERE id=$1 FOR UPDATE", [body.runId])).rows[0];
-      if (!row || row.owner_id || row.legacy_owner_hash !== hashSecret(owner)) throw new AccessError("This run cannot be linked from this browser.");
+      if (!row || row.owner_id || row.legacy_owner_hash !== hashSecret(owner))
+        throw new AccessError("This run cannot be linked from this browser.");
       await tx.query("UPDATE licensegraph.runs SET owner_id=$1,legacy_owner_hash=NULL WHERE id=$2", [principal.id, body.runId]);
       await rt.runs.audit(tx, principal.id, "legacy_run_linked", body.runId, {});
     });
@@ -415,10 +654,31 @@ async function marketplaceRequest(rt: PrivateRuntime, principal: Principal, requ
       const licensors = await rt.db.pool.query("SELECT * FROM licensegraph.licensors ORDER BY reviewed_at NULLS FIRST LIMIT 200");
       const offers = await rt.db.pool.query("SELECT * FROM licensegraph.offers WHERE status='pending' LIMIT 200");
       const disputes = await rt.db.pool.query("SELECT * FROM licensegraph.disputes WHERE status IN ('open','escalated') LIMIT 200");
-      const operations = await rt.db.pool.query("SELECT id,run_id,kind,status,stage,error_code FROM licensegraph.operations WHERE status='reconcile' LIMIT 200");
-      return json({ licensors: readable("staff_licensors", licensors.rows, (row) => ({ id: row.id, userId: row.user_id, version: row.version, status: row.status, recipientConfirmed: Boolean(row.recipient_confirmed_at), details: rt.cipher.open(row.sealed, `licensor:${row.id}:${row.version}`) })),
-        offers: readable("staff_offers", offers.rows, (row) => ({ id: row.id, version: row.version, ...rt.cipher.open<object>(row.sealed, `offer:${row.id}:${row.version}`) })),
-        disputes: readable("staff_disputes", disputes.rows, (row) => ({ id: row.id, runId: row.run_id, status: row.status, details: rt.cipher.open(row.sealed, `dispute:${row.id}`) })), operations: operations.rows });
+      const operations = await rt.db.pool.query(
+        "SELECT id,run_id,kind,status,stage,error_code FROM licensegraph.operations WHERE status='reconcile' LIMIT 200",
+      );
+      return json({
+        licensors: readable("staff_licensors", licensors.rows, (row) => ({
+          id: row.id,
+          userId: row.user_id,
+          version: row.version,
+          status: row.status,
+          recipientConfirmed: Boolean(row.recipient_confirmed_at),
+          details: rt.cipher.open(row.sealed, `licensor:${row.id}:${row.version}`),
+        })),
+        offers: readable("staff_offers", offers.rows, (row) => ({
+          id: row.id,
+          version: row.version,
+          ...rt.cipher.open<object>(row.sealed, `offer:${row.id}:${row.version}`),
+        })),
+        disputes: readable("staff_disputes", disputes.rows, (row) => ({
+          id: row.id,
+          runId: row.run_id,
+          status: row.status,
+          details: rt.cipher.open(row.sealed, `dispute:${row.id}`),
+        })),
+        operations: operations.rows,
+      });
     }
     if (id === "licensors" && action && request.method === "POST") {
       const body = Req.LicensorReview.parse(await readJson(request));
@@ -433,14 +693,17 @@ async function marketplaceRequest(rt: PrivateRuntime, principal: Principal, requ
       return json(await resolveDispute(rt, principal, uuid.parse(action), body));
     }
     if (id === "reconcile" && action && request.method === "POST") {
-      const body=Req.Reconciliation.parse(await readJson(request));
-      const {reconcileOperation}=await import("./reconcile");
-      return json(await reconcileOperation(rt,principal,uuid.parse(action),body.providerId,body.reason));
+      const body = Req.Reconciliation.parse(await readJson(request));
+      const { reconcileOperation } = await import("./reconcile");
+      return json(await reconcileOperation(rt, principal, uuid.parse(action), body.providerId, body.reason));
     }
     if (id === "assign-legacy" && request.method === "POST") {
       const body = Req.AssignLegacy.parse(await readJson(request));
       await rt.db.transaction(async (tx) => {
-        const updated = await tx.query("UPDATE licensegraph.runs SET owner_id=$1,legacy_owner_hash=NULL WHERE id=$2 AND owner_id IS NULL", [body.ownerId, body.runId]);
+        const updated = await tx.query("UPDATE licensegraph.runs SET owner_id=$1,legacy_owner_hash=NULL WHERE id=$2 AND owner_id IS NULL", [
+          body.ownerId,
+          body.runId,
+        ]);
         if (!updated.rowCount) throw new ConflictError("Only unassigned imported runs can be assigned.");
         await rt.runs.audit(tx, principal.id, "legacy_owner_assigned", body.runId, { ownerId: body.ownerId, reason: body.reason });
       });
@@ -450,26 +713,40 @@ async function marketplaceRequest(rt: PrivateRuntime, principal: Principal, requ
   throw new AccessError("Marketplace endpoint not found.", 404);
 }
 
-async function resolveDispute(rt: PrivateRuntime, principal: Principal, id: string, body: { decision: "release" | "refund" | "escalate"; reason: string }) {
+async function resolveDispute(
+  rt: PrivateRuntime,
+  principal: Principal,
+  id: string,
+  body: { decision: "release" | "refund" | "escalate"; reason: string },
+) {
   return rt.db.transaction(async (tx) => {
     const ref = (await tx.query("SELECT run_id FROM licensegraph.disputes WHERE id=$1", [id])).rows[0];
     if (!ref) throw new AccessError("Dispute not found.", 404);
     await rt.runs.lock(ref.run_id, tx);
     const dispute = (await tx.query("SELECT * FROM licensegraph.disputes WHERE id=$1 FOR UPDATE", [id])).rows[0];
     const purchase = (await tx.query("SELECT * FROM licensegraph.purchases WHERE run_id=$1 FOR UPDATE", [ref.run_id])).rows[0];
-    if (!["open","escalated"].includes(dispute.status)) throw new ConflictError("This dispute is already resolved.");
-    if (body.decision !== "escalate" && purchase.payout_state !== "held") throw new ConflictError("Funds may already have moved. Reconcile and escalate this case.");
+    if (!["open", "escalated"].includes(dispute.status)) throw new ConflictError("This dispute is already resolved.");
+    if (body.decision !== "escalate" && purchase.payout_state !== "held")
+      throw new ConflictError("Funds may already have moved. Reconcile and escalate this case.");
     const previous = rt.cipher.open<object>(dispute.sealed, `dispute:${id}`);
     const status = body.decision === "release" ? "released" : body.decision === "refund" ? "open" : "escalated";
-    await tx.query("UPDATE licensegraph.disputes SET status=$1,sealed=$2,resolved_by=$3,resolved_at=CASE WHEN $1='released' THEN now() ELSE NULL END WHERE id=$4", [status, rt.cipher.seal({ ...previous, resolution: body }, `dispute:${id}`), principal.id, id]);
+    await tx.query(
+      "UPDATE licensegraph.disputes SET status=$1,sealed=$2,resolved_by=$3,resolved_at=CASE WHEN $1='released' THEN now() ELSE NULL END WHERE id=$4",
+      [status, rt.cipher.seal({ ...previous, resolution: body }, `dispute:${id}`), principal.id, id],
+    );
     let operation: Operation | undefined;
     if (body.decision === "release") {
       await tx.query("UPDATE licensegraph.purchases SET accepted_at=now() WHERE run_id=$1", [ref.run_id]);
       operation = await rt.queue.enqueue(tx, ref.run_id, "payout", "release");
-      await tx.query("UPDATE licensegraph.operations SET status='queued',error_code=NULL,available_at=now() WHERE id=$1 AND status='failed' AND stage='waiting'", [operation.id]);
+      await tx.query(
+        "UPDATE licensegraph.operations SET status='queued',error_code=NULL,available_at=now() WHERE id=$1 AND status='failed' AND stage='waiting'",
+        [operation.id],
+      );
     }
     if (body.decision === "refund") {
-      await tx.query("UPDATE licensegraph.operations SET status='canceled' WHERE run_id=$1 AND kind='payout' AND status='queued'", [ref.run_id]);
+      await tx.query("UPDATE licensegraph.operations SET status='canceled' WHERE run_id=$1 AND kind='payout' AND status='queued'", [
+        ref.run_id,
+      ]);
       operation = await rt.queue.enqueue(tx, ref.run_id, "refund", "initial");
     }
     await rt.runs.audit(tx, principal.id, `dispute_${body.decision}`, ref.run_id, { disputeId: id, reason: body.reason });
@@ -479,11 +756,19 @@ async function resolveDispute(rt: PrivateRuntime, principal: Principal, id: stri
 
 async function receiveWebhook(rt: PrivateRuntime, request: Request) {
   const headers = readWebhookHeaders(request.headers);
-  if (!headers || !process.env.PAYPAL_WEBHOOK_ID || !rt.deps.payments?.verifyWebhookSignature) throw new AccessError("Sandbox webhook verification is unavailable.", 503);
-  const event = z.object({ id: z.string().min(1).max(160), event_type: z.string().min(1).max(160), resource: z.record(z.string(), z.unknown()) }).passthrough().parse(await readJson(request));
-  if (!(await rt.deps.payments.verifyWebhookSignature({ headers, webhookId: process.env.PAYPAL_WEBHOOK_ID, event }))) throw new AccessError("Invalid webhook signature.", 401);
+  if (!headers || !process.env.PAYPAL_WEBHOOK_ID || !rt.deps.payments?.verifyWebhookSignature)
+    throw new AccessError("Sandbox webhook verification is unavailable.", 503);
+  const event = z
+    .object({ id: z.string().min(1).max(160), event_type: z.string().min(1).max(160), resource: z.record(z.string(), z.unknown()) })
+    .passthrough()
+    .parse(await readJson(request));
+  if (!(await rt.deps.payments.verifyWebhookSignature({ headers, webhookId: process.env.PAYPAL_WEBHOOK_ID, event })))
+    throw new AccessError("Invalid webhook signature.", 401);
   return rt.db.transaction(async (tx) => {
-    const inserted = await tx.query("INSERT INTO licensegraph.webhook_deliveries(event_id,sealed) VALUES ($1,$2) ON CONFLICT DO NOTHING RETURNING event_id", [event.id, rt.cipher.seal(event, `webhook:${event.id}`)]);
+    const inserted = await tx.query(
+      "INSERT INTO licensegraph.webhook_deliveries(event_id,sealed) VALUES ($1,$2) ON CONFLICT DO NOTHING RETURNING event_id",
+      [event.id, rt.cipher.seal(event, `webhook:${event.id}`)],
+    );
     if (!inserted.rowCount) return json({ accepted: true, duplicate: true });
     await applyWebhook(rt, tx, event);
     return json({ accepted: true }, 202);
