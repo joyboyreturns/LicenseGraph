@@ -62,7 +62,7 @@ systemd-cgtop -m                                           # memory per service
 - A native **PostgreSQL 18** is already running (`postgresql@18-main`, port 5432, about 15 MB). Use option B above: create the `licensegraph` and `keycloak` databases and roles there, run only Keycloak in Docker, and do not start the bundled `postgres` service (its port 5432 would clash anyway).
 - Ports already taken include 3000, 3005, 3007, 3008, 5432, 8080, 8096 and 8100. Use for this project: web server `PORT=3110` (edit the unit) and Keycloak `8081`.
 - System Node is 20.20 (`/usr/bin/node`); Node 22 exists only under one user's nvm. The release runs on Node 20.20 as well (`engines` allows 20.19 or newer); the CI and local tests ran on Node 22.
-- Nothing has been installed or changed on that machine by this work.
+- Trial on 4 November 2026: the release archive was unpacked to `~/licensegraph` (95 MB, no secrets) and the account-free demo ran there for 60 seconds on Node 22, bound to 127.0.0.1:3110 with no PayPal credentials. It answered `/api/health`, served pages and static files, and settled at about 150 MB. It was not installed as a service and nothing is left running; the unpacked folder remains. The signed-in stack (Keycloak, the host PostgreSQL, the worker) was not started there.
 
 ## Keeping several projects on one machine
 

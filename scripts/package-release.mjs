@@ -32,5 +32,6 @@ if (leaked.length) {
   rmSync("release", { recursive: true, force: true });
   throw new Error(`Refusing to package local secrets or data: ${leaked.join(", ")}`);
 }
-execFileSync("tar", ["-czf", "release.tar.gz", "release"], { stdio: "inherit" });
+// COPYFILE_DISABLE stops macOS tar from adding extended attributes that GNU tar then warns about.
+execFileSync("tar", ["-czf", "release.tar.gz", "release"], { stdio: "inherit", env: { ...process.env, COPYFILE_DISABLE: "1" } });
 console.log("release/ and release.tar.gz are ready.");
