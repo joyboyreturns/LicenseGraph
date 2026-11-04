@@ -25,3 +25,4 @@ graphify-out/
 release/
 release.tar.gz
 .sandbox-run/
+demo-video/

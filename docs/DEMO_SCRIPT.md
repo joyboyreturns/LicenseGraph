@@ -28,6 +28,10 @@ The redesigned desk keeps the brief, current decision and next action together. 
 - **What a negotiation did to the price.** After changing a brief or playing a licensor reply, open the portfolio: the deal ladder draws each negotiation as a ladder of totals, step by step.
 - **Where the money went.** On the portfolio dashboard, the money flow widget draws what buyers paid flowing to each creator, and the assistant adds one from "Add a money flow diagram of what was paid to each creator."
 
+## Automated captioned recording
+
+`scripts/record-demo.mjs` records the primary journey above as a 1920x1080 WebM with on-screen captions and a visible cursor, about 1 minute 55 seconds, no voice-over. In one terminal run `npm run demo -- --port 3400 --fresh`; in another run `node scripts/record-demo.mjs http://localhost:3400 demo-video`. The output is `demo-video/licensegraph-demo.webm` (ignored by git; YouTube accepts WebM). It shows the replayed scenario and the labelled payment simulator, and says so in the captions. It is not a PayPal Sandbox recording.
+
 ## Checklist before you record
 
 Use `docs/READINESS.md` to distinguish the checks already run from the release evidence still needed. The table above describes the intended final recording, not proof that a fresh live Sandbox journey has been recorded.
